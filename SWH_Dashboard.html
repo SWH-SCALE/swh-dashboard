@@ -1446,179 +1446,153 @@ select.input-field option { background: var(--bg2); }
 
 <script>
 // ═══════════════════════════════════════════
-// SWH / TCC COMMAND CENTER
-// Real data seeded from TCC Ads Tracking 2026
-// Period: Dec 1 2025 – Apr 9 2026
-// All figures saved permanently via localStorage
+// SWH COMMAND CENTER — SUPABASE EDITION
+// All data reads/writes to Supabase database
+// Everyone on the team sees the same live data
 // ═══════════════════════════════════════════
 
-const AED_RATE    = 3.6725;
-const STORAGE_KEY = 'swh_deals_v2';
-const LOG_KEY     = 'swh_daily_v2';
-const SETTINGS_KEY= 'swh_settings_v2';
+const SUPABASE_URL = 'https://qstlyvauppjkdiwpgtql.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_czRZf2kLIUZQdBY5nlO3zw_cm9xbmPE';
+const AED_RATE = 3.6725;
 
-// ── Default targets (editable in Settings) ──
+// ── Supabase API helper ─────────────────────
+async function sbFetch(path, options={}) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    ...options,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': options.prefer || 'return=representation',
+      ...(options.headers||{}),
+    },
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
+}
+
+async function getDeals() {
+  return await sbFetch('deals?order=date.desc');
+}
+async function getLog() {
+  return await sbFetch('daily_log?order=date.desc');
+}
+async function insertDeal(deal) {
+  return await sbFetch('deals', {
+    method: 'POST',
+    body: JSON.stringify(deal),
+  });
+}
+async function insertLog(entry) {
+  return await sbFetch('daily_log', {
+    method: 'POST',
+    prefer: 'resolution=merge-duplicates,return=representation',
+    headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify(entry),
+  });
+}
+async function deleteRow(table, id) {
+  return await sbFetch(table + '?id=eq.' + id, { method: 'DELETE', prefer: '' });
+}
+
+// ── Default settings stored locally ─────────
+const SETTINGS_KEY = 'swh_settings_v3';
 const DEFAULT_SETTINGS = {
-  tgt_cpl: 150, tgt_cpbc: 500, tgt_showup: 70,
-  tgt_cr: 25, tgt_roas: 2.0, aed_rate: 3.6725,
+  tgt_cpl:150, tgt_cpbc:500, tgt_showup:70,
+  tgt_cr:25, tgt_roas:2.0, aed_rate:3.6725,
 };
-
 function getSettings() {
   try { return Object.assign({}, DEFAULT_SETTINGS, JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')); }
   catch(e) { return {...DEFAULT_SETTINGS}; }
 }
 function saveSettingsData(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
 
-// ── REAL DEALS from TCC sheet ───────────────
-// HT Cash: Elliot $1k, Saff $10k, Chanique $3k, Sion $5k, Don $2k
-// Contract values where known
+// ── Real TCC seed data ───────────────────────
 const SEED_DEALS = [
-  {id:'d1',name:'Elliot',        date:'2026-01-15',usd:1000, contract:10000,source:'Ads',closer:'Frankie',setter:'Salima', notes:'$9k balance owed'},
-  {id:'d2',name:'Saff Hassan',   date:'2026-02-20',usd:10000,contract:10000,source:'Ads',closer:'Frankie',setter:'Salima', notes:'Paid in full'},
-  {id:'d3',name:'Chanique',      date:'2026-02-28',usd:3000, contract:10000,source:'Ads',closer:'Mehdi',  setter:'Salima', notes:'Balance owed'},
-  {id:'d4',name:'Sion Monty',    date:'2026-03-10',usd:5000, contract:10000,source:'Ads',closer:'Mehdi',  setter:'Salima', notes:'Balance owed'},
-  {id:'d5',name:'Don',           date:'2026-03-20',usd:2000, contract:10000,source:'Ads',closer:'Mehdi',  setter:'Other',  notes:'Balance owed'},
-  {id:'d6',name:'Pipeline Deal 1',date:'2026-03-25',usd:0,   contract:10000,source:'Ads',closer:'Frankie',setter:'Salima', notes:'Offered – not signed'},
-  {id:'d7',name:'Pipeline Deal 2',date:'2026-04-01',usd:0,   contract:10000,source:'Ads',closer:'Frankie',setter:'Salima', notes:'Offered – not signed'},
+  {name:'Elliot',        date:'2026-01-15',usd:1000, contract:10000,source:'Ads',closer:'Frankie',setter:'Salima', notes:'$9k balance owed'},
+  {name:'Saff Hassan',   date:'2026-02-20',usd:10000,contract:10000,source:'Ads',closer:'Frankie',setter:'Salima', notes:'Paid in full'},
+  {name:'Chanique',      date:'2026-02-28',usd:3000, contract:10000,source:'Ads',closer:'Mehdi',  setter:'Salima', notes:'Balance owed'},
+  {name:'Sion Monty',    date:'2026-03-10',usd:5000, contract:10000,source:'Ads',closer:'Mehdi',  setter:'Salima', notes:'Balance owed'},
+  {name:'Don',           date:'2026-03-20',usd:2000, contract:10000,source:'Ads',closer:'Mehdi',  setter:'Other',  notes:'Balance owed'},
 ];
-
-// ── REAL DAILY LOG seeded from ad metrics ───
-// Total spend $25,677.90 across ~130 days (Dec–Apr)
-// Spread across weeks with real weekly totals
 const SEED_LOG = [
-  // Most recent 7 days seeded with representative daily figures
-  {id:'l1',date:'2026-04-03',spend:198,leads:2,booked:0,shows:0,noshows:0,closes:0,cash:0,   lt:54, source:'Meta Ads',closer:'',       notes:''},
-  {id:'l2',date:'2026-04-04',spend:205,leads:1,booked:1,shows:0,noshows:0,closes:0,cash:0,   lt:27, source:'Meta Ads',closer:'',       notes:''},
-  {id:'l3',date:'2026-04-05',spend:189,leads:2,booked:1,shows:1,noshows:0,closes:0,cash:0,   lt:81, source:'Meta Ads',closer:'Mehdi',  notes:'No close'},
-  {id:'l4',date:'2026-04-06',spend:212,leads:1,booked:0,shows:0,noshows:0,closes:0,cash:0,   lt:54, source:'Meta Ads',closer:'',       notes:''},
-  {id:'l5',date:'2026-04-07',spend:197,leads:2,booked:1,shows:1,noshows:0,closes:0,cash:0,   lt:27, source:'Meta Ads',closer:'Frankie',notes:''},
-  {id:'l6',date:'2026-04-08',spend:221,leads:1,booked:1,shows:0,noshows:1,closes:0,cash:0,   lt:108,source:'Meta Ads',closer:'',       notes:'No-show'},
-  {id:'l7',date:'2026-04-09',spend:178,leads:1,booked:0,shows:0,noshows:0,closes:0,cash:0,   lt:27, source:'Meta Ads',closer:'',       notes:''},
+  {date:'2026-04-03',spend:198,leads:2,booked:0,shows:0,noshows:0,closes:0,cash:0,lt:54, source:'Meta Ads',closer:'',notes:''},
+  {date:'2026-04-04',spend:205,leads:1,booked:1,shows:0,noshows:0,closes:0,cash:0,lt:27, source:'Meta Ads',closer:'',notes:''},
+  {date:'2026-04-05',spend:189,leads:2,booked:1,shows:1,noshows:0,closes:0,cash:0,lt:81, source:'Meta Ads',closer:'Mehdi',notes:'No close'},
+  {date:'2026-04-06',spend:212,leads:1,booked:0,shows:0,noshows:0,closes:0,cash:0,lt:54, source:'Meta Ads',closer:'',notes:''},
+  {date:'2026-04-07',spend:197,leads:2,booked:1,shows:1,noshows:0,closes:0,cash:0,lt:27, source:'Meta Ads',closer:'Frankie',notes:''},
+  {date:'2026-04-08',spend:221,leads:1,booked:1,shows:0,noshows:1,closes:0,cash:0,lt:108,source:'Meta Ads',closer:'',notes:'No-show'},
+  {date:'2026-04-09',spend:178,leads:1,booked:0,shows:0,noshows:0,closes:0,cash:0,lt:27, source:'Meta Ads',closer:'',notes:''},
 ];
 
-// ── Cumulative totals (all-time from sheet) ─
-// These are injected as a synthetic "all-time" log entry
-// so period filters work correctly
-const ALL_TIME_TOTALS = {
-  spend: 25677.90, leads: 195, booked: 54, shows: 17,
-  noshows: 5, closes: 7, lt: 3564, cash: 21000,
+// ── Seed database on first load ──────────────
+const SEEDED_KEY = 'swh_seeded_v1';
+async function seedIfEmpty() {
+  if (localStorage.getItem(SEEDED_KEY)) return;
+  try {
+    const deals = await getDeals();
+    if (deals.length === 0) {
+      for (const d of SEED_DEALS) await insertDeal(d);
+    }
+    const log = await getLog();
+    if (log.length === 0) {
+      for (const l of SEED_LOG) await insertLog(l);
+    }
+    localStorage.setItem(SEEDED_KEY, '1');
+  } catch(e) { console.log('Seed error:', e); }
+}
+
+// ── All-time verified totals from spreadsheet ─
+const ALL_TIME = {
+  spend:25677.90, leads:195, booked:54, shows:17,
+  noshows:5, closes:7, lt:3564, cash:21000,
 };
 
-function loadDeals() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) { try { return JSON.parse(raw); } catch(e){} }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_DEALS));
-  return [...SEED_DEALS];
-}
-function saveDeals(arr) { localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }
-
-function loadLog() {
-  const raw = localStorage.getItem(LOG_KEY);
-  if (raw) { try { return JSON.parse(raw); } catch(e){} }
-  localStorage.setItem(LOG_KEY, JSON.stringify(SEED_LOG));
-  return [...SEED_LOG];
-}
-function saveLog(arr) { localStorage.setItem(LOG_KEY, JSON.stringify(arr)); }
-
-// ── Compute metrics for a given period ──────
-function computeMetrics(period) {
-  const deals = loadDeals();
-  const log   = loadLog();
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-
-  // For 'all' period, use the real verified totals directly
-  if (period === 'all') {
-    const allDeals = deals.filter(d => d.usd > 0);
-    const htCash   = allDeals.reduce((s,d) => s+(d.usd||0), 0);
-    const htAds    = allDeals.filter(d=>d.source==='Ads').reduce((s,d)=>s+(d.usd||0),0);
-    const htOrg    = allDeals.filter(d=>d.source!=='Ads').reduce((s,d)=>s+(d.usd||0),0);
-    const contractTotal = deals.filter(d=>d.contract>0).reduce((s,d)=>s+(d.contract||0),0);
-    return buildMetrics(
-      ALL_TIME_TOTALS.spend, ALL_TIME_TOTALS.leads, ALL_TIME_TOTALS.booked,
-      ALL_TIME_TOTALS.shows, ALL_TIME_TOTALS.noshows, ALL_TIME_TOTALS.closes,
-      ALL_TIME_TOTALS.lt, htCash, htAds, htOrg, deals, contractTotal
-    );
-  }
-
-  function inPeriod(dateStr) {
-    const d = new Date(dateStr);
-    if (period==='today') return dateStr === todayStr;
-    if (period==='7d') { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
-    if (period==='mtd') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
-    if (period==='lm') { const l=new Date(today); l.setMonth(l.getMonth()-1); return d.getFullYear()===l.getFullYear()&&d.getMonth()===l.getMonth(); }
-    return true;
-  }
-
-  const pLog   = log.filter(l=>inPeriod(l.date));
-  const pDeals = deals.filter(d=>inPeriod(d.date)&&d.usd>0);
-
-  const spend  = pLog.reduce((s,l)=>s+(l.spend||0),0);
-  const leads  = pLog.reduce((s,l)=>s+(l.leads||0),0);
-  const booked = pLog.reduce((s,l)=>s+(l.booked||0),0);
-  const shows  = pLog.reduce((s,l)=>s+(l.shows||0),0);
-  const noshows= pLog.reduce((s,l)=>s+(l.noshows||0),0);
-  const closes = pLog.reduce((s,l)=>s+(l.closes||0),0);
-  const lt     = pLog.reduce((s,l)=>s+(l.lt||0),0);
-  const htCash = pDeals.reduce((s,d)=>s+(d.usd||0),0);
-  const htAds  = pDeals.filter(d=>d.source==='Ads').reduce((s,d)=>s+(d.usd||0),0);
-  const htOrg  = pDeals.filter(d=>d.source!=='Ads').reduce((s,d)=>s+(d.usd||0),0);
-  const contractTotal = pDeals.reduce((s,d)=>s+(d.contract||0),0);
-
-  return buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,pDeals,contractTotal);
-}
-
-function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,dealsArr,contractTotal) {
-  const deals = loadDeals();
-  const log   = loadLog();
-  const today = new Date();
-  const frankieDeals = dealsArr.filter(d=>d.closer==='Frankie');
-  const mehdiDeals   = dealsArr.filter(d=>d.closer==='Mehdi');
-  const frankieCash  = frankieDeals.reduce((s,d)=>s+(d.usd||0),0);
-  const mehdiCash    = mehdiDeals.reduce((s,d)=>s+(d.usd||0),0);
-  const frankieShows = log.reduce((s,l)=>s+(l.closer==='Frankie'?(l.shows||0):0),0);
-  const mehdiShows   = log.reduce((s,l)=>s+(l.closer==='Mehdi'?(l.shows||0):0),0);
-  const adsBooked    = log.reduce((s,l)=>s+((l.source||'').toLowerCase().includes('ads')?(l.booked||0):0),0);
-  const totalCash    = htCash + lt;
-  const pipeline     = deals.filter(d=>d.usd===0&&d.contract>0).reduce((s,d)=>s+(d.contract||0),0);
-
-  const last7 = [];
-  for(let i=6;i>=0;i--){
-    const d=new Date(today); d.setDate(d.getDate()-i);
-    const ds=d.toISOString().split('T')[0];
-    const dl=log.filter(l=>l.date===ds);
-    const dd=deals.filter(d2=>d2.date===ds&&d2.usd>0);
-    last7.push({
-      label:d.toLocaleDateString('en-GB',{month:'short',day:'numeric'}),
-      spend:dl.reduce((s,l)=>s+(l.spend||0),0),
-      revenue:dd.reduce((s,d2)=>s+(d2.usd||0),0)+dl.reduce((s,l)=>s+(l.lt||0),0),
-    });
-  }
-
-  return { spend,leads,booked,shows,noshows,closes,lt,
-    cash:totalCash, htCash, htAds, htOrg, contractTotal, pipeline,
-    frankieDeals:frankieDeals.length, mehdiDeals:mehdiDeals.length,
-    frankieCash, mehdiCash, frankieShows, mehdiShows,
-    adsBookedCalls:adsBooked, orgBookedCalls:booked-adsBooked,
-    rawDeals:dealsArr,
-    trend:{labels:last7.map(d=>d.label),spend:last7.map(d=>d.spend),revenue:last7.map(d=>d.revenue)},
-  };
-}
-
 // ═══════════════════════════════════════════
-// STATE & NAV
+// STATE
 // ═══════════════════════════════════════════
 let currentPeriod = 'all';
 let chartTrend=null, chartSource=null, chartCloser=null, chartCallsTrend=null;
+let DB_DEALS = [];
+let DB_LOG   = [];
+let loading  = false;
 
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+function set(id,val){const e=document.getElementById(id);if(e)e.textContent=val;}
+function badge(id,cls){const e=document.getElementById(id);if(e)e.className='kpi-badge '+cls;}
+function fmt(n,p='$'){if(!n||isNaN(n))return p+'0';if(n>=1000)return p+(n/1000).toFixed(1)+'k';return p+Math.round(n).toLocaleString();}
+function fmtFull(n,p='$'){return p+Math.round(n||0).toLocaleString();}
+function fmtDec(n,p='$'){return p+(n||0).toFixed(2);}
+function pct(n,d){return d?Math.round(n/d*100)+'%':'0%';}
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.style.background = type==='error' ? '#FF5252' : '#00F5A8';
+  t.style.color = type==='error' ? '#fff' : '#0D1117';
+  t.style.opacity = '1';
+  t.style.transform = 'translateY(0)';
+  setTimeout(() => { t.style.opacity='0'; t.style.transform='translateY(10px)'; }, 3000);
+}
+
+// ═══════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════
 const PAGE_TITLES = {
-  exec:      ['Executive Dashboard',   'TCC · Dec 2025 – Apr 2026 · USD'],
+  exec:      ['Executive Dashboard',   'TCC · Dec 2025 – present · USD · live data'],
   calls:     ['Call Tracking',         'Booked calls · show-ups · no-shows'],
   sales:     ['Sales & Revenue',       'HT sales · LT revenue · pipeline'],
-  closers:   ['Closer Performance',    'Frankie vs Mehdi · attribution'],
-  lowticket: ['Low-Ticket',            '$27 course · 132 purchases · GHL'],
-  daily:     ['Daily Input',           'Log today\'s numbers · 2 minutes'],
-  deals:     ['Add New Deal',          'Log a closed deal · auto-updates all metrics'],
+  closers:   ['Closer Performance',    'Frankie vs Mehdi · live attribution'],
+  lowticket: ['Low-Ticket',            '$27 course · GHL purchases'],
+  daily:     ['Daily Input',           'Log today\'s numbers · saves instantly for everyone'],
+  deals:     ['Add New Deal',          'Log a closed deal · updates all metrics live'],
   slack:     ['Slack Reports',         'Daily & weekly summaries'],
   settings:  ['Settings',              'Targets · rates · thresholds'],
 };
@@ -1647,11 +1621,10 @@ function setPeriod(p,btn) {
   renderAll();
 }
 
-// ── Update period buttons to include All Time ──
 function initPeriodBtns() {
-  const ps = document.getElementById('period-switcher');
-  if (!ps) return;
-  ps.innerHTML = `
+  const ps=document.getElementById('period-switcher');
+  if(!ps)return;
+  ps.innerHTML=`
     <button class="period-btn" onclick="setPeriod('today',this)">Today</button>
     <button class="period-btn" onclick="setPeriod('7d',this)">7 Days</button>
     <button class="period-btn" onclick="setPeriod('mtd',this)">MTD</button>
@@ -1661,26 +1634,117 @@ function initPeriodBtns() {
 }
 
 // ═══════════════════════════════════════════
-// HELPERS
+// COMPUTE METRICS
 // ═══════════════════════════════════════════
-function set(id,val){const e=document.getElementById(id);if(e)e.textContent=val;}
-function badge(id,cls){const e=document.getElementById(id);if(e)e.className='kpi-badge '+cls;}
-function fmt(n,p='$'){if(!n||isNaN(n))return p+'0';if(n>=1000)return p+(n/1000).toFixed(1)+'k';return p+Math.round(n).toLocaleString();}
-function fmtFull(n,p='$'){return p+Math.round(n||0).toLocaleString();}
-function fmtDec(n,p='$'){return p+(n||0).toFixed(2);}
-function pct(n,d){return d?Math.round(n/d*100)+'%':'0%';}
-function uid(){return 'id'+Date.now()+Math.random().toString(36).slice(2,6);}
+function computeMetrics(period) {
+  const deals = DB_DEALS;
+  const log   = DB_LOG;
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+
+  if (period === 'all') {
+    const htCash = deals.filter(d=>d.usd>0).reduce((s,d)=>s+(d.usd||0),0);
+    const htAds  = deals.filter(d=>d.source==='Ads'&&d.usd>0).reduce((s,d)=>s+(d.usd||0),0);
+    const htOrg  = deals.filter(d=>d.source!=='Ads'&&d.usd>0).reduce((s,d)=>s+(d.usd||0),0);
+    const contractTotal = deals.reduce((s,d)=>s+(d.contract||0),0);
+    const pipeline = deals.filter(d=>!d.usd||d.usd===0).reduce((s,d)=>s+(d.contract||0),0);
+    return buildMetrics(
+      ALL_TIME.spend, ALL_TIME.leads, ALL_TIME.booked,
+      ALL_TIME.shows, ALL_TIME.noshows, ALL_TIME.closes,
+      ALL_TIME.lt, htCash, htAds, htOrg,
+      deals.filter(d=>d.usd>0), contractTotal, pipeline, deals
+    );
+  }
+
+  function inPeriod(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (period==='today') return dateStr===todayStr;
+    if (period==='7d') { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
+    if (period==='mtd') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
+    if (period==='lm') { const l=new Date(today); l.setMonth(l.getMonth()-1); return d.getFullYear()===l.getFullYear()&&d.getMonth()===l.getMonth(); }
+    return true;
+  }
+
+  const pLog   = log.filter(l=>inPeriod(l.date));
+  const pDeals = deals.filter(d=>inPeriod(d.date)&&d.usd>0);
+
+  const spend  = pLog.reduce((s,l)=>s+(l.spend||0),0);
+  const leads  = pLog.reduce((s,l)=>s+(l.leads||0),0);
+  const booked = pLog.reduce((s,l)=>s+(l.booked||0),0);
+  const shows  = pLog.reduce((s,l)=>s+(l.shows||0),0);
+  const noshows= pLog.reduce((s,l)=>s+(l.noshows||0),0);
+  const closes = pLog.reduce((s,l)=>s+(l.closes||0),0);
+  const lt     = pLog.reduce((s,l)=>s+(l.lt||0),0);
+  const htCash = pDeals.reduce((s,d)=>s+(d.usd||0),0);
+  const htAds  = pDeals.filter(d=>d.source==='Ads').reduce((s,d)=>s+(d.usd||0),0);
+  const htOrg  = pDeals.filter(d=>d.source!=='Ads').reduce((s,d)=>s+(d.usd||0),0);
+  const contractTotal = pDeals.reduce((s,d)=>s+(d.contract||0),0);
+  const pipeline = deals.filter(d=>(!d.usd||d.usd===0)&&inPeriod(d.date)).reduce((s,d)=>s+(d.contract||0),0);
+
+  return buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,pDeals,contractTotal,pipeline,deals);
+}
+
+function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,dealsArr,contractTotal,pipeline,allDeals) {
+  const frankieDeals = dealsArr.filter(d=>d.closer==='Frankie');
+  const mehdiDeals   = dealsArr.filter(d=>d.closer==='Mehdi');
+  const frankieCash  = frankieDeals.reduce((s,d)=>s+(d.usd||0),0);
+  const mehdiCash    = mehdiDeals.reduce((s,d)=>s+(d.usd||0),0);
+  const log = DB_LOG;
+  const frankieShows = log.reduce((s,l)=>s+(l.closer==='Frankie'?(l.shows||0):0),0);
+  const mehdiShows   = log.reduce((s,l)=>s+(l.closer==='Mehdi'?(l.shows||0):0),0);
+  const adsBooked    = log.reduce((s,l)=>s+((l.source||'').toLowerCase().includes('ads')?(l.booked||0):0),0);
+  const totalCash    = htCash + lt;
+  const today = new Date();
+  const last7=[];
+  for(let i=6;i>=0;i--){
+    const d=new Date(today); d.setDate(d.getDate()-i);
+    const ds=d.toISOString().split('T')[0];
+    const dl=log.filter(l=>l.date===ds);
+    const dd=(allDeals||dealsArr).filter(d2=>d2.date===ds&&d2.usd>0);
+    last7.push({
+      label:d.toLocaleDateString('en-GB',{month:'short',day:'numeric'}),
+      spend:dl.reduce((s,l)=>s+(l.spend||0),0),
+      revenue:dd.reduce((s,d2)=>s+(d2.usd||0),0)+dl.reduce((s,l)=>s+(l.lt||0),0),
+    });
+  }
+  return {
+    spend,leads,booked,shows,noshows,closes,lt,
+    cash:totalCash,htCash,htAds,htOrg,contractTotal,pipeline:pipeline||0,
+    frankieDeals:frankieDeals.length,mehdiDeals:mehdiDeals.length,
+    frankieCash,mehdiCash,frankieShows,mehdiShows,
+    adsBookedCalls:adsBooked,orgBookedCalls:booked-adsBooked,
+    rawDeals:dealsArr,
+    trend:{labels:last7.map(d=>d.label),spend:last7.map(d=>d.spend),revenue:last7.map(d=>d.revenue)},
+  };
+}
 
 // ═══════════════════════════════════════════
 // RENDER ALL
 // ═══════════════════════════════════════════
+async function loadAndRender() {
+  showLoading(true);
+  try {
+    [DB_DEALS, DB_LOG] = await Promise.all([getDeals(), getLog()]);
+    renderAll();
+  } catch(e) {
+    console.error(e);
+    showToast('Connection error — check your internet', 'error');
+  }
+  showLoading(false);
+}
+
+function showLoading(on) {
+  const el = document.getElementById('last-sync');
+  if (el) el.textContent = on ? 'Loading...' : 'Updated: '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+}
+
 function renderAll() {
   const d=computeMetrics(currentPeriod);
   renderExec(d);
   renderCallsTab(d);
   renderLowTicket(d);
   renderSlack(d);
-  document.getElementById('last-sync').textContent='Updated: '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 }
 
 // ═══════════════════════════════════════════
@@ -1691,15 +1755,13 @@ function renderExec(d) {
   const cpl    = d.leads  ? d.spend/d.leads   : 0;
   const cpbc   = d.booked ? d.spend/d.booked  : 0;
   const showR  = d.booked ? d.shows/d.booked  : 0;
-  const cr     = d.shows  ? d.closes/d.shows  : 0;  // note: closes from log
-  const htCR   = d.shows  ? d.rawDeals.length/d.shows : 0; // deals / shows
+  const cr     = d.shows  ? d.rawDeals.length/d.shows : 0;
   const roas   = d.spend  ? d.cash/d.spend    : 0;
   const roasCon= d.spend  ? d.contractTotal/d.spend : 0;
   const cac    = d.rawDeals.length ? d.spend/d.rawDeals.length : 0;
 
-  // Row 1 — spend + acquisition
   set('k-spend', fmtDec(d.spend));
-  set('k-spend-delta', currentPeriod==='all'?'Dec 2025 – Apr 2026':'this period');
+  set('k-spend-delta', currentPeriod==='all'?'Dec 2025 – present':'this period');
   badge('k-spend-delta','neutral');
 
   set('k-leads', d.leads);
@@ -1718,7 +1780,6 @@ function renderExec(d) {
   set('k-cpbc-flag', cpbc>0?(cpbc<=S.tgt_cpbc?'✓ under $'+S.tgt_cpbc:'target $'+S.tgt_cpbc):'—');
   badge('k-cpbc-flag', cpbc<=S.tgt_cpbc&&cpbc>0?'up':cpbc>0?'warn':'neutral');
 
-  // Row 2 — conversion + revenue
   set('k-showup', d.booked?Math.round(showR*100)+'%':'—');
   const showOk=showR>=(S.tgt_showup/100)&&d.booked>0;
   set('k-showup-flag', d.booked?(showOk?'✓ healthy':'target '+S.tgt_showup+'%'):'—');
@@ -1734,11 +1795,9 @@ function renderExec(d) {
   badge('k-cash-split', d.cash>0?'up':'neutral');
 
   set('k-cac', d.rawDeals.length?fmtFull(cac):'—');
-  badge('k-cac-flag', cac>0&&cac<=3000?'up':cac>0?'warn':'neutral');
   set('k-cac-flag', cac>0?(cac<=3000?'✓ under $3k':'review – over $3k'):'—');
+  badge('k-cac-flag', cac>0&&cac<=3000?'up':cac>0?'warn':'neutral');
 
-  // ROAS — show both cash and contract
-  const roasStr=d.spend?(roas.toFixed(2)+'x cash'):'—';
   set('k-roas', d.spend?roas.toFixed(2)+'x':'—');
   set('k-roas-flag', d.spend?('contract '+roasCon.toFixed(1)+'x'):'—');
   badge('k-roas-flag', roas>=S.tgt_roas?'up':roas>=1?'warn':'down');
@@ -1746,14 +1805,15 @@ function renderExec(d) {
   renderFunnel(d);
   renderTrendChart(d);
   renderSourceChart(d);
-  renderFlags(d,{cpl,cpbc,showupRate:showR,cr:htCR,roas,cac,roasCon});
-  renderScale(d,{cpl,cpbc,showupRate:showR,cr:htCR,roas,roasCon});
+  renderFlags(d,{cpl,cpbc,showupRate:showR,cr,roas,cac,roasCon});
+  renderScale(d,{cpl,cpbc,showupRate:showR,cr,roas,roasCon});
 }
 
 function renderFunnel(d) {
+  const ltCount = d.lt>0?Math.round(d.lt/27):0;
   const steps=[
     {label:'Leads generated',val:d.leads,  color:'#5B9CF6',pct:100},
-    {label:'→ LT purchased',  val:d.lt>0?Math.round(d.lt/27):0,color:'#FFB742',pct:d.leads?Math.round((d.lt>0?d.lt/27:0)/d.leads*100):0},
+    {label:'→ LT purchased',  val:ltCount, color:'#FFB742',pct:d.leads?Math.round(ltCount/d.leads*100):0},
     {label:'→ Booked calls',  val:d.booked,color:'#00F5A8',pct:d.leads?Math.round(d.booked/d.leads*100):0},
     {label:'→ Show-ups',      val:d.shows, color:'#B794F4',pct:d.booked?Math.round(d.shows/d.booked*100):0},
     {label:'→ HT closes',     val:d.rawDeals.length,color:'#FF9F43',pct:d.shows?Math.round(d.rawDeals.length/d.shows*100):0},
@@ -1783,7 +1843,7 @@ function renderTrendChart(d) {
 function renderSourceChart(d) {
   if(chartSource)chartSource.destroy();
   const ctx=document.getElementById('chart-source');if(!ctx)return;
-  chartSource=new Chart(ctx,{type:'doughnut',data:{labels:['Ads','Low-Ticket'],datasets:[{
+  chartSource=new Chart(ctx,{type:'doughnut',data:{labels:['HT Ads','Low-Ticket'],datasets:[{
     data:[d.htAds||0,d.lt||0],
     backgroundColor:['rgba(91,156,246,0.7)','rgba(255,183,66,0.7)'],
     borderColor:['#5B9CF6','#FFB742'],borderWidth:1.5,
@@ -1803,29 +1863,29 @@ function renderFlags(d,m) {
   const S=getSettings();
   const flags=[
     {cls:m.roas>=1?'warn':'stop',
-     title:'ROAS (cash basis): '+m.roas.toFixed(2)+'x',
-     text:m.roas>=1?'Slight loss on cash. Contract ROAS is '+m.roasCon.toFixed(1)+'x — profitable when clients pay.':'Cash ROAS below 1x. Total cash: $'+d.cash.toLocaleString()+' vs $'+Math.round(d.spend).toLocaleString()+' spend.'},
+     title:'ROAS (cash): '+m.roas.toFixed(2)+'x',
+     text:m.roas>=1?'Slight loss on cash. Contract ROAS is '+m.roasCon.toFixed(1)+'x — profitable when clients pay in full.':'Cash ROAS below 1x. $'+Math.round(d.spend).toLocaleString()+' spend vs $'+d.cash.toLocaleString()+' collected.'},
     {cls:m.showupRate>=0.70?'go':'warn',
-     title:m.showupRate>=0.70?'Show-up rate strong':'Show-up rate needs work',
+     title:m.showupRate>=0.70?'Show-up rate strong':'Show-up needs work',
      text:d.booked?Math.round(m.showupRate*100)+'% of booked calls showing up. Target 70%+.':'No call data for this period.'},
     {cls:m.cr>=0.25?'go':'warn',
-     title:m.cr>=0.25?'Close rate strong at '+Math.round(m.cr*100)+'%':'Close rate below 25%',
-     text:d.shows?Math.round(m.cr*100)+'% of shows close. Benchmark is 25%+.':'No show data yet.'},
-    {cls:m.cpl<=150?'go':'warn',
-     title:m.cpl<=150?'CPL within target':'CPL above $150 target',
-     text:d.leads?'Cost per lead: $'+Math.round(m.cpl)+'. Benchmark <$150.':'Log spend + leads to calculate.'},
+     title:'Close rate: '+Math.round(m.cr*100)+'%',
+     text:d.shows?Math.round(m.cr*100)+'% of shows close. Benchmark 25%+.':'No show data yet.'},
+    {cls:m.cpl<=S.tgt_cpl&&m.cpl>0?'go':'warn',
+     title:m.cpl<=S.tgt_cpl&&m.cpl>0?'CPL within target':'CPL status',
+     text:m.cpl>0?'Cost per lead: $'+Math.round(m.cpl)+'. Target <$'+S.tgt_cpl+'.':'Log spend + leads to calculate CPL.'},
     {cls:d.pipeline>0?'info':'neutral',
-     title:'Pipeline value: $'+((d.pipeline||0).toLocaleString()),
-     text:'Unsigned contracts in pipeline. If all close: ROAS would be '+(d.spend?(((d.contractTotal+(d.pipeline||0))/d.spend).toFixed(1)+'x'):'—')+'.'},
+     title:'Pipeline: $'+(d.pipeline||0).toLocaleString(),
+     text:'If all pipeline closes, total ROAS would be '+(d.spend?((d.contractTotal+(d.pipeline||0))/d.spend).toFixed(1)+'x':'—')+'.'},
     {cls:'info',
-     title:'Purchase → call booking: 40.9%',
-     text:'Key bottleneck. Add OTO call-booking page after $27 purchase to push above 40%.'},
-    {cls:m.cpbc<=500?'go':'warn',
-     title:m.cpbc<=500?'CPBC under $500 target':'CPBC above $500',
-     text:d.booked?'Cost per booked call: $'+Math.round(m.cpbc)+'.':'No call data.'},
+     title:'Key bottleneck identified',
+     text:'Purchase → call booking at 40.9%. Add OTO call-booking page after $27 purchase to fix.'},
+    {cls:m.cpbc<=S.tgt_cpbc&&m.cpbc>0?'go':'warn',
+     title:'CPBC: $'+Math.round(m.cpbc||0),
+     text:m.cpbc>0?'Cost per booked call vs $'+S.tgt_cpbc+' target.':'Log calls to calculate.'},
     {cls:m.roas>=1&&m.showupRate>=0.70&&m.cr>=0.25?'go':'warn',
-     title:m.roas>=1&&m.showupRate>=0.70&&m.cr>=0.25?'Core funnel is healthy':'Fix ROAS before scaling',
-     text:m.roas>=1&&m.showupRate>=0.70&&m.cr>=0.25?'Show-up and close rate are strong. Focus on increasing spend to scale.':'Get cash ROAS above 1x before significantly increasing spend.'},
+     title:m.roas>=1&&m.showupRate>=0.70&&m.cr>=0.25?'Core funnel healthy':'Fix before scaling',
+     text:m.roas>=1&&m.showupRate>=0.70&&m.cr>=0.25?'Show-up and close rate are strong. Focus on scaling spend.':'Get cash ROAS above 1x before significantly increasing budget.'},
   ];
   document.getElementById('flag-grid').innerHTML=flags.map(f=>`
     <div class="flag-card ${f.cls}">
@@ -1837,12 +1897,12 @@ function renderFlags(d,m) {
 function renderScale(d,m) {
   const S=getSettings();
   const checks=[
-    {label:'ROAS ≥ '+S.tgt_roas+'x (cash)',   ok:m.roas>=S.tgt_roas,    val:d.spend?m.roas.toFixed(2)+'x':'—'},
-    {label:'Contract ROAS ≥ 3x',              ok:m.roasCon>=3,           val:d.spend?m.roasCon.toFixed(1)+'x':'—'},
-    {label:'Show-up ≥ '+S.tgt_showup+'%',     ok:m.showupRate>=(S.tgt_showup/100)&&d.booked>0, val:d.booked?Math.round(m.showupRate*100)+'%':'—'},
-    {label:'Close rate ≥ '+S.tgt_cr+'%',      ok:m.cr>=(S.tgt_cr/100)&&d.shows>0,             val:d.shows?Math.round(m.cr*100)+'%':'—'},
-    {label:'CPL ≤ $'+S.tgt_cpl,               ok:m.cpl<=S.tgt_cpl&&m.cpl>0,                  val:m.cpl>0?'$'+Math.round(m.cpl):'—'},
-    {label:'CPBC ≤ $'+S.tgt_cpbc,             ok:m.cpbc<=S.tgt_cpbc&&m.cpbc>0,                val:m.cpbc>0?'$'+Math.round(m.cpbc):'—'},
+    {label:'ROAS ≥ '+S.tgt_roas+'x (cash)',   ok:m.roas>=S.tgt_roas,          val:d.spend?m.roas.toFixed(2)+'x':'—'},
+    {label:'Contract ROAS ≥ 3x',              ok:m.roasCon>=3,                 val:d.spend?m.roasCon.toFixed(1)+'x':'—'},
+    {label:'Show-up ≥ '+S.tgt_showup+'%',     ok:m.showupRate>=(S.tgt_showup/100)&&d.booked>0,val:d.booked?Math.round(m.showupRate*100)+'%':'—'},
+    {label:'Close rate ≥ '+S.tgt_cr+'%',      ok:m.cr>=(S.tgt_cr/100)&&d.shows>0,val:d.shows?Math.round(m.cr*100)+'%':'—'},
+    {label:'CPL ≤ $'+S.tgt_cpl,               ok:m.cpl<=S.tgt_cpl&&m.cpl>0,  val:m.cpl>0?'$'+Math.round(m.cpl):'—'},
+    {label:'CPBC ≤ $'+S.tgt_cpbc,             ok:m.cpbc<=S.tgt_cpbc&&m.cpbc>0,val:m.cpbc>0?'$'+Math.round(m.cpbc):'—'},
   ];
   const score=checks.filter(c=>c.ok).length;
   set('scale-score',score);
@@ -1852,11 +1912,7 @@ function renderScale(d,m) {
   ring.setAttribute('stroke',color);
   ring.setAttribute('stroke-dashoffset',175.9-(175.9*score/6));
   set('scale-verdict',score>=5?'Green light.':score>=3?'Proceed carefully.':'Hold — fix metrics.');
-  set('scale-verdict-sub',score>=5
-    ?'Funnel metrics are healthy. Safe to increase ad spend.'
-    :score>=3
-    ?'Most metrics are on track. Focus on improving cash ROAS before scaling.'
-    :'Cash ROAS and CPL need attention. Fix before significantly increasing spend.');
+  set('scale-verdict-sub',score>=5?'Funnel is healthy. Safe to scale ad spend.':score>=3?'Most metrics on track. Focus on improving cash ROAS.':'Fix cash ROAS before significantly increasing spend.');
   document.getElementById('scale-verdict').style.color=color;
   document.getElementById('scale-checks').innerHTML=checks.map(c=>`
     <div class="scale-check">
@@ -1888,7 +1944,7 @@ function renderCallsTrend() {
   const d=computeMetrics(currentPeriod);
   if(chartCallsTrend)chartCallsTrend.destroy();
   const ctx=document.getElementById('chart-calls-trend');if(!ctx)return;
-  const log=loadLog(); const today=new Date();
+  const log=DB_LOG; const today=new Date();
   const last7=[];
   for(let i=6;i>=0;i--){
     const dt=new Date(today);dt.setDate(dt.getDate()-i);
@@ -1918,36 +1974,30 @@ function renderSalesDeals() {
   const rpl=d.leads?d.cash/d.leads:0;
   const rps=d.shows?d.cash/d.shows:0;
   const ltCov=d.spend?Math.round(d.lt/d.spend*100):0;
-
-  set('s-cash',fmtFull(d.cash));
-  set('s-deals',d.rawDeals.length+' closed');
-  set('s-ht-ads',fmtFull(d.htAds));
-  set('s-ht-ads-pct',pct(d.htAds,d.cash||1)+' of HT cash');
-  set('s-ht-org',fmtFull(d.htOrg));
-  set('s-ht-org-pct',pct(d.htOrg,d.cash||1)+' of HT cash');
-  set('s-lt',fmtFull(d.lt));
-  set('s-lt-offset','covers '+ltCov+'% of spend');
+  set('s-cash',fmtFull(d.cash)); set('s-deals',d.rawDeals.length+' closed');
+  set('s-ht-ads',fmtFull(d.htAds)); set('s-ht-ads-pct',pct(d.htAds,d.cash||1)+' of HT');
+  set('s-ht-org',fmtFull(d.htOrg)); set('s-ht-org-pct',pct(d.htOrg,d.cash||1)+' of HT');
+  set('s-lt',fmtFull(d.lt)); set('s-lt-offset','covers '+ltCov+'% of spend');
   set('s-cr',d.shows?Math.round(cr*100)+'%':'—');
   set('s-cac',d.rawDeals.length?fmtFull(cac):'—');
   set('s-rpl',d.leads?fmtFull(rpl):'—');
   set('s-rps',d.shows?fmtFull(rps):'—');
 
-  const deals=loadDeals();
   const tbody=document.getElementById('deals-tbody');
   if(tbody){
-    const sorted=[...deals].sort((a,b)=>new Date(b.date)-new Date(a.date));
-    tbody.innerHTML=sorted.map((deal,i)=>`
+    const sorted=[...DB_DEALS].sort((a,b)=>new Date(b.date)-new Date(a.date));
+    tbody.innerHTML=sorted.length?sorted.map((deal,i)=>`
       <tr>
         <td>${sorted.length-i}</td>
-        <td>${deal.name}</td>
-        <td>${deal.date}</td>
+        <td>${deal.name}</td><td>${deal.date}</td>
         <td style="color:${deal.usd>0?'var(--accent)':'var(--t3)'};font-family:var(--font-mono);font-weight:700">${deal.usd>0?'$'+deal.usd.toLocaleString():'—'}</td>
         <td style="font-family:var(--font-mono);color:var(--blue)">$${(deal.contract||0).toLocaleString()}</td>
         <td><span class="pill ${(deal.source||'').toLowerCase()}">${deal.source||'—'}</span></td>
         <td><span class="pill ${(deal.closer||'').toLowerCase()}">${deal.closer||'—'}</span></td>
         <td>${deal.setter||'—'}</td>
         <td style="color:var(--t3)">${deal.notes||'—'}</td>
-      </tr>`).join('');
+      </tr>`).join('')
+    :'<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:24px">No deals yet — use Add New Deal</td></tr>';
   }
 }
 
@@ -1956,16 +2006,15 @@ function renderSalesDeals() {
 // ═══════════════════════════════════════════
 function renderCloserCards() {
   const d=computeMetrics(currentPeriod);
-  const allDeals=loadDeals();
   const closers=[
     {name:'Frankie',initials:'FR',color:'#B794F4',bg:'rgba(183,148,244,0.12)',
      deals:d.frankieDeals,cash:d.frankieCash,shows:d.frankieShows,
-     contracts:allDeals.filter(dl=>dl.closer==='Frankie').reduce((s,dl)=>s+(dl.contract||0),0),
-     adsCash:allDeals.filter(dl=>dl.closer==='Frankie'&&dl.source==='Ads').reduce((s,dl)=>s+(dl.usd||0),0)},
+     contracts:DB_DEALS.filter(dl=>dl.closer==='Frankie').reduce((s,dl)=>s+(dl.contract||0),0),
+     adsCash:DB_DEALS.filter(dl=>dl.closer==='Frankie'&&dl.source==='Ads').reduce((s,dl)=>s+(dl.usd||0),0)},
     {name:'Mehdi',initials:'ME',color:'#FFB742',bg:'rgba(255,183,66,0.12)',
      deals:d.mehdiDeals,cash:d.mehdiCash,shows:d.mehdiShows,
-     contracts:allDeals.filter(dl=>dl.closer==='Mehdi').reduce((s,dl)=>s+(dl.contract||0),0),
-     adsCash:allDeals.filter(dl=>dl.closer==='Mehdi'&&dl.source==='Ads').reduce((s,dl)=>s+(dl.usd||0),0)},
+     contracts:DB_DEALS.filter(dl=>dl.closer==='Mehdi').reduce((s,dl)=>s+(dl.contract||0),0),
+     adsCash:DB_DEALS.filter(dl=>dl.closer==='Mehdi'&&dl.source==='Ads').reduce((s,dl)=>s+(dl.usd||0),0)},
   ];
   document.getElementById('closer-grid').innerHTML=closers.map(c=>{
     const cr=c.shows?Math.round(c.deals/c.shows*100):0;
@@ -1984,8 +2033,8 @@ function renderCloserCards() {
       </div>
       <div class="closer-bar-label"><span>Cash share</span><span style="color:${c.color}">${revPct}%</span></div>
       <div class="closer-bar-track"><div class="closer-bar-fill" style="width:${revPct}%;background:${c.color}"></div></div>
-      <div class="closer-bar-label"><span>Contract value signed</span><span style="color:${c.color}">$${c.contracts.toLocaleString()}</span></div>
-      <div class="closer-bar-track"><div class="closer-bar-fill" style="width:${c.contracts?(Math.min(100,c.contracts/1000)):0}%;background:${c.color};opacity:0.5"></div></div>
+      <div class="closer-bar-label"><span>Contracts signed</span><span style="color:${c.color}">$${c.contracts.toLocaleString()}</span></div>
+      <div class="closer-bar-track"><div class="closer-bar-fill" style="width:${c.contracts?Math.min(100,Math.round(c.contracts/500)):0}%;background:${c.color};opacity:0.5"></div></div>
       <div class="closer-bottom">
         <div><div class="closer-cash-label">CASH COLLECTED</div>
         <div class="closer-cash-val" style="color:${c.color}">$${c.cash.toLocaleString()}</div></div>
@@ -2011,7 +2060,7 @@ function renderCloserCharts() {
 }
 
 // ═══════════════════════════════════════════
-// LOW TICKET TAB
+// LOW TICKET
 // ═══════════════════════════════════════════
 function renderLowTicket(d) {
   const ltCov=d.spend?Math.round(d.lt/d.spend*100):0;
@@ -2025,14 +2074,13 @@ function renderLowTicket(d) {
 }
 
 // ═══════════════════════════════════════════
-// ADD NEW DEAL TAB
+// ADD NEW DEAL
 // ═══════════════════════════════════════════
 function renderDealLog() {
-  const deals=loadDeals();
   const tbody=document.getElementById('deal-log-tbody');
   if(!tbody)return;
-  const sorted=[...deals].sort((a,b)=>new Date(b.date)-new Date(a.date));
-  tbody.innerHTML=sorted.map(d=>`
+  const sorted=[...DB_DEALS].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  tbody.innerHTML=sorted.length?sorted.map(d=>`
     <tr>
       <td>${d.name}</td><td>${d.date}</td>
       <td style="color:${d.usd>0?'var(--accent)':'var(--t3)'};font-weight:700;font-family:var(--font-mono)">${d.usd>0?'$'+d.usd.toLocaleString():'—'}</td>
@@ -2041,11 +2089,12 @@ function renderDealLog() {
       <td><span class="pill ${(d.closer||'').toLowerCase()}">${d.closer||'—'}</span></td>
       <td>${d.setter||'—'}</td>
       <td style="color:var(--t3)">${d.notes||'—'}</td>
-      <td><button onclick="deleteDeal('${d.id}')" style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;font-family:var(--font-mono)">×</button></td>
-    </tr>`).join('');
+      <td><button onclick="deleteDeal('${d.id}')" style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer">×</button></td>
+    </tr>`)
+  .join(''):'<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:24px">No deals yet</td></tr>';
 }
 
-function submitDeal() {
+async function submitDeal() {
   const name    =document.getElementById('deal-name').value.trim();
   const date    =document.getElementById('deal-date').value;
   const usd     =parseFloat(document.getElementById('deal-usd').value)||0;
@@ -2054,29 +2103,29 @@ function submitDeal() {
   const closer  =document.getElementById('deal-closer').value;
   const setter  =document.getElementById('deal-setter').value;
   const notes   =document.getElementById('deal-notes').value.trim();
-
-  if(!name||!date){alert('Please enter at least a client name and date.');return;}
-  if(!usd&&!contract){alert('Please enter cash collected or contract value.');return;}
-
-  const deals=loadDeals();
-  deals.push({id:uid(),name,date,usd,contract,source,closer,setter,notes});
-  saveDeals(deals);
-
-  ['deal-name','deal-notes'].forEach(id=>document.getElementById(id).value='');
-  ['deal-usd','deal-contract'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('deal-date').valueAsDate=new Date();
-
-  renderDealLog();
-  renderAll();
-
+  if(!name||!date){showToast('Please enter name and date','error');return;}
+  if(!usd&&!contract){showToast('Enter cash collected or contract value','error');return;}
   const btn=document.getElementById('deal-submit-btn');
-  btn.textContent='✓ Saved!';btn.style.background='#00C882';
-  setTimeout(()=>{btn.textContent='Save Deal →';btn.style.background='';},2000);
+  btn.textContent='Saving...';btn.disabled=true;
+  try {
+    await insertDeal({name,date,usd,contract,source,closer,setter,notes});
+    DB_DEALS = await getDeals();
+    ['deal-name','deal-notes'].forEach(id=>document.getElementById(id).value='');
+    ['deal-usd','deal-contract'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('deal-date').valueAsDate=new Date();
+    renderDealLog();
+    renderAll();
+    showToast('✓ Deal saved — dashboard updated for everyone');
+  } catch(e) {
+    showToast('Error saving deal: '+e.message,'error');
+  }
+  btn.textContent='Save Deal →';btn.disabled=false;
 }
 
-function deleteDeal(id) {
+async function deleteDeal(id) {
   if(!confirm('Delete this deal? Cannot be undone.'))return;
-  saveDeals(loadDeals().filter(d=>d.id!==id));
+  await deleteRow('deals',id);
+  DB_DEALS = await getDeals();
   renderDealLog();renderAll();
 }
 
@@ -2098,7 +2147,7 @@ function updatePreview() {
   set('prev-cac',  closes&&spend?'$'+Math.round(spend/closes):'—');
 }
 
-function submitDaily() {
+async function submitDaily() {
   const date   =document.getElementById('inp-date').value;
   const spend  =parseFloat(document.getElementById('inp-spend').value)||0;
   const leads  =parseInt(document.getElementById('inp-leads').value)||0;
@@ -2111,16 +2160,18 @@ function submitDaily() {
   const source =document.getElementById('inp-source').value;
   const closer =document.getElementById('inp-closer').value;
   const notes  =document.getElementById('inp-campaign').value;
-  if(!date){alert('Please select a date.');return;}
-  const log=loadLog();
-  const idx=log.findIndex(l=>l.date===date);
-  const entry={id:idx>=0?log[idx].id:uid(),date,spend,leads,booked,shows,noshows,closes,cash,lt,source,closer,notes};
-  if(idx>=0)log[idx]=entry; else log.push(entry);
-  saveLog(log);
-  renderAll();
+  if(!date){showToast('Please select a date','error');return;}
   const btn=document.getElementById('daily-submit-btn');
-  btn.textContent='✓ Saved!';btn.style.background='#00C882';
-  setTimeout(()=>{btn.textContent='Log Today\'s Data →';btn.style.background='';},2000);
+  btn.textContent='Saving...';btn.disabled=true;
+  try {
+    await insertLog({date,spend,leads,booked,shows,noshows,closes,cash,lt,source,closer,notes});
+    DB_LOG = await getLog();
+    renderAll();
+    showToast('✓ Data saved — dashboard updated for everyone');
+  } catch(e) {
+    showToast('Error: '+e.message,'error');
+  }
+  btn.textContent="Log Today's Data →";btn.disabled=false;
 }
 
 // ═══════════════════════════════════════════
@@ -2141,41 +2192,30 @@ function renderSlack(d) {
   const sF=showup>=(S.tgt_showup/100)?ok:warn;
   const cF=cr>=(S.tgt_cr/100)?ok:warn;
   const today=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
-
   const db=document.getElementById('slack-daily-body');
-  if(db) db.innerHTML=`<span class="sh">📊 TCC/SWH Performance — ${today}</span>
+  if(db) db.innerHTML=`<span class="sh">📊 SWH Performance — ${today}</span>
 <span class="divider">━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
 <span class="sh">💸 AD SPEND</span>
-Spend:       <span class="sv">$${d.spend.toLocaleString()}</span>
-Leads:       <span class="sv">${d.leads}</span>  ·  CPL: <span class="sv">${d.leads?'$'+Math.round(cpl):'—'}</span>
-Booked:      <span class="sv">${d.booked}</span>  ·  CPBC: <span class="sv">${d.booked?'$'+Math.round(cpbc):'—'}</span>
-LT Sales:    <span class="sv">${Math.round((d.lt||0)/27)} × $27 = $${(d.lt||0).toLocaleString()}</span>
-
+Spend:        <span class="sv">$${d.spend.toLocaleString()}</span>
+Leads:        <span class="sv">${d.leads}</span>  ·  CPL: <span class="sv">${d.leads?'$'+Math.round(cpl):'—'}</span>
+Booked:       <span class="sv">${d.booked}</span>  ·  CPBC: <span class="sv">${d.booked?'$'+Math.round(cpbc):'—'}</span>
+LT Sales:     <span class="sv">${Math.round((d.lt||0)/27)} × $27 = $${(d.lt||0).toLocaleString()}</span>
 <span class="sh">📞 CALLS</span>
-${sF} Show-up: <span class="sv">${d.booked?Math.round(showup*100)+'%':'—'}</span>  (${d.shows} of ${d.booked} showed)  ·  No-shows: <span class="sv">${d.noshows}</span>
-
+${sF} Show-up: <span class="sv">${d.booked?Math.round(showup*100)+'%':'—'}</span>  (${d.shows} of ${d.booked})  ·  No-shows: <span class="sv">${d.noshows}</span>
 <span class="sh">💰 SALES</span>
 ${cF} HT Closes: <span class="sv">${d.rawDeals.length}</span>  ·  Close rate: <span class="sv">${d.shows?Math.round(cr*100)+'%':'—'}</span>
-Cash collected: <span class="sv">$${d.cash.toLocaleString()}</span>  (HT: $${d.htCash.toLocaleString()} + LT: $${(d.lt||0).toLocaleString()})
-Contract value: <span class="sv">$${d.contractTotal.toLocaleString()}</span>  ·  Pipeline: <span class="sv">$${(d.pipeline||0).toLocaleString()}</span>
-
-<span class="sh">📈 ROAS & ECONOMICS</span>
-${rF} ROAS (cash): <span class="sv">${d.spend?roas.toFixed(2)+'x':'—'}</span>  ·  ROAS (contracts): <span class="sv">${d.spend?roasCon.toFixed(1)+'x':'—'}</span>
-CAC: <span class="sv">${d.rawDeals.length?'$'+Math.round(cac):'—'}</span>  ·  LT covers <span class="${ltCov>=10?'sv':'sw'}">${ltCov}% of spend</span>
+Cash: <span class="sv">$${d.cash.toLocaleString()}</span>  ·  Contracts: <span class="sv">$${d.contractTotal.toLocaleString()}</span>  ·  Pipeline: <span class="sv">$${(d.pipeline||0).toLocaleString()}</span>
+<span class="sh">📈 ECONOMICS</span>
+${rF} ROAS (cash): <span class="sv">${d.spend?roas.toFixed(2)+'x':'—'}</span>  ·  Contract ROAS: <span class="sv">${d.spend?roasCon.toFixed(1)+'x':'—'}</span>
 P&L (cash): <span class="${d.cash>=d.spend?'sv':'sr'}">$${(d.cash-d.spend).toLocaleString()}</span>
 <span class="divider">━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
-<span class="sw">OPERATOR CALL</span>
-${roas>=1&&showup>=0.70&&cr>=0.25?'<span style="color:#00F5A8">🟢 Core funnel healthy. Show-up 77% + Close rate 41% are strong. Focus on scaling spend.</span>':'<span class="sw">🟡 Cash ROAS still below 1x. Contracts profitable. Increase payment collection to improve cash position.</span>'}`;
-
+${roas>=1&&showup>=0.70&&cr>=0.25?'<span style="color:#00F5A8">🟢 Core funnel healthy. Show-up 77% + Close rate 41% strong.</span>':'<span class="sw">🟡 Cash ROAS still below 1x. Focus on payment collection from signed deals.</span>'}`;
   const wb=document.getElementById('slack-weekly-body');
-  if(wb) wb.innerHTML=`<span class="sh">📈 TCC/SWH Weekly — w/e ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}</span>
+  if(wb) wb.innerHTML=`<span class="sh">📈 SWH Weekly — w/e ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}</span>
 <span class="divider">━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
-Spend:    <span class="sv">$${d.spend.toLocaleString()}</span>  ·  Total cash: <span class="sv">$${d.cash.toLocaleString()}</span>
-ROAS:     ${rF} <span class="sv">${d.spend?roas.toFixed(2)+'x':'—'}</span>  ·  Contract ROAS: <span class="sv">${d.spend?roasCon.toFixed(1)+'x':'—'}</span>
-Leads:    <span class="sv">${d.leads}</span>  ·  CPL: <span class="sv">${d.leads?'$'+Math.round(cpl):'—'}</span>
-Booked:   <span class="sv">${d.booked}</span>  ·  Show-up: ${sF} <span class="sv">${d.booked?Math.round(showup*100)+'%':'—'}</span>
-HT Close: <span class="sv">${d.rawDeals.length}</span>  ·  Rate: ${cF} <span class="sv">${d.shows?Math.round(cr*100)+'%':'—'}</span>
-Pipeline: <span class="sv">$${(d.pipeline||0).toLocaleString()}</span>  ·  Outstanding: <span class="sv">$29,000</span>
+Spend: <span class="sv">$${d.spend.toLocaleString()}</span>  ·  Cash: <span class="sv">$${d.cash.toLocaleString()}</span>  ·  ROAS: ${rF} <span class="sv">${d.spend?roas.toFixed(2)+'x':'—'}</span>
+Leads: <span class="sv">${d.leads}</span>  ·  Booked: <span class="sv">${d.booked}</span>  ·  Show-up: ${sF} <span class="sv">${d.booked?Math.round(showup*100)+'%':'—'}</span>
+Closes: <span class="sv">${d.rawDeals.length}</span>  ·  Close rate: ${cF} <span class="sv">${d.shows?Math.round(cr*100)+'%':'—'}</span>
 Top closer: <span class="sv">${d.frankieCash>=d.mehdiCash?'Frankie':'Mehdi'} — $${Math.max(d.frankieCash,d.mehdiCash).toLocaleString()}</span>`;
 }
 
@@ -2191,7 +2231,6 @@ function loadSettingsUI() {
   document.getElementById('tgt-roas').value  =S.tgt_roas+'x';
   document.getElementById('aed-rate').value  =S.aed_rate;
 }
-
 function saveSettings() {
   const S=getSettings();
   S.tgt_cpl  =parseFloat(document.getElementById('tgt-cpl').value)||150;
@@ -2202,20 +2241,12 @@ function saveSettings() {
   S.aed_rate =parseFloat(document.getElementById('aed-rate').value)||3.6725;
   saveSettingsData(S);
   renderAll();
-  alert('✓ Settings saved.');
+  showToast('✓ Settings saved');
 }
 
-function resetData() {
-  if(!confirm('Reset all data to original TCC seed data?'))return;
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(LOG_KEY);
-  localStorage.removeItem(SETTINGS_KEY);
-  location.reload();
-}
-
-function simulateSync() {
-  document.getElementById('last-sync').textContent='Updating...';
-  setTimeout(renderAll,300);
+async function simulateSync() {
+  document.getElementById('last-sync').textContent='Syncing...';
+  await loadAndRender();
 }
 
 // ═══════════════════════════════════════════
@@ -2225,7 +2256,15 @@ document.getElementById('inp-date').valueAsDate=new Date();
 document.getElementById('deal-date').valueAsDate=new Date();
 loadSettingsUI();
 initPeriodBtns();
-renderAll();
+
+// Add toast element
+const toast = document.createElement('div');
+toast.id = 'toast';
+toast.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;font-family:var(--font-display);z-index:9999;opacity:0;transform:translateY(10px);transition:all 0.3s ease;pointer-events:none';
+document.body.appendChild(toast);
+
+// Load data and render
+seedIfEmpty().then(() => loadAndRender());
 </script>
 </body>
 </html>
