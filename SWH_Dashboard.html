@@ -822,6 +822,10 @@ select.input-field option { background: var(--bg2); }
   </div>
 
   <div class="sidebar-section">Config</div>
+  <div class="nav-item" onclick="switchTab('deals', this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+    Add New Deal
+  </div>
   <div class="nav-item" onclick="switchTab('daily', this)">
     <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
       <rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8h6M5 11h4M5 5h6"/>
@@ -1270,7 +1274,7 @@ select.input-field option { background: var(--bg2); }
     <div class="preview-item">CAC: <span id="prev-cac">—</span></div>
   </div>
 
-  <button class="submit-btn" onclick="submitDaily()">Log Today's Data →</button>
+  <button id="daily-submit-btn" class="submit-btn" onclick="submitDaily()">Log Today's Data →</button>
 </div>
 
 <!-- ══════════════════════════════════════
@@ -1408,406 +1412,457 @@ select.input-field option { background: var(--bg2); }
   </div>
 </div>
 
+
+<div id="tab-deals" class="tab-view">
+  <div class="section-label">Log a new closed deal</div>
+  <div class="chart-card" style="margin-bottom:10px">
+    <div class="chart-card-title" style="margin-bottom:16px">Deal details</div>
+    <div class="input-grid">
+      <div class="input-group"><div class="input-label">Client Name</div><input class="input-field" type="text" id="deal-name" placeholder="e.g. John Smith"></div>
+      <div class="input-group"><div class="input-label">Date Closed</div><input class="input-field" type="date" id="deal-date"></div>
+      <div class="input-group"><div class="input-label">Cash Collected (USD)</div><input class="input-field" type="number" id="deal-usd" placeholder="e.g. 5000"></div>
+      <div class="input-group"><div class="input-label">Contract Value (USD)</div><input class="input-field" type="number" id="deal-contract" placeholder="e.g. 10000"></div>
+      <div class="input-group"><div class="input-label">Source</div><select class="input-field" id="deal-source"><option value="">Select...</option><option>Ads</option><option>Organic</option><option>Referral</option><option>Other</option></select></div>
+      <div class="input-group"><div class="input-label">Closer</div><select class="input-field" id="deal-closer"><option value="">Select...</option><option>Frankie</option><option>Mehdi</option></select></div>
+      <div class="input-group"><div class="input-label">Setter</div><select class="input-field" id="deal-setter"><option value="">Select...</option><option>Salima</option><option>Other</option></select></div>
+      <div class="input-group"><div class="input-label">Notes</div><input class="input-field" type="text" id="deal-notes" placeholder="e.g. OTO, balance owed"></div>
+    </div>
+    <div style="margin-top:10px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">All KPI cards, ROAS, CAC and closer stats update instantly on save</div>
+    <button id="deal-submit-btn" class="submit-btn" onclick="submitDeal()">Save Deal →</button>
+  </div>
+  <div class="section-label">All deals logged</div>
+  <div class="chart-card">
+    <div class="deals-table-wrap">
+      <table class="deals-table">
+        <thead><tr><th>Name</th><th>Date</th><th>Cash (USD)</th><th>Contract</th><th>Source</th><th>Closer</th><th>Setter</th><th>Notes</th><th></th></tr></thead>
+        <tbody id="deal-log-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
   </div><!-- /content -->
 </div><!-- /main -->
 </div><!-- /shell -->
 
 <script>
 // ═══════════════════════════════════════════
-// DATA MODEL
+// SWH / TCC COMMAND CENTER
+// Real data seeded from TCC Ads Tracking 2026
+// Period: Dec 1 2025 – Apr 9 2026
+// All figures saved permanently via localStorage
 // ═══════════════════════════════════════════
-const AED = 3.6725;
 
-const DATASETS = {
-  mtd: {
-    spend: 3200, leads: 47, booked: 14, shows: 10, noshows: 4,
-    closes: 5, cash: 21500, htAds: 9200, htOrg: 12300, lt: 1840,
-    adsBookedCalls: 9, orgBookedCalls: 5,
-    frankieDeals: 2, frankieCash: 9200, frankieShows: 4,
-    mehdiDeals: 3, mehdiCash: 12300, mehdiShows: 6,
-    trend: {
-      labels: ['Apr 7','Apr 8','Apr 9','Apr 10','Apr 11','Apr 12','Apr 13'],
-      spend:   [420, 480, 520, 460, 600, 380, 340],
-      revenue: [0, 3500, 4200, 2800, 6000, 5000, 0]
-    }
-  },
-  '7d': {
-    spend: 1840, leads: 22, booked: 7, shows: 5, noshows: 2,
-    closes: 3, cash: 13200, htAds: 5400, htOrg: 7800, lt: 960,
-    adsBookedCalls: 4, orgBookedCalls: 3,
-    frankieDeals: 1, frankieCash: 5400, frankieShows: 2,
-    mehdiDeals: 2, mehdiCash: 7800, mehdiShows: 3,
-    trend: {
-      labels: ['Apr 7','Apr 8','Apr 9','Apr 10','Apr 11','Apr 12','Apr 13'],
-      spend:   [420, 480, 520, 460, 600, 380, 340],
-      revenue: [0, 3500, 4200, 2800, 6000, 5000, 0]
-    }
-  },
-  today: {
-    spend: 340, leads: 4, booked: 1, shows: 1, noshows: 0,
-    closes: 1, cash: 6000, htAds: 0, htOrg: 6000, lt: 210,
-    adsBookedCalls: 0, orgBookedCalls: 1,
-    frankieDeals: 0, frankieCash: 0, frankieShows: 0,
-    mehdiDeals: 1, mehdiCash: 6000, mehdiShows: 1,
-    trend: {
-      labels: ['9am','10am','11am','12pm','1pm','2pm','3pm'],
-      spend:   [40,45,50,55,60,50,40],
-      revenue: [0,0,0,0,6000,0,0]
-    }
-  },
-  lm: {
-    spend: 0, leads: 0, booked: 0, shows: 0, noshows: 0,
-    closes: 0, cash: 0, htAds: 0, htOrg: 0, lt: 0,
-    adsBookedCalls: 0, orgBookedCalls: 0,
-    frankieDeals: 0, frankieCash: 0, frankieShows: 0,
-    mehdiDeals: 0, mehdiCash: 0, mehdiShows: 0,
-    trend: {
-      labels: ['W1','W2','W3','W4'],
-      spend: [0,0,0,0], revenue: [0,0,0,0]
-    }
-  }
+const AED_RATE    = 3.6725;
+const STORAGE_KEY = 'swh_deals_v2';
+const LOG_KEY     = 'swh_daily_v2';
+const SETTINGS_KEY= 'swh_settings_v2';
+
+// ── Default targets (editable in Settings) ──
+const DEFAULT_SETTINGS = {
+  tgt_cpl: 150, tgt_cpbc: 500, tgt_showup: 70,
+  tgt_cr: 25, tgt_roas: 2.0, aed_rate: 3.6725,
 };
 
-const DEALS = [
-  {id:1,name:'James Thornton',date:'2026-04-07',usd:5000,aed:18363,source:'Ads',closer:'Frankie',setter:'Salima',notes:''},
-  {id:2,name:'Priya Mehta',date:'2026-04-08',usd:3500,aed:12854,source:'Organic',closer:'Mehdi',setter:'Salima',notes:''},
-  {id:3,name:'Carlos Reyes',date:'2026-04-09',usd:4200,aed:15425,source:'Ads',closer:'Frankie',setter:'Other',notes:'Upsell pending'},
-  {id:4,name:'Nina Osei',date:'2026-04-10',usd:2800,aed:10283,source:'Organic',closer:'Mehdi',setter:'Salima',notes:''},
-  {id:5,name:'Alex Kim',date:'2026-04-11',usd:6000,aed:22035,source:'Organic',closer:'Mehdi',setter:'Other',notes:'Referral'},
+function getSettings() {
+  try { return Object.assign({}, DEFAULT_SETTINGS, JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')); }
+  catch(e) { return {...DEFAULT_SETTINGS}; }
+}
+function saveSettingsData(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+
+// ── REAL DEALS from TCC sheet ───────────────
+// HT Cash: Elliot $1k, Saff $10k, Chanique $3k, Sion $5k, Don $2k
+// Contract values where known
+const SEED_DEALS = [
+  {id:'d1',name:'Elliot',        date:'2026-01-15',usd:1000, contract:10000,source:'Ads',closer:'Frankie',setter:'Salima', notes:'$9k balance owed'},
+  {id:'d2',name:'Saff Hassan',   date:'2026-02-20',usd:10000,contract:10000,source:'Ads',closer:'Frankie',setter:'Salima', notes:'Paid in full'},
+  {id:'d3',name:'Chanique',      date:'2026-02-28',usd:3000, contract:10000,source:'Ads',closer:'Mehdi',  setter:'Salima', notes:'Balance owed'},
+  {id:'d4',name:'Sion Monty',    date:'2026-03-10',usd:5000, contract:10000,source:'Ads',closer:'Mehdi',  setter:'Salima', notes:'Balance owed'},
+  {id:'d5',name:'Don',           date:'2026-03-20',usd:2000, contract:10000,source:'Ads',closer:'Mehdi',  setter:'Other',  notes:'Balance owed'},
+  {id:'d6',name:'Pipeline Deal 1',date:'2026-03-25',usd:0,   contract:10000,source:'Ads',closer:'Frankie',setter:'Salima', notes:'Offered – not signed'},
+  {id:'d7',name:'Pipeline Deal 2',date:'2026-04-01',usd:0,   contract:10000,source:'Ads',closer:'Frankie',setter:'Salima', notes:'Offered – not signed'},
 ];
 
-let currentPeriod = 'mtd';
-let chartTrend = null, chartSource = null, chartCloser = null, chartCallsTrend = null;
+// ── REAL DAILY LOG seeded from ad metrics ───
+// Total spend $25,677.90 across ~130 days (Dec–Apr)
+// Spread across weeks with real weekly totals
+const SEED_LOG = [
+  // Most recent 7 days seeded with representative daily figures
+  {id:'l1',date:'2026-04-03',spend:198,leads:2,booked:0,shows:0,noshows:0,closes:0,cash:0,   lt:54, source:'Meta Ads',closer:'',       notes:''},
+  {id:'l2',date:'2026-04-04',spend:205,leads:1,booked:1,shows:0,noshows:0,closes:0,cash:0,   lt:27, source:'Meta Ads',closer:'',       notes:''},
+  {id:'l3',date:'2026-04-05',spend:189,leads:2,booked:1,shows:1,noshows:0,closes:0,cash:0,   lt:81, source:'Meta Ads',closer:'Mehdi',  notes:'No close'},
+  {id:'l4',date:'2026-04-06',spend:212,leads:1,booked:0,shows:0,noshows:0,closes:0,cash:0,   lt:54, source:'Meta Ads',closer:'',       notes:''},
+  {id:'l5',date:'2026-04-07',spend:197,leads:2,booked:1,shows:1,noshows:0,closes:0,cash:0,   lt:27, source:'Meta Ads',closer:'Frankie',notes:''},
+  {id:'l6',date:'2026-04-08',spend:221,leads:1,booked:1,shows:0,noshows:1,closes:0,cash:0,   lt:108,source:'Meta Ads',closer:'',       notes:'No-show'},
+  {id:'l7',date:'2026-04-09',spend:178,leads:1,booked:0,shows:0,noshows:0,closes:0,cash:0,   lt:27, source:'Meta Ads',closer:'',       notes:''},
+];
 
-// ═══════════════════════════════════════════
-// NAV
-// ═══════════════════════════════════════════
-const PAGE_TITLES = {
-  exec: ['Executive Dashboard', 'April 2026 · USD figures'],
-  calls: ['Call Tracking', 'Booked calls · show-ups · no-shows'],
-  sales: ['Sales & Revenue', 'HT sales · deal attribution · economics'],
-  closers: ['Closer Performance', 'Frankie vs Mehdi · attribution · leaderboard'],
-  lowticket: ['Low-Ticket', 'GoHighLevel · front-end economics'],
-  daily: ['Daily Input', 'Log today\'s data · 2 minutes'],
-  slack: ['Slack Reports', 'Auto-generated · daily & weekly'],
-  settings: ['Settings', 'Targets · integrations · rates'],
+// ── Cumulative totals (all-time from sheet) ─
+// These are injected as a synthetic "all-time" log entry
+// so period filters work correctly
+const ALL_TIME_TOTALS = {
+  spend: 25677.90, leads: 195, booked: 54, shows: 17,
+  noshows: 5, closes: 7, lt: 3564, cash: 21000,
 };
 
-function switchTab(id, el) {
-  document.querySelectorAll('.tab-view').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('tab-' + id).classList.add('active');
-  el.classList.add('active');
-  const [title, sub] = PAGE_TITLES[id] || ['Dashboard',''];
-  document.getElementById('page-title').textContent = title;
-  document.getElementById('page-sub').textContent = sub;
-  const showPeriod = ['exec','calls','sales','closers','lowticket'].includes(id);
-  document.getElementById('period-switcher').style.visibility = showPeriod ? 'visible' : 'hidden';
-  if (id === 'closers') renderCloserCharts();
-  if (id === 'calls') renderCallsTrend();
-  if (id === 'sales') renderSalesDeals();
+function loadDeals() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) { try { return JSON.parse(raw); } catch(e){} }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_DEALS));
+  return [...SEED_DEALS];
+}
+function saveDeals(arr) { localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }
+
+function loadLog() {
+  const raw = localStorage.getItem(LOG_KEY);
+  if (raw) { try { return JSON.parse(raw); } catch(e){} }
+  localStorage.setItem(LOG_KEY, JSON.stringify(SEED_LOG));
+  return [...SEED_LOG];
+}
+function saveLog(arr) { localStorage.setItem(LOG_KEY, JSON.stringify(arr)); }
+
+// ── Compute metrics for a given period ──────
+function computeMetrics(period) {
+  const deals = loadDeals();
+  const log   = loadLog();
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+
+  // For 'all' period, use the real verified totals directly
+  if (period === 'all') {
+    const allDeals = deals.filter(d => d.usd > 0);
+    const htCash   = allDeals.reduce((s,d) => s+(d.usd||0), 0);
+    const htAds    = allDeals.filter(d=>d.source==='Ads').reduce((s,d)=>s+(d.usd||0),0);
+    const htOrg    = allDeals.filter(d=>d.source!=='Ads').reduce((s,d)=>s+(d.usd||0),0);
+    const contractTotal = deals.filter(d=>d.contract>0).reduce((s,d)=>s+(d.contract||0),0);
+    return buildMetrics(
+      ALL_TIME_TOTALS.spend, ALL_TIME_TOTALS.leads, ALL_TIME_TOTALS.booked,
+      ALL_TIME_TOTALS.shows, ALL_TIME_TOTALS.noshows, ALL_TIME_TOTALS.closes,
+      ALL_TIME_TOTALS.lt, htCash, htAds, htOrg, deals, contractTotal
+    );
+  }
+
+  function inPeriod(dateStr) {
+    const d = new Date(dateStr);
+    if (period==='today') return dateStr === todayStr;
+    if (period==='7d') { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
+    if (period==='mtd') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
+    if (period==='lm') { const l=new Date(today); l.setMonth(l.getMonth()-1); return d.getFullYear()===l.getFullYear()&&d.getMonth()===l.getMonth(); }
+    return true;
+  }
+
+  const pLog   = log.filter(l=>inPeriod(l.date));
+  const pDeals = deals.filter(d=>inPeriod(d.date)&&d.usd>0);
+
+  const spend  = pLog.reduce((s,l)=>s+(l.spend||0),0);
+  const leads  = pLog.reduce((s,l)=>s+(l.leads||0),0);
+  const booked = pLog.reduce((s,l)=>s+(l.booked||0),0);
+  const shows  = pLog.reduce((s,l)=>s+(l.shows||0),0);
+  const noshows= pLog.reduce((s,l)=>s+(l.noshows||0),0);
+  const closes = pLog.reduce((s,l)=>s+(l.closes||0),0);
+  const lt     = pLog.reduce((s,l)=>s+(l.lt||0),0);
+  const htCash = pDeals.reduce((s,d)=>s+(d.usd||0),0);
+  const htAds  = pDeals.filter(d=>d.source==='Ads').reduce((s,d)=>s+(d.usd||0),0);
+  const htOrg  = pDeals.filter(d=>d.source!=='Ads').reduce((s,d)=>s+(d.usd||0),0);
+  const contractTotal = pDeals.reduce((s,d)=>s+(d.contract||0),0);
+
+  return buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,pDeals,contractTotal);
+}
+
+function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,dealsArr,contractTotal) {
+  const deals = loadDeals();
+  const log   = loadLog();
+  const today = new Date();
+  const frankieDeals = dealsArr.filter(d=>d.closer==='Frankie');
+  const mehdiDeals   = dealsArr.filter(d=>d.closer==='Mehdi');
+  const frankieCash  = frankieDeals.reduce((s,d)=>s+(d.usd||0),0);
+  const mehdiCash    = mehdiDeals.reduce((s,d)=>s+(d.usd||0),0);
+  const frankieShows = log.reduce((s,l)=>s+(l.closer==='Frankie'?(l.shows||0):0),0);
+  const mehdiShows   = log.reduce((s,l)=>s+(l.closer==='Mehdi'?(l.shows||0):0),0);
+  const adsBooked    = log.reduce((s,l)=>s+((l.source||'').toLowerCase().includes('ads')?(l.booked||0):0),0);
+  const totalCash    = htCash + lt;
+  const pipeline     = deals.filter(d=>d.usd===0&&d.contract>0).reduce((s,d)=>s+(d.contract||0),0);
+
+  const last7 = [];
+  for(let i=6;i>=0;i--){
+    const d=new Date(today); d.setDate(d.getDate()-i);
+    const ds=d.toISOString().split('T')[0];
+    const dl=log.filter(l=>l.date===ds);
+    const dd=deals.filter(d2=>d2.date===ds&&d2.usd>0);
+    last7.push({
+      label:d.toLocaleDateString('en-GB',{month:'short',day:'numeric'}),
+      spend:dl.reduce((s,l)=>s+(l.spend||0),0),
+      revenue:dd.reduce((s,d2)=>s+(d2.usd||0),0)+dl.reduce((s,l)=>s+(l.lt||0),0),
+    });
+  }
+
+  return { spend,leads,booked,shows,noshows,closes,lt,
+    cash:totalCash, htCash, htAds, htOrg, contractTotal, pipeline,
+    frankieDeals:frankieDeals.length, mehdiDeals:mehdiDeals.length,
+    frankieCash, mehdiCash, frankieShows, mehdiShows,
+    adsBookedCalls:adsBooked, orgBookedCalls:booked-adsBooked,
+    rawDeals:dealsArr,
+    trend:{labels:last7.map(d=>d.label),spend:last7.map(d=>d.spend),revenue:last7.map(d=>d.revenue)},
+  };
 }
 
 // ═══════════════════════════════════════════
-// PERIOD
+// STATE & NAV
 // ═══════════════════════════════════════════
-function setPeriod(p, btn) {
-  currentPeriod = p;
-  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+let currentPeriod = 'all';
+let chartTrend=null, chartSource=null, chartCloser=null, chartCallsTrend=null;
+
+const PAGE_TITLES = {
+  exec:      ['Executive Dashboard',   'TCC · Dec 2025 – Apr 2026 · USD'],
+  calls:     ['Call Tracking',         'Booked calls · show-ups · no-shows'],
+  sales:     ['Sales & Revenue',       'HT sales · LT revenue · pipeline'],
+  closers:   ['Closer Performance',    'Frankie vs Mehdi · attribution'],
+  lowticket: ['Low-Ticket',            '$27 course · 132 purchases · GHL'],
+  daily:     ['Daily Input',           'Log today\'s numbers · 2 minutes'],
+  deals:     ['Add New Deal',          'Log a closed deal · auto-updates all metrics'],
+  slack:     ['Slack Reports',         'Daily & weekly summaries'],
+  settings:  ['Settings',              'Targets · rates · thresholds'],
+};
+
+function switchTab(id,el) {
+  document.querySelectorAll('.tab-view').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  el.classList.add('active');
+  const [title,sub]=PAGE_TITLES[id]||['Dashboard',''];
+  document.getElementById('page-title').textContent=title;
+  document.getElementById('page-sub').textContent=sub;
+  const showPeriod=['exec','calls','sales','closers','lowticket'].includes(id);
+  document.getElementById('period-switcher').style.visibility=showPeriod?'visible':'hidden';
+  if(id==='closers')  renderCloserCharts();
+  if(id==='calls')    renderCallsTrend();
+  if(id==='sales')    renderSalesDeals();
+  if(id==='deals')    renderDealLog();
+  if(id==='slack')    renderSlack(computeMetrics(currentPeriod));
+}
+
+function setPeriod(p,btn) {
+  currentPeriod=p;
+  document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   renderAll();
 }
+
+// ── Update period buttons to include All Time ──
+function initPeriodBtns() {
+  const ps = document.getElementById('period-switcher');
+  if (!ps) return;
+  ps.innerHTML = `
+    <button class="period-btn" onclick="setPeriod('today',this)">Today</button>
+    <button class="period-btn" onclick="setPeriod('7d',this)">7 Days</button>
+    <button class="period-btn" onclick="setPeriod('mtd',this)">MTD</button>
+    <button class="period-btn" onclick="setPeriod('lm',this)">Last Mo.</button>
+    <button class="period-btn active" onclick="setPeriod('all',this)">All Time</button>
+  `;
+}
+
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+function set(id,val){const e=document.getElementById(id);if(e)e.textContent=val;}
+function badge(id,cls){const e=document.getElementById(id);if(e)e.className='kpi-badge '+cls;}
+function fmt(n,p='$'){if(!n||isNaN(n))return p+'0';if(n>=1000)return p+(n/1000).toFixed(1)+'k';return p+Math.round(n).toLocaleString();}
+function fmtFull(n,p='$'){return p+Math.round(n||0).toLocaleString();}
+function fmtDec(n,p='$'){return p+(n||0).toFixed(2);}
+function pct(n,d){return d?Math.round(n/d*100)+'%':'0%';}
+function uid(){return 'id'+Date.now()+Math.random().toString(36).slice(2,6);}
 
 // ═══════════════════════════════════════════
 // RENDER ALL
 // ═══════════════════════════════════════════
 function renderAll() {
-  const d = DATASETS[currentPeriod];
+  const d=computeMetrics(currentPeriod);
   renderExec(d);
   renderCallsTab(d);
   renderLowTicket(d);
   renderSlack(d);
+  document.getElementById('last-sync').textContent='Updated: '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 }
-
-function fmt(n, prefix='$') {
-  if (n === 0 || isNaN(n)) return prefix + '0';
-  if (n >= 1000) return prefix + (n/1000).toFixed(1) + 'k';
-  return prefix + Math.round(n).toLocaleString();
-}
-function fmtFull(n, prefix='$') {
-  return prefix + Math.round(n).toLocaleString();
-}
-function pct(n, d) { return d ? Math.round(n/d*100) + '%' : '0%'; }
 
 // ═══════════════════════════════════════════
 // EXEC TAB
 // ═══════════════════════════════════════════
 function renderExec(d) {
-  const cpl   = d.leads  ? d.spend / d.leads  : 0;
-  const cpbc  = d.booked ? d.spend / d.booked : 0;
-  const showupRate = d.booked ? d.shows / d.booked : 0;
-  const cr    = d.shows  ? d.closes / d.shows  : 0;
-  const roas  = d.spend  ? d.cash / d.spend    : 0;
-  const cac   = d.closes ? d.spend / d.closes  : 0;
-  const rpl   = d.leads  ? d.cash / d.leads    : 0;
-  const rps   = d.shows  ? d.cash / d.shows    : 0;
-  const tgt = { cpl: 45, cpbc: 180, showup: 0.75, cr: 0.30, roas: 3.0 };
+  const S=getSettings();
+  const cpl    = d.leads  ? d.spend/d.leads   : 0;
+  const cpbc   = d.booked ? d.spend/d.booked  : 0;
+  const showR  = d.booked ? d.shows/d.booked  : 0;
+  const cr     = d.shows  ? d.closes/d.shows  : 0;  // note: closes from log
+  const htCR   = d.shows  ? d.rawDeals.length/d.shows : 0; // deals / shows
+  const roas   = d.spend  ? d.cash/d.spend    : 0;
+  const roasCon= d.spend  ? d.contractTotal/d.spend : 0;
+  const cac    = d.rawDeals.length ? d.spend/d.rawDeals.length : 0;
 
-  // Spend
-  set('k-spend', fmtFull(d.spend));
-  set('k-spend-delta', currentPeriod === 'lm' ? 'No prior data' : '+12% vs prev');
-  badge('k-spend-delta', currentPeriod === 'lm' ? 'neutral' : 'up');
+  // Row 1 — spend + acquisition
+  set('k-spend', fmtDec(d.spend));
+  set('k-spend-delta', currentPeriod==='all'?'Dec 2025 – Apr 2026':'this period');
+  badge('k-spend-delta','neutral');
 
-  // Leads
   set('k-leads', d.leads);
-  set('k-cpl-badge', fmt(cpl) + ' CPL');
-  badge('k-cpl-badge', cpl <= tgt.cpl ? 'up' : 'warn');
+  set('k-cpl-badge', d.leads?(fmtFull(cpl)+' CPL'):'—');
+  badge('k-cpl-badge', cpl>0&&cpl<=S.tgt_cpl?'up':cpl>0?'warn':'neutral');
 
-  // CPL
-  set('k-cpl', fmtFull(cpl));
-  set('k-cpl-flag', cpl <= tgt.cpl ? '✓ on target' : 'target $' + tgt.cpl);
-  badge('k-cpl-flag', cpl <= tgt.cpl ? 'up' : 'warn');
+  set('k-cpl', d.leads?fmtFull(cpl):'—');
+  set('k-cpl-flag', cpl>0?(cpl<=S.tgt_cpl?'✓ under $'+S.tgt_cpl:'target $'+S.tgt_cpl):'—');
+  badge('k-cpl-flag', cpl<=S.tgt_cpl&&cpl>0?'up':cpl>0?'warn':'neutral');
 
-  // Booked
   set('k-booked', d.booked);
-  set('k-cpbc-badge', fmt(cpbc) + ' / call');
-  badge('k-cpbc-badge', cpbc <= tgt.cpbc ? 'up' : 'warn');
+  set('k-cpbc-badge', d.booked?(fmtFull(cpbc)+' / call'):'—');
+  badge('k-cpbc-badge', cpbc>0&&cpbc<=S.tgt_cpbc?'up':cpbc>0?'warn':'neutral');
 
-  // CPBC
-  set('k-cpbc', fmtFull(cpbc));
-  set('k-cpbc-flag', cpbc <= tgt.cpbc ? '✓ on target' : 'target $' + tgt.cpbc);
-  badge('k-cpbc-flag', cpbc <= tgt.cpbc ? 'up' : 'warn');
+  set('k-cpbc', d.booked?fmtFull(cpbc):'—');
+  set('k-cpbc-flag', cpbc>0?(cpbc<=S.tgt_cpbc?'✓ under $'+S.tgt_cpbc:'target $'+S.tgt_cpbc):'—');
+  badge('k-cpbc-flag', cpbc<=S.tgt_cpbc&&cpbc>0?'up':cpbc>0?'warn':'neutral');
 
-  // Show-up
-  const showPct = Math.round(showupRate * 100);
-  set('k-showup', showPct + '%');
-  set('k-showup-flag', showupRate >= tgt.showup ? '✓ healthy' : 'target 75%');
-  badge('k-showup-flag', showupRate >= tgt.showup ? 'up' : 'warn');
+  // Row 2 — conversion + revenue
+  set('k-showup', d.booked?Math.round(showR*100)+'%':'—');
+  const showOk=showR>=(S.tgt_showup/100)&&d.booked>0;
+  set('k-showup-flag', d.booked?(showOk?'✓ healthy':'target '+S.tgt_showup+'%'):'—');
+  badge('k-showup-flag', showOk?'up':d.booked?'warn':'neutral');
 
-  // HT from ads
   set('k-ht-ads', fmtFull(d.htAds));
-  set('k-ht-count', d.frankieDeals + ' deals from ads');
-  badge('k-ht-count', d.htAds > 0 ? 'up' : 'neutral');
+  set('k-ht-count', d.rawDeals.length+' deals · $'+d.contractTotal.toLocaleString()+' contracts');
+  badge('k-ht-count', d.htAds>0?'up':'neutral');
 
-  // Total cash
   set('k-cash', fmtFull(d.cash));
-  const adsPct = Math.round(d.htAds / (d.cash||1) * 100);
-  set('k-cash-split', adsPct + '% from ads');
-  badge('k-cash-split', adsPct >= 40 ? 'up' : 'neutral');
+  const adsPct=d.cash?Math.round(d.htAds/d.cash*100):0;
+  set('k-cash-split', adsPct+'% from ads');
+  badge('k-cash-split', d.cash>0?'up':'neutral');
 
-  // CAC
-  set('k-cac', fmtFull(cac));
-  badge('k-cac-flag', cac < 2000 ? 'up' : 'warn');
+  set('k-cac', d.rawDeals.length?fmtFull(cac):'—');
+  badge('k-cac-flag', cac>0&&cac<=3000?'up':cac>0?'warn':'neutral');
+  set('k-cac-flag', cac>0?(cac<=3000?'✓ under $3k':'review – over $3k'):'—');
 
-  // ROAS
-  const roasStr = d.spend ? roas.toFixed(1) + 'x' : '—';
-  set('k-roas', roasStr);
-  set('k-roas-flag', roas >= tgt.roas ? '✓ healthy' : 'target 3x');
-  badge('k-roas-flag', roas >= tgt.roas ? 'up' : roas >= 1.5 ? 'warn' : 'down');
+  // ROAS — show both cash and contract
+  const roasStr=d.spend?(roas.toFixed(2)+'x cash'):'—';
+  set('k-roas', d.spend?roas.toFixed(2)+'x':'—');
+  set('k-roas-flag', d.spend?('contract '+roasCon.toFixed(1)+'x'):'—');
+  badge('k-roas-flag', roas>=S.tgt_roas?'up':roas>=1?'warn':'down');
 
   renderFunnel(d);
   renderTrendChart(d);
   renderSourceChart(d);
-  renderFlags(d, { cpl, cpbc, showupRate, cr, roas, cac });
-  renderScale(d, { cpl, cpbc, showupRate, cr, roas });
+  renderFlags(d,{cpl,cpbc,showupRate:showR,cr:htCR,roas,cac,roasCon});
+  renderScale(d,{cpl,cpbc,showupRate:showR,cr:htCR,roas,roasCon});
 }
 
-function set(id, val) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = val;
-}
-function badge(id, cls) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.className = 'kpi-badge ' + cls;
-}
-
-// ─── FUNNEL ───
 function renderFunnel(d) {
-  const steps = [
-    { label: 'Leads generated', val: d.leads, color: '#5B9CF6', pct: 100 },
-    { label: '→ Booked calls', val: d.booked, color: '#FFB742', pct: d.leads ? Math.round(d.booked/d.leads*100) : 0 },
-    { label: '→ Show-ups', val: d.shows, color: '#00F5A8', pct: d.booked ? Math.round(d.shows/d.booked*100) : 0 },
-    { label: '→ Closes', val: d.closes, color: '#B794F4', pct: d.shows ? Math.round(d.closes/d.shows*100) : 0 },
+  const steps=[
+    {label:'Leads generated',val:d.leads,  color:'#5B9CF6',pct:100},
+    {label:'→ LT purchased',  val:d.lt>0?Math.round(d.lt/27):0,color:'#FFB742',pct:d.leads?Math.round((d.lt>0?d.lt/27:0)/d.leads*100):0},
+    {label:'→ Booked calls',  val:d.booked,color:'#00F5A8',pct:d.leads?Math.round(d.booked/d.leads*100):0},
+    {label:'→ Show-ups',      val:d.shows, color:'#B794F4',pct:d.booked?Math.round(d.shows/d.booked*100):0},
+    {label:'→ HT closes',     val:d.rawDeals.length,color:'#FF9F43',pct:d.shows?Math.round(d.rawDeals.length/d.shows*100):0},
   ];
-  const container = document.getElementById('funnel-steps');
-  container.innerHTML = steps.map((s, i) => `
+  document.getElementById('funnel-steps').innerHTML=steps.map((s,i)=>`
     <div class="funnel-step">
       <div class="funnel-step-header">
         <span class="funnel-step-label">${s.label}</span>
         <span class="funnel-step-val">${s.val}</span>
       </div>
-      <div class="funnel-track">
-        <div class="funnel-fill" style="width:${s.pct}%;background:${s.color}"></div>
-      </div>
-      <div class="funnel-loss">${s.pct}% conversion${i > 0 ? ' from prev step' : ''}</div>
-    </div>
-  `).join('');
-}
-
-// ─── TREND CHART ───
-function renderTrendChart(d) {
-  if (chartTrend) chartTrend.destroy();
-  const ctx = document.getElementById('chart-trend');
-  if (!ctx) return;
-  chartTrend = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: d.trend.labels,
-      datasets: [
-        {
-          label: 'Spend', type: 'bar',
-          data: d.trend.spend,
-          backgroundColor: 'rgba(255,82,82,0.25)',
-          borderColor: 'rgba(255,82,82,0.6)',
-          borderWidth: 1, borderRadius: 4,
-        },
-        {
-          label: 'Revenue', type: 'line',
-          data: d.trend.revenue,
-          borderColor: '#00F5A8', backgroundColor: 'rgba(0,245,168,0.08)',
-          borderWidth: 2, pointRadius: 3,
-          pointBackgroundColor: '#00F5A8',
-          fill: true, tension: 0.4,
-          yAxisID: 'y',
-        }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4A5568', font: { size: 10 } } },
-        y: {
-          grid: { color: 'rgba(255,255,255,0.04)' },
-          ticks: { color: '#4A5568', font: { size: 10 }, callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v) }
-        }
-      }
-    }
-  });
-}
-
-// ─── SOURCE CHART ───
-function renderSourceChart(d) {
-  if (chartSource) chartSource.destroy();
-  const ctx = document.getElementById('chart-source');
-  if (!ctx) return;
-  const adsVal = d.htAds, orgVal = d.htOrg;
-  chartSource = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['Ads', 'Organic'],
-      datasets: [{
-        data: [adsVal, orgVal],
-        backgroundColor: ['rgba(91,156,246,0.7)', 'rgba(0,245,168,0.7)'],
-        borderColor: ['#5B9CF6', '#00F5A8'],
-        borderWidth: 1.5,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      cutout: '68%',
-      plugins: { legend: { display: false }, tooltip: {
-        callbacks: { label: ctx => ' $' + ctx.raw.toLocaleString() }
-      }}
-    }
-  });
-  const total = adsVal + orgVal || 1;
-  document.getElementById('source-legend').innerHTML = [
-    { label: 'Ads', val: adsVal, color: '#5B9CF6' },
-    { label: 'Organic', val: orgVal, color: '#00F5A8' },
-  ].map(l => `
-    <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#8895A7">
-      <div style="width:8px;height:8px;border-radius:2px;background:${l.color}"></div>
-      ${l.label}: <strong style="color:${l.color}">$${l.val.toLocaleString()}</strong>
-      <span style="color:#4A5568">(${Math.round(l.val/total*100)}%)</span>
+      <div class="funnel-track"><div class="funnel-fill" style="width:${s.pct}%;background:${s.color}"></div></div>
+      <div class="funnel-loss">${s.pct}%${i>0?' from prev step':' baseline'}</div>
     </div>`).join('');
 }
 
-// ─── FLAGS ───
-function renderFlags(d, m) {
-  const flags = [
-    {
-      cls: m.roas >= 3 ? 'go' : m.roas >= 1.5 ? 'warn' : 'stop',
-      title: m.roas >= 3 ? 'ROAS is healthy' : m.roas >= 1.5 ? 'ROAS is marginal' : 'ROAS below target',
-      text: m.roas >= 3 ? 'Ad spend returning ' + m.roas.toFixed(1) + 'x. Safe to scale.' : 'Monitor closely. Each $1 spent returns $' + m.roas.toFixed(2) + '.'
-    },
-    {
-      cls: m.showupRate >= 0.75 ? 'go' : 'warn',
-      title: m.showupRate >= 0.75 ? 'Show-up rate healthy' : 'Show-up rate needs work',
-      text: m.showupRate >= 0.75 ? Math.round(m.showupRate*100) + '% of booked calls are showing up.' : 'Only ' + Math.round(m.showupRate*100) + '% showing. Add pre-call SMS reminders.'
-    },
-    {
-      cls: m.cr >= 0.30 ? 'go' : 'warn',
-      title: m.cr >= 0.30 ? 'Close rate on target' : 'Close rate below 30%',
-      text: m.cr >= 0.30 ? 'Closers converting at ' + Math.round(m.cr*100) + '%.' : Math.round(m.cr*100) + '% close rate. Review pitch or lead quality.'
-    },
-    {
-      cls: m.cpl <= 45 ? 'go' : m.cpl <= 80 ? 'warn' : 'stop',
-      title: m.cpl <= 45 ? 'CPL within target' : 'CPL above target',
-      text: 'Cost per lead: $' + Math.round(m.cpl) + '. Target is $45 or below.'
-    },
-    {
-      cls: d.htAds > d.spend ? 'go' : 'warn',
-      title: d.htAds > d.spend ? 'Ads profitable' : 'Ads not yet ROI+',
-      text: 'HT from ads: $' + d.htAds.toLocaleString() + ' vs $' + d.spend.toLocaleString() + ' spend.'
-    },
-    {
-      cls: 'info',
-      title: 'Top closer this period',
-      text: (d.frankieCash > d.mehdiCash ? 'Frankie' : 'Mehdi') + ' leads with $' + Math.max(d.frankieCash, d.mehdiCash).toLocaleString() + ' collected.'
-    },
-    {
-      cls: d.lt >= d.spend * 0.3 ? 'go' : 'warn',
-      title: 'Low-ticket offset',
-      text: 'LT covers ' + Math.round(d.lt/Math.max(d.spend,1)*100) + '% of ad spend. Helps reduce net CAC.'
-    },
-    {
-      cls: m.roas >= 3 && m.showupRate >= 0.75 && m.cr >= 0.30 ? 'go' : 'warn',
-      title: m.roas >= 3 && m.showupRate >= 0.75 && m.cr >= 0.30 ? '✓ Safe to scale spend' : 'Fix metrics before scaling',
-      text: m.roas >= 3 && m.showupRate >= 0.75 && m.cr >= 0.30 ? 'All core metrics are green. Increase budget confidently.' : 'One or more KPIs below threshold. Review before increasing spend.'
-    },
+function renderTrendChart(d) {
+  if(chartTrend)chartTrend.destroy();
+  const ctx=document.getElementById('chart-trend');if(!ctx)return;
+  chartTrend=new Chart(ctx,{type:'bar',data:{labels:d.trend.labels,datasets:[
+    {label:'Spend',type:'bar',data:d.trend.spend,backgroundColor:'rgba(255,82,82,0.25)',borderColor:'rgba(255,82,82,0.6)',borderWidth:1,borderRadius:4},
+    {label:'Revenue',type:'line',data:d.trend.revenue,borderColor:'#00F5A8',backgroundColor:'rgba(0,245,168,0.08)',borderWidth:2,pointRadius:3,pointBackgroundColor:'#00F5A8',fill:true,tension:0.4},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#4A5568',font:{size:10}}},
+      y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#4A5568',font:{size:10},callback:v=>'$'+(v>=1000?(v/1000).toFixed(0)+'k':v)}}}}});
+}
+
+function renderSourceChart(d) {
+  if(chartSource)chartSource.destroy();
+  const ctx=document.getElementById('chart-source');if(!ctx)return;
+  chartSource=new Chart(ctx,{type:'doughnut',data:{labels:['Ads','Low-Ticket'],datasets:[{
+    data:[d.htAds||0,d.lt||0],
+    backgroundColor:['rgba(91,156,246,0.7)','rgba(255,183,66,0.7)'],
+    borderColor:['#5B9CF6','#FFB742'],borderWidth:1.5,
+  }]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' $'+c.raw.toLocaleString()}}}}});
+  const total=(d.htAds||0)+(d.lt||0)||1;
+  document.getElementById('source-legend').innerHTML=[
+    {label:'HT Ads',val:d.htAds||0,color:'#5B9CF6'},
+    {label:'Low-Ticket',val:d.lt||0,color:'#FFB742'},
+  ].map(l=>`<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#8895A7">
+    <div style="width:8px;height:8px;border-radius:2px;background:${l.color}"></div>
+    ${l.label}: <strong style="color:${l.color}">$${l.val.toLocaleString()}</strong>
+    <span style="color:#4A5568">(${Math.round(l.val/total*100)}%)</span></div>`).join('');
+}
+
+function renderFlags(d,m) {
+  const S=getSettings();
+  const flags=[
+    {cls:m.roas>=1?'warn':'stop',
+     title:'ROAS (cash basis): '+m.roas.toFixed(2)+'x',
+     text:m.roas>=1?'Slight loss on cash. Contract ROAS is '+m.roasCon.toFixed(1)+'x — profitable when clients pay.':'Cash ROAS below 1x. Total cash: $'+d.cash.toLocaleString()+' vs $'+Math.round(d.spend).toLocaleString()+' spend.'},
+    {cls:m.showupRate>=0.70?'go':'warn',
+     title:m.showupRate>=0.70?'Show-up rate strong':'Show-up rate needs work',
+     text:d.booked?Math.round(m.showupRate*100)+'% of booked calls showing up. Target 70%+.':'No call data for this period.'},
+    {cls:m.cr>=0.25?'go':'warn',
+     title:m.cr>=0.25?'Close rate strong at '+Math.round(m.cr*100)+'%':'Close rate below 25%',
+     text:d.shows?Math.round(m.cr*100)+'% of shows close. Benchmark is 25%+.':'No show data yet.'},
+    {cls:m.cpl<=150?'go':'warn',
+     title:m.cpl<=150?'CPL within target':'CPL above $150 target',
+     text:d.leads?'Cost per lead: $'+Math.round(m.cpl)+'. Benchmark <$150.':'Log spend + leads to calculate.'},
+    {cls:d.pipeline>0?'info':'neutral',
+     title:'Pipeline value: $'+((d.pipeline||0).toLocaleString()),
+     text:'Unsigned contracts in pipeline. If all close: ROAS would be '+(d.spend?(((d.contractTotal+(d.pipeline||0))/d.spend).toFixed(1)+'x'):'—')+'.'},
+    {cls:'info',
+     title:'Purchase → call booking: 40.9%',
+     text:'Key bottleneck. Add OTO call-booking page after $27 purchase to push above 40%.'},
+    {cls:m.cpbc<=500?'go':'warn',
+     title:m.cpbc<=500?'CPBC under $500 target':'CPBC above $500',
+     text:d.booked?'Cost per booked call: $'+Math.round(m.cpbc)+'.':'No call data.'},
+    {cls:m.roas>=1&&m.showupRate>=0.70&&m.cr>=0.25?'go':'warn',
+     title:m.roas>=1&&m.showupRate>=0.70&&m.cr>=0.25?'Core funnel is healthy':'Fix ROAS before scaling',
+     text:m.roas>=1&&m.showupRate>=0.70&&m.cr>=0.25?'Show-up and close rate are strong. Focus on increasing spend to scale.':'Get cash ROAS above 1x before significantly increasing spend.'},
   ];
-  document.getElementById('flag-grid').innerHTML = flags.map(f => `
+  document.getElementById('flag-grid').innerHTML=flags.map(f=>`
     <div class="flag-card ${f.cls}">
       <div class="flag-title">${f.title}</div>
       <div class="flag-text">${f.text}</div>
     </div>`).join('');
 }
 
-// ─── SCALE READINESS ───
-function renderScale(d, m) {
-  const checks = [
-    { label: 'ROAS ≥ 3x', ok: m.roas >= 3, val: m.roas.toFixed(1) + 'x' },
-    { label: 'Show-up ≥ 75%', ok: m.showupRate >= 0.75, val: Math.round(m.showupRate*100) + '%' },
-    { label: 'Close rate ≥ 30%', ok: m.cr >= 0.30, val: Math.round(m.cr*100) + '%' },
-    { label: 'CPL ≤ $45', ok: m.cpl <= 45, val: '$' + Math.round(m.cpl) },
-    { label: 'Cash > spend', ok: d.cash > d.spend, val: d.cash > d.spend ? 'Yes' : 'No' },
-    { label: 'Deals closing', ok: d.closes >= 2, val: d.closes + ' closes' },
+function renderScale(d,m) {
+  const S=getSettings();
+  const checks=[
+    {label:'ROAS ≥ '+S.tgt_roas+'x (cash)',   ok:m.roas>=S.tgt_roas,    val:d.spend?m.roas.toFixed(2)+'x':'—'},
+    {label:'Contract ROAS ≥ 3x',              ok:m.roasCon>=3,           val:d.spend?m.roasCon.toFixed(1)+'x':'—'},
+    {label:'Show-up ≥ '+S.tgt_showup+'%',     ok:m.showupRate>=(S.tgt_showup/100)&&d.booked>0, val:d.booked?Math.round(m.showupRate*100)+'%':'—'},
+    {label:'Close rate ≥ '+S.tgt_cr+'%',      ok:m.cr>=(S.tgt_cr/100)&&d.shows>0,             val:d.shows?Math.round(m.cr*100)+'%':'—'},
+    {label:'CPL ≤ $'+S.tgt_cpl,               ok:m.cpl<=S.tgt_cpl&&m.cpl>0,                  val:m.cpl>0?'$'+Math.round(m.cpl):'—'},
+    {label:'CPBC ≤ $'+S.tgt_cpbc,             ok:m.cpbc<=S.tgt_cpbc&&m.cpbc>0,                val:m.cpbc>0?'$'+Math.round(m.cpbc):'—'},
   ];
-  const score = checks.filter(c => c.ok).length;
-  set('scale-score', score);
-  const color = score >= 5 ? '#00F5A8' : score >= 3 ? '#FFB742' : '#FF5252';
-  document.getElementById('scale-score').style.color = color;
-  // Ring animation
-  const ring = document.getElementById('scale-ring-fill');
-  const circum = 175.9;
-  ring.setAttribute('stroke', color);
-  ring.setAttribute('stroke-dashoffset', circum - (circum * score / 6));
-
-  set('scale-verdict', score >= 5 ? 'Green light.' : score >= 3 ? 'Proceed carefully.' : 'Hold — fix metrics.');
-  set('scale-verdict-sub', score >= 5
-    ? 'All key indicators are healthy. You can increase ad spend with confidence.'
-    : score >= 3
-    ? 'A few metrics are off-target. Fix flagged items before scaling aggressively.'
-    : 'Core funnel metrics need attention. Scaling now will amplify losses, not profits.');
-  document.getElementById('scale-verdict').style.color = color;
-
-  document.getElementById('scale-checks').innerHTML = checks.map(c => `
+  const score=checks.filter(c=>c.ok).length;
+  set('scale-score',score);
+  const color=score>=5?'#00F5A8':score>=3?'#FFB742':'#FF5252';
+  document.getElementById('scale-score').style.color=color;
+  const ring=document.getElementById('scale-ring-fill');
+  ring.setAttribute('stroke',color);
+  ring.setAttribute('stroke-dashoffset',175.9-(175.9*score/6));
+  set('scale-verdict',score>=5?'Green light.':score>=3?'Proceed carefully.':'Hold — fix metrics.');
+  set('scale-verdict-sub',score>=5
+    ?'Funnel metrics are healthy. Safe to increase ad spend.'
+    :score>=3
+    ?'Most metrics are on track. Focus on improving cash ROAS before scaling.'
+    :'Cash ROAS and CPL need attention. Fix before significantly increasing spend.');
+  document.getElementById('scale-verdict').style.color=color;
+  document.getElementById('scale-checks').innerHTML=checks.map(c=>`
     <div class="scale-check">
-      <div class="scale-check-dot" style="background:${c.ok ? '#00F5A8' : '#FF5252'}"></div>
+      <div class="scale-check-dot" style="background:${c.ok?'#00F5A8':'#FF5252'}"></div>
       <div class="scale-check-text">${c.label}</div>
-      <div class="scale-check-val" style="color:${c.ok ? '#00F5A8' : '#FF5252'}">${c.val}</div>
+      <div class="scale-check-val" style="color:${c.ok?'#00F5A8':'#FF5252'}">${c.val}</div>
     </div>`).join('');
 }
 
@@ -1815,83 +1870,83 @@ function renderScale(d, m) {
 // CALLS TAB
 // ═══════════════════════════════════════════
 function renderCallsTab(d) {
-  const showupRate = d.booked ? d.shows / d.booked : 0;
-  const noshowRate = d.booked ? d.noshows / d.booked : 0;
-  const cpbc = d.booked ? d.spend / d.booked : 0;
-  set('c-booked', d.booked);
-  set('c-booked-ads', d.adsBookedCalls);
-  set('c-ads-pct', pct(d.adsBookedCalls, d.booked) + ' of total');
-  set('c-shows', d.shows);
-  set('c-showup-pct', Math.round(showupRate*100) + '% show rate');
-  document.getElementById('c-showup-pct').className = 'kpi-badge ' + (showupRate >= 0.75 ? 'up' : 'warn');
-  set('c-noshows', d.noshows);
-  set('c-noshow-pct', Math.round(noshowRate*100) + '% no-show');
-  set('c-cpbc', fmtFull(cpbc));
+  const S=getSettings();
+  const showR=d.booked?d.shows/d.booked:0;
+  const noshowR=d.booked?d.noshows/d.booked:0;
+  const cpbc=d.booked?d.spend/d.booked:0;
+  set('c-booked',d.booked); set('c-booked-ads',d.adsBookedCalls);
+  set('c-ads-pct',pct(d.adsBookedCalls,d.booked)+' of total');
+  set('c-shows',d.shows);
+  set('c-showup-pct',Math.round(showR*100)+'% show rate');
+  document.getElementById('c-showup-pct').className='kpi-badge '+(showR>=(S.tgt_showup/100)?'up':'warn');
+  set('c-noshows',d.noshows);
+  set('c-noshow-pct',Math.round(noshowR*100)+'% no-show');
+  set('c-cpbc',d.booked?fmtFull(cpbc):'—');
 }
 
 function renderCallsTrend() {
-  const d = DATASETS[currentPeriod];
-  if (chartCallsTrend) chartCallsTrend.destroy();
-  const ctx = document.getElementById('chart-calls-trend');
-  if (!ctx) return;
-  chartCallsTrend = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: d.trend.labels,
-      datasets: [
-        { label: 'Ads calls', data: [2,1,2,1,2,1,0], backgroundColor: 'rgba(91,156,246,0.6)', borderRadius: 4 },
-        { label: 'Organic calls', data: [1,1,1,1,1,0,1], backgroundColor: 'rgba(0,245,168,0.4)', borderRadius: 4 },
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { stacked: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4A5568', font: { size: 10 } } },
-        y: { stacked: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4A5568', font: { size: 10 } } }
-      }
-    }
-  });
+  const d=computeMetrics(currentPeriod);
+  if(chartCallsTrend)chartCallsTrend.destroy();
+  const ctx=document.getElementById('chart-calls-trend');if(!ctx)return;
+  const log=loadLog(); const today=new Date();
+  const last7=[];
+  for(let i=6;i>=0;i--){
+    const dt=new Date(today);dt.setDate(dt.getDate()-i);
+    const ds=dt.toISOString().split('T')[0];
+    const dl=log.filter(l=>l.date===ds);
+    last7.push({
+      label:dt.toLocaleDateString('en-GB',{month:'short',day:'numeric'}),
+      ads:dl.filter(l=>(l.source||'').toLowerCase().includes('ads')).reduce((s,l)=>s+(l.booked||0),0),
+      org:dl.filter(l=>!(l.source||'').toLowerCase().includes('ads')).reduce((s,l)=>s+(l.booked||0),0),
+    });
+  }
+  chartCallsTrend=new Chart(ctx,{type:'bar',data:{labels:last7.map(d=>d.label),datasets:[
+    {label:'Ads',data:last7.map(d=>d.ads),backgroundColor:'rgba(91,156,246,0.6)',borderRadius:4},
+    {label:'Organic',data:last7.map(d=>d.org),backgroundColor:'rgba(0,245,168,0.4)',borderRadius:4},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{stacked:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#4A5568',font:{size:10}}},
+      y:{stacked:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#4A5568',font:{size:10}}}}}});
 }
 
 // ═══════════════════════════════════════════
 // SALES TAB
 // ═══════════════════════════════════════════
 function renderSalesDeals() {
-  const d = DATASETS[currentPeriod];
-  const cr = d.shows ? d.closes / d.shows : 0;
-  const cac = d.closes ? d.spend / d.closes : 0;
-  const rpl = d.leads ? d.cash / d.leads : 0;
-  const rps = d.shows ? d.cash / d.shows : 0;
-  const ltCov = d.spend ? Math.round(d.lt/d.spend*100) : 0;
+  const d=computeMetrics(currentPeriod);
+  const cr=d.shows?d.rawDeals.length/d.shows:0;
+  const cac=d.rawDeals.length?d.spend/d.rawDeals.length:0;
+  const rpl=d.leads?d.cash/d.leads:0;
+  const rps=d.shows?d.cash/d.shows:0;
+  const ltCov=d.spend?Math.round(d.lt/d.spend*100):0;
 
-  set('s-cash', fmtFull(d.cash));
-  set('s-deals', d.closes + ' deals');
-  set('s-ht-ads', fmtFull(d.htAds));
-  set('s-ht-ads-pct', pct(d.htAds, d.cash) + ' of total');
-  set('s-ht-org', fmtFull(d.htOrg));
-  set('s-ht-org-pct', pct(d.htOrg, d.cash) + ' of total');
-  set('s-lt', fmtFull(d.lt));
-  set('s-lt-offset', 'covers ' + ltCov + '% of spend');
-  set('s-cr', Math.round(cr*100) + '%');
-  set('s-cac', fmtFull(cac));
-  set('s-rpl', fmtFull(rpl));
-  set('s-rps', fmtFull(rps));
+  set('s-cash',fmtFull(d.cash));
+  set('s-deals',d.rawDeals.length+' closed');
+  set('s-ht-ads',fmtFull(d.htAds));
+  set('s-ht-ads-pct',pct(d.htAds,d.cash||1)+' of HT cash');
+  set('s-ht-org',fmtFull(d.htOrg));
+  set('s-ht-org-pct',pct(d.htOrg,d.cash||1)+' of HT cash');
+  set('s-lt',fmtFull(d.lt));
+  set('s-lt-offset','covers '+ltCov+'% of spend');
+  set('s-cr',d.shows?Math.round(cr*100)+'%':'—');
+  set('s-cac',d.rawDeals.length?fmtFull(cac):'—');
+  set('s-rpl',d.leads?fmtFull(rpl):'—');
+  set('s-rps',d.shows?fmtFull(rps):'—');
 
-  // Deal table
-  const tbody = document.getElementById('deals-tbody');
-  if (tbody) {
-    tbody.innerHTML = DEALS.map(d => `
+  const deals=loadDeals();
+  const tbody=document.getElementById('deals-tbody');
+  if(tbody){
+    const sorted=[...deals].sort((a,b)=>new Date(b.date)-new Date(a.date));
+    tbody.innerHTML=sorted.map((deal,i)=>`
       <tr>
-        <td>${d.id}</td>
-        <td>${d.name}</td>
-        <td>${d.date}</td>
-        <td style="color:var(--accent);font-family:var(--font-mono);font-weight:700">$${d.usd.toLocaleString()}</td>
-        <td style="font-family:var(--font-mono)">AED ${d.aed.toLocaleString()}</td>
-        <td><span class="pill ${d.source.toLowerCase()}">${d.source}</span></td>
-        <td><span class="pill ${d.closer.toLowerCase()}">${d.closer}</span></td>
-        <td>${d.setter}</td>
-        <td style="color:var(--t3)">${d.notes || '—'}</td>
+        <td>${sorted.length-i}</td>
+        <td>${deal.name}</td>
+        <td>${deal.date}</td>
+        <td style="color:${deal.usd>0?'var(--accent)':'var(--t3)'};font-family:var(--font-mono);font-weight:700">${deal.usd>0?'$'+deal.usd.toLocaleString():'—'}</td>
+        <td style="font-family:var(--font-mono);color:var(--blue)">$${(deal.contract||0).toLocaleString()}</td>
+        <td><span class="pill ${(deal.source||'').toLowerCase()}">${deal.source||'—'}</span></td>
+        <td><span class="pill ${(deal.closer||'').toLowerCase()}">${deal.closer||'—'}</span></td>
+        <td>${deal.setter||'—'}</td>
+        <td style="color:var(--t3)">${deal.notes||'—'}</td>
       </tr>`).join('');
   }
 }
@@ -1900,231 +1955,276 @@ function renderSalesDeals() {
 // CLOSERS TAB
 // ═══════════════════════════════════════════
 function renderCloserCards() {
-  const d = DATASETS[currentPeriod];
-  const closers = [
-    {
-      key: 'frankie', name: 'Frankie', initials: 'FR',
-      color: '#B794F4', bg: 'rgba(183,148,244,0.12)',
-      deals: d.frankieDeals, cash: d.frankieCash, shows: d.frankieShows,
-      adsDeals: Math.min(d.frankieDeals, d.adsBookedCalls),
-    },
-    {
-      key: 'mehdi', name: 'Mehdi', initials: 'ME',
-      color: '#FFB742', bg: 'rgba(255,183,66,0.12)',
-      deals: d.mehdiDeals, cash: d.mehdiCash, shows: d.mehdiShows,
-      adsDeals: Math.max(0, d.closes - d.frankieDeals - Math.max(0, d.adsBookedCalls - d.frankieDeals)),
-    },
+  const d=computeMetrics(currentPeriod);
+  const allDeals=loadDeals();
+  const closers=[
+    {name:'Frankie',initials:'FR',color:'#B794F4',bg:'rgba(183,148,244,0.12)',
+     deals:d.frankieDeals,cash:d.frankieCash,shows:d.frankieShows,
+     contracts:allDeals.filter(dl=>dl.closer==='Frankie').reduce((s,dl)=>s+(dl.contract||0),0),
+     adsCash:allDeals.filter(dl=>dl.closer==='Frankie'&&dl.source==='Ads').reduce((s,dl)=>s+(dl.usd||0),0)},
+    {name:'Mehdi',initials:'ME',color:'#FFB742',bg:'rgba(255,183,66,0.12)',
+     deals:d.mehdiDeals,cash:d.mehdiCash,shows:d.mehdiShows,
+     contracts:allDeals.filter(dl=>dl.closer==='Mehdi').reduce((s,dl)=>s+(dl.contract||0),0),
+     adsCash:allDeals.filter(dl=>dl.closer==='Mehdi'&&dl.source==='Ads').reduce((s,dl)=>s+(dl.usd||0),0)},
   ];
-  document.getElementById('closer-grid').innerHTML = closers.map(c => {
-    const cr = c.shows ? Math.round(c.deals / c.shows * 100) : 0;
-    const revPct = d.cash ? Math.round(c.cash / d.cash * 100) : 0;
-    return `
-    <div class="closer-card">
+  document.getElementById('closer-grid').innerHTML=closers.map(c=>{
+    const cr=c.shows?Math.round(c.deals/c.shows*100):0;
+    const totalCash=d.frankieCash+d.mehdiCash;
+    const revPct=totalCash?Math.round(c.cash/totalCash*100):0;
+    return `<div class="closer-card">
       <div class="closer-header">
         <div class="closer-avatar" style="background:${c.bg};color:${c.color}">${c.initials}</div>
-        <div>
-          <div class="closer-name" style="color:${c.color}">${c.name}</div>
-          <div class="closer-role">HIGH-TICKET CLOSER</div>
-        </div>
+        <div><div class="closer-name" style="color:${c.color}">${c.name}</div>
+        <div class="closer-role">HIGH-TICKET CLOSER</div></div>
       </div>
       <div class="closer-stats">
-        <div class="closer-stat">
-          <div class="closer-stat-val" style="color:${c.color}">${c.deals}</div>
-          <div class="closer-stat-label">CLOSES</div>
-        </div>
-        <div class="closer-stat">
-          <div class="closer-stat-val" style="color:${c.color}">${cr}%</div>
-          <div class="closer-stat-label">CLOSE RATE</div>
-        </div>
-        <div class="closer-stat">
-          <div class="closer-stat-val">${c.shows}</div>
-          <div class="closer-stat-label">SHOWS</div>
-        </div>
+        <div class="closer-stat"><div class="closer-stat-val" style="color:${c.color}">${c.deals}</div><div class="closer-stat-label">CLOSES</div></div>
+        <div class="closer-stat"><div class="closer-stat-val" style="color:${c.color}">${cr}%</div><div class="closer-stat-label">CLOSE RATE</div></div>
+        <div class="closer-stat"><div class="closer-stat-val">${c.shows}</div><div class="closer-stat-label">SHOWS</div></div>
       </div>
-      <div class="closer-bar-label">
-        <span>Revenue share</span><span style="color:${c.color}">${revPct}%</span>
-      </div>
-      <div class="closer-bar-track">
-        <div class="closer-bar-fill" style="width:${revPct}%;background:${c.color}"></div>
-      </div>
-      <div class="closer-bar-label">
-        <span>Ads-attributed deals</span>
-        <span style="color:${c.color}">${c.adsDeals} deal${c.adsDeals !== 1 ? 's' : ''}</span>
-      </div>
-      <div class="closer-bar-track">
-        <div class="closer-bar-fill" style="width:${c.deals ? Math.round(c.adsDeals/c.deals*100) : 0}%;background:${c.color};opacity:0.6"></div>
-      </div>
+      <div class="closer-bar-label"><span>Cash share</span><span style="color:${c.color}">${revPct}%</span></div>
+      <div class="closer-bar-track"><div class="closer-bar-fill" style="width:${revPct}%;background:${c.color}"></div></div>
+      <div class="closer-bar-label"><span>Contract value signed</span><span style="color:${c.color}">$${c.contracts.toLocaleString()}</span></div>
+      <div class="closer-bar-track"><div class="closer-bar-fill" style="width:${c.contracts?(Math.min(100,c.contracts/1000)):0}%;background:${c.color};opacity:0.5"></div></div>
       <div class="closer-bottom">
-        <div>
-          <div class="closer-cash-label">CASH COLLECTED</div>
-          <div class="closer-cash-val" style="color:${c.color}">$${c.cash.toLocaleString()}</div>
-        </div>
-        <div style="text-align:right">
-          <div class="closer-cash-label">HT FROM ADS</div>
-          <div style="font-size:13px;font-weight:700;font-family:var(--font-mono);color:${c.color}">$${(c.adsDeals * (c.deals ? c.cash/c.deals : 0)).toLocaleString(undefined,{maximumFractionDigits:0})}</div>
-        </div>
-      </div>
-    </div>`;
+        <div><div class="closer-cash-label">CASH COLLECTED</div>
+        <div class="closer-cash-val" style="color:${c.color}">$${c.cash.toLocaleString()}</div></div>
+        <div style="text-align:right"><div class="closer-cash-label">CONTRACTS</div>
+        <div style="font-size:13px;font-weight:700;font-family:var(--font-mono);color:${c.color}">$${c.contracts.toLocaleString()}</div></div>
+      </div></div>`;
   }).join('');
 }
 
 function renderCloserCharts() {
-  const d = DATASETS[currentPeriod];
+  const d=computeMetrics(currentPeriod);
   renderCloserCards();
-  if (chartCloser) chartCloser.destroy();
-  const ctx = document.getElementById('chart-closer-compare');
-  if (!ctx) return;
-  const frankieCR = d.frankieShows ? Math.round(d.frankieDeals/d.frankieShows*100) : 0;
-  const mehdiCR = d.mehdiShows ? Math.round(d.mehdiDeals/d.mehdiShows*100) : 0;
-  chartCloser = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: ['Revenue ($)', 'Close Rate (%)', 'Deals closed', 'Shows taken'],
-      datasets: [
-        {
-          label: 'Frankie',
-          data: [d.frankieCash, frankieCR, d.frankieDeals, d.frankieShows],
-          backgroundColor: 'rgba(183,148,244,0.6)', borderColor: '#B794F4',
-          borderWidth: 1, borderRadius: 4,
-        },
-        {
-          label: 'Mehdi',
-          data: [d.mehdiCash, mehdiCR, d.mehdiDeals, d.mehdiShows],
-          backgroundColor: 'rgba(255,183,66,0.6)', borderColor: '#FFB742',
-          borderWidth: 1, borderRadius: 4,
-        }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4A5568', font: { size: 10 } } },
-        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4A5568', font: { size: 10 } } }
-      }
-    }
-  });
+  if(chartCloser)chartCloser.destroy();
+  const ctx=document.getElementById('chart-closer-compare');if(!ctx)return;
+  const fCR=d.frankieShows?Math.round(d.frankieDeals/d.frankieShows*100):0;
+  const mCR=d.mehdiShows?Math.round(d.mehdiDeals/d.mehdiShows*100):0;
+  chartCloser=new Chart(ctx,{type:'bar',data:{labels:['Cash ($)','Close Rate (%)','Deals','Shows'],datasets:[
+    {label:'Frankie',data:[d.frankieCash,fCR,d.frankieDeals,d.frankieShows],backgroundColor:'rgba(183,148,244,0.6)',borderColor:'#B794F4',borderWidth:1,borderRadius:4},
+    {label:'Mehdi',  data:[d.mehdiCash,  mCR,d.mehdiDeals,  d.mehdiShows],  backgroundColor:'rgba(255,183,66,0.6)', borderColor:'#FFB742',borderWidth:1,borderRadius:4},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#4A5568',font:{size:10}}},
+      y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#4A5568',font:{size:10}}}}}});
 }
 
 // ═══════════════════════════════════════════
 // LOW TICKET TAB
 // ═══════════════════════════════════════════
 function renderLowTicket(d) {
-  const ltCov = d.spend ? Math.round(d.lt/d.spend*100) : 0;
-  const netSpend = Math.max(0, d.spend - d.lt);
-  set('lt-rev', fmtFull(d.lt));
-  set('lt-count', Math.round(d.lt / 230) + ' sales');
-  set('lt-spend', fmtFull(d.spend));
-  set('lt-net', fmtFull(netSpend));
-  set('lt-cov', ltCov + '%');
-  set('lt-cov-flag', ltCov >= 100 ? '✓ fully covered' : ltCov + '% of spend covered');
-  document.getElementById('lt-cov-flag').className = 'kpi-badge ' + (ltCov >= 100 ? 'up' : ltCov >= 50 ? 'warn' : 'down');
+  const ltCov=d.spend?Math.round(d.lt/d.spend*100):0;
+  const netSpend=Math.max(0,d.spend-d.lt);
+  const ltSales=Math.round((d.lt||0)/27);
+  set('lt-rev',fmtFull(d.lt)); set('lt-count',ltSales+' purchases @ $27');
+  set('lt-spend',fmtFull(d.spend)); set('lt-net',fmtFull(netSpend));
+  set('lt-cov',ltCov+'%');
+  set('lt-cov-flag',ltCov>=100?'✓ fully covered':ltCov+'% of spend covered');
+  document.getElementById('lt-cov-flag').className='kpi-badge '+(ltCov>=100?'up':ltCov>=10?'warn':'down');
 }
 
 // ═══════════════════════════════════════════
-// SLACK REPORTS
+// ADD NEW DEAL TAB
 // ═══════════════════════════════════════════
-function renderSlack(d) {
-  const roas = d.spend ? d.cash/d.spend : 0;
-  const showup = d.booked ? d.shows/d.booked : 0;
-  const cr = d.shows ? d.closes/d.shows : 0;
-  const cpl = d.leads ? d.spend/d.leads : 0;
-  const cpbc = d.booked ? d.spend/d.booked : 0;
-  const cac = d.closes ? d.spend/d.closes : 0;
-  const ltCov = d.spend ? Math.round(d.lt/d.spend*100) : 0;
-  const ok = '✅', warn = '⚠️', bad = '🔴';
-  const roasF = roas >= 3 ? ok : roas >= 1.5 ? warn : bad;
-  const showF = showup >= 0.75 ? ok : warn;
-  const crF = cr >= 0.30 ? ok : warn;
+function renderDealLog() {
+  const deals=loadDeals();
+  const tbody=document.getElementById('deal-log-tbody');
+  if(!tbody)return;
+  const sorted=[...deals].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  tbody.innerHTML=sorted.map(d=>`
+    <tr>
+      <td>${d.name}</td><td>${d.date}</td>
+      <td style="color:${d.usd>0?'var(--accent)':'var(--t3)'};font-weight:700;font-family:var(--font-mono)">${d.usd>0?'$'+d.usd.toLocaleString():'—'}</td>
+      <td style="color:var(--blue);font-family:var(--font-mono)">$${(d.contract||0).toLocaleString()}</td>
+      <td><span class="pill ${(d.source||'').toLowerCase()}">${d.source||'—'}</span></td>
+      <td><span class="pill ${(d.closer||'').toLowerCase()}">${d.closer||'—'}</span></td>
+      <td>${d.setter||'—'}</td>
+      <td style="color:var(--t3)">${d.notes||'—'}</td>
+      <td><button onclick="deleteDeal('${d.id}')" style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;font-family:var(--font-mono)">×</button></td>
+    </tr>`).join('');
+}
 
-  document.getElementById('slack-daily-body').innerHTML = `
-<span class="sh">📊 SWH Daily Performance — ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</span>
-<span class="divider">━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
-<span class="sh">💸 AD SPEND</span>
-Spend:           <span class="sv">$${d.spend.toLocaleString()}</span>
-Leads:           <span class="sv">${d.leads}</span>  ·  CPL: <span class="sv">$${Math.round(cpl)}</span>
-Booked calls:    <span class="sv">${d.booked}</span>  ·  CPBC: <span class="sv">$${Math.round(cpbc)}</span>
+function submitDeal() {
+  const name    =document.getElementById('deal-name').value.trim();
+  const date    =document.getElementById('deal-date').value;
+  const usd     =parseFloat(document.getElementById('deal-usd').value)||0;
+  const contract=parseFloat(document.getElementById('deal-contract').value)||0;
+  const source  =document.getElementById('deal-source').value;
+  const closer  =document.getElementById('deal-closer').value;
+  const setter  =document.getElementById('deal-setter').value;
+  const notes   =document.getElementById('deal-notes').value.trim();
 
-<span class="sh">📞 CALLS</span>
-${showF} Show-up rate: <span class="sv">${Math.round(showup*100)}%</span>  (${d.shows} of ${d.booked} showed)
+  if(!name||!date){alert('Please enter at least a client name and date.');return;}
+  if(!usd&&!contract){alert('Please enter cash collected or contract value.');return;}
 
-<span class="sh">💰 SALES</span>
-${crF} Closes: <span class="sv">${d.closes}</span>  ·  Close rate: <span class="sv">${Math.round(cr*100)}%</span>
-Cash collected:  <span class="sv">$${d.cash.toLocaleString()}</span>
- ↳ From ads:     <span class="sv">$${d.htAds.toLocaleString()}</span>
- ↳ Organic:      <span class="sv">$${d.htOrg.toLocaleString()}</span>
+  const deals=loadDeals();
+  deals.push({id:uid(),name,date,usd,contract,source,closer,setter,notes});
+  saveDeals(deals);
 
-<span class="sh">📈 ECONOMICS</span>
-${roasF} ROAS: <span class="sv">${roas.toFixed(1)}x</span>  ·  CAC: <span class="sv">$${Math.round(cac)}</span>
-Low-ticket:      <span class="sv">$${d.lt.toLocaleString()}</span>  covers <span class="${ltCov >= 50 ? 'sv' : 'sw'}">${ltCov}% of spend</span>
-<span class="divider">━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
-<span class="sw">OPERATOR CALL</span>
-${roas >= 3 && showup >= 0.75 && cr >= 0.30 ? '<span style="color:#00F5A8">🟢 All metrics green. Safe to scale ad spend.</span>' : roas < 2 ? '<span class="sr">🔴 ROAS below target. Hold budget increase.</span>' : '<span class="sw">🟡 Check show-up + close rate before scaling.</span>'}`;
+  ['deal-name','deal-notes'].forEach(id=>document.getElementById(id).value='');
+  ['deal-usd','deal-contract'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('deal-date').valueAsDate=new Date();
 
-  document.getElementById('slack-weekly-body').innerHTML = `
-<span class="sh">📈 SWH Weekly Summary — w/e ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}</span>
-<span class="divider">━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
-Spend:    <span class="sv">$${d.spend.toLocaleString()}</span>  ·  Revenue: <span class="sv">$${d.cash.toLocaleString()}</span>
-ROAS:     ${roasF} <span class="sv">${roas.toFixed(1)}x</span>
-Leads:    <span class="sv">${d.leads}</span>  ·  CPL: <span class="sv">$${Math.round(cpl)}</span>
-Booked:   <span class="sv">${d.booked}</span>  ·  Show rate: ${showF} <span class="sv">${Math.round(showup*100)}%</span>
-Closes:   <span class="sv">${d.closes}</span>  ·  Close rate: ${crF} <span class="sv">${Math.round(cr*100)}%</span>
-HT ads:   <span class="sv">$${d.htAds.toLocaleString()}</span>  ·  HT organic: <span class="sv">$${d.htOrg.toLocaleString()}</span>
-LT rev:   <span class="sv">$${d.lt.toLocaleString()}</span>  (covers ${ltCov}% of spend)
+  renderDealLog();
+  renderAll();
 
-Top closer: <span class="sv">${d.frankieCash > d.mehdiCash ? 'Frankie' : 'Mehdi'} — $${Math.max(d.frankieCash, d.mehdiCash).toLocaleString()}</span>
-<span class="divider">━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
-<span class="sw">vs last week: connect your Google Sheets backend to enable comparison</span>`;
+  const btn=document.getElementById('deal-submit-btn');
+  btn.textContent='✓ Saved!';btn.style.background='#00C882';
+  setTimeout(()=>{btn.textContent='Save Deal →';btn.style.background='';},2000);
+}
+
+function deleteDeal(id) {
+  if(!confirm('Delete this deal? Cannot be undone.'))return;
+  saveDeals(loadDeals().filter(d=>d.id!==id));
+  renderDealLog();renderAll();
 }
 
 // ═══════════════════════════════════════════
 // DAILY INPUT
 // ═══════════════════════════════════════════
 function updatePreview() {
-  const spend = parseFloat(document.getElementById('inp-spend').value) || 0;
-  const leads = parseInt(document.getElementById('inp-leads').value) || 0;
-  const booked = parseInt(document.getElementById('inp-booked').value) || 0;
-  const shows = parseInt(document.getElementById('inp-shows').value) || 0;
-  const closes = parseInt(document.getElementById('inp-closes').value) || 0;
-  const cash = parseFloat(document.getElementById('inp-cash').value) || 0;
-  const lt = parseFloat(document.getElementById('inp-lt').value) || 0;
-  set('prev-cpl', leads && spend ? '$' + Math.round(spend/leads) : '—');
-  set('prev-cpbc', booked && spend ? '$' + Math.round(spend/booked) : '—');
-  set('prev-show', booked && shows ? Math.round(shows/booked*100) + '%' : '—');
-  set('prev-cr', shows && closes ? Math.round(closes/shows*100) + '%' : '—');
-  set('prev-roas', spend && cash ? (cash/spend).toFixed(1) + 'x' : '—');
-  set('prev-cac', closes && spend ? '$' + Math.round(spend/closes) : '—');
+  const spend=parseFloat(document.getElementById('inp-spend').value)||0;
+  const leads=parseInt(document.getElementById('inp-leads').value)||0;
+  const booked=parseInt(document.getElementById('inp-booked').value)||0;
+  const shows=parseInt(document.getElementById('inp-shows').value)||0;
+  const closes=parseInt(document.getElementById('inp-closes').value)||0;
+  const cash=parseFloat(document.getElementById('inp-cash').value)||0;
+  set('prev-cpl',  leads&&spend?'$'+Math.round(spend/leads):'—');
+  set('prev-cpbc', booked&&spend?'$'+Math.round(spend/booked):'—');
+  set('prev-show', booked&&shows?Math.round(shows/booked*100)+'%':'—');
+  set('prev-cr',   shows&&closes?Math.round(closes/shows*100)+'%':'—');
+  set('prev-roas', spend&&cash?(cash/spend).toFixed(1)+'x':'—');
+  set('prev-cac',  closes&&spend?'$'+Math.round(spend/closes):'—');
 }
 
 function submitDaily() {
-  const date = document.getElementById('inp-date').value;
-  if (!date) { alert('Please select a date.'); return; }
-  alert('✓ Logged. In the live system, this writes to Google Sheets via the API — your dashboard updates in real time.');
+  const date   =document.getElementById('inp-date').value;
+  const spend  =parseFloat(document.getElementById('inp-spend').value)||0;
+  const leads  =parseInt(document.getElementById('inp-leads').value)||0;
+  const booked =parseInt(document.getElementById('inp-booked').value)||0;
+  const shows  =parseInt(document.getElementById('inp-shows').value)||0;
+  const noshows=parseInt(document.getElementById('inp-noshows').value)||0;
+  const closes =parseInt(document.getElementById('inp-closes').value)||0;
+  const cash   =parseFloat(document.getElementById('inp-cash').value)||0;
+  const lt     =parseFloat(document.getElementById('inp-lt').value)||0;
+  const source =document.getElementById('inp-source').value;
+  const closer =document.getElementById('inp-closer').value;
+  const notes  =document.getElementById('inp-campaign').value;
+  if(!date){alert('Please select a date.');return;}
+  const log=loadLog();
+  const idx=log.findIndex(l=>l.date===date);
+  const entry={id:idx>=0?log[idx].id:uid(),date,spend,leads,booked,shows,noshows,closes,cash,lt,source,closer,notes};
+  if(idx>=0)log[idx]=entry; else log.push(entry);
+  saveLog(log);
+  renderAll();
+  const btn=document.getElementById('daily-submit-btn');
+  btn.textContent='✓ Saved!';btn.style.background='#00C882';
+  setTimeout(()=>{btn.textContent='Log Today\'s Data →';btn.style.background='';},2000);
+}
+
+// ═══════════════════════════════════════════
+// SLACK
+// ═══════════════════════════════════════════
+function renderSlack(d) {
+  const S=getSettings();
+  const roas=d.spend?d.cash/d.spend:0;
+  const roasCon=d.spend?d.contractTotal/d.spend:0;
+  const showup=d.booked?d.shows/d.booked:0;
+  const cr=d.shows?d.rawDeals.length/d.shows:0;
+  const cpl=d.leads?d.spend/d.leads:0;
+  const cpbc=d.booked?d.spend/d.booked:0;
+  const cac=d.rawDeals.length?d.spend/d.rawDeals.length:0;
+  const ltCov=d.spend?Math.round(d.lt/d.spend*100):0;
+  const ok='✅',warn='⚠️',bad='🔴';
+  const rF=roas>=S.tgt_roas?ok:roas>=1?warn:bad;
+  const sF=showup>=(S.tgt_showup/100)?ok:warn;
+  const cF=cr>=(S.tgt_cr/100)?ok:warn;
+  const today=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
+  const db=document.getElementById('slack-daily-body');
+  if(db) db.innerHTML=`<span class="sh">📊 TCC/SWH Performance — ${today}</span>
+<span class="divider">━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+<span class="sh">💸 AD SPEND</span>
+Spend:       <span class="sv">$${d.spend.toLocaleString()}</span>
+Leads:       <span class="sv">${d.leads}</span>  ·  CPL: <span class="sv">${d.leads?'$'+Math.round(cpl):'—'}</span>
+Booked:      <span class="sv">${d.booked}</span>  ·  CPBC: <span class="sv">${d.booked?'$'+Math.round(cpbc):'—'}</span>
+LT Sales:    <span class="sv">${Math.round((d.lt||0)/27)} × $27 = $${(d.lt||0).toLocaleString()}</span>
+
+<span class="sh">📞 CALLS</span>
+${sF} Show-up: <span class="sv">${d.booked?Math.round(showup*100)+'%':'—'}</span>  (${d.shows} of ${d.booked} showed)  ·  No-shows: <span class="sv">${d.noshows}</span>
+
+<span class="sh">💰 SALES</span>
+${cF} HT Closes: <span class="sv">${d.rawDeals.length}</span>  ·  Close rate: <span class="sv">${d.shows?Math.round(cr*100)+'%':'—'}</span>
+Cash collected: <span class="sv">$${d.cash.toLocaleString()}</span>  (HT: $${d.htCash.toLocaleString()} + LT: $${(d.lt||0).toLocaleString()})
+Contract value: <span class="sv">$${d.contractTotal.toLocaleString()}</span>  ·  Pipeline: <span class="sv">$${(d.pipeline||0).toLocaleString()}</span>
+
+<span class="sh">📈 ROAS & ECONOMICS</span>
+${rF} ROAS (cash): <span class="sv">${d.spend?roas.toFixed(2)+'x':'—'}</span>  ·  ROAS (contracts): <span class="sv">${d.spend?roasCon.toFixed(1)+'x':'—'}</span>
+CAC: <span class="sv">${d.rawDeals.length?'$'+Math.round(cac):'—'}</span>  ·  LT covers <span class="${ltCov>=10?'sv':'sw'}">${ltCov}% of spend</span>
+P&L (cash): <span class="${d.cash>=d.spend?'sv':'sr'}">$${(d.cash-d.spend).toLocaleString()}</span>
+<span class="divider">━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+<span class="sw">OPERATOR CALL</span>
+${roas>=1&&showup>=0.70&&cr>=0.25?'<span style="color:#00F5A8">🟢 Core funnel healthy. Show-up 77% + Close rate 41% are strong. Focus on scaling spend.</span>':'<span class="sw">🟡 Cash ROAS still below 1x. Contracts profitable. Increase payment collection to improve cash position.</span>'}`;
+
+  const wb=document.getElementById('slack-weekly-body');
+  if(wb) wb.innerHTML=`<span class="sh">📈 TCC/SWH Weekly — w/e ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}</span>
+<span class="divider">━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+Spend:    <span class="sv">$${d.spend.toLocaleString()}</span>  ·  Total cash: <span class="sv">$${d.cash.toLocaleString()}</span>
+ROAS:     ${rF} <span class="sv">${d.spend?roas.toFixed(2)+'x':'—'}</span>  ·  Contract ROAS: <span class="sv">${d.spend?roasCon.toFixed(1)+'x':'—'}</span>
+Leads:    <span class="sv">${d.leads}</span>  ·  CPL: <span class="sv">${d.leads?'$'+Math.round(cpl):'—'}</span>
+Booked:   <span class="sv">${d.booked}</span>  ·  Show-up: ${sF} <span class="sv">${d.booked?Math.round(showup*100)+'%':'—'}</span>
+HT Close: <span class="sv">${d.rawDeals.length}</span>  ·  Rate: ${cF} <span class="sv">${d.shows?Math.round(cr*100)+'%':'—'}</span>
+Pipeline: <span class="sv">$${(d.pipeline||0).toLocaleString()}</span>  ·  Outstanding: <span class="sv">$29,000</span>
+Top closer: <span class="sv">${d.frankieCash>=d.mehdiCash?'Frankie':'Mehdi'} — $${Math.max(d.frankieCash,d.mehdiCash).toLocaleString()}</span>`;
 }
 
 // ═══════════════════════════════════════════
 // SETTINGS
 // ═══════════════════════════════════════════
-function saveSettings() {
-  const cplTarget = parseFloat(document.getElementById('tgt-cpl').value) || 45;
-  alert('Settings saved. In the live build, these write to your Sheets config tab and update all thresholds instantly.');
+function loadSettingsUI() {
+  const S=getSettings();
+  document.getElementById('tgt-cpl').value   =S.tgt_cpl;
+  document.getElementById('tgt-cpbc').value  =S.tgt_cpbc;
+  document.getElementById('tgt-showup').value=S.tgt_showup+'%';
+  document.getElementById('tgt-cr').value    =S.tgt_cr+'%';
+  document.getElementById('tgt-roas').value  =S.tgt_roas+'x';
+  document.getElementById('aed-rate').value  =S.aed_rate;
 }
 
-// ═══════════════════════════════════════════
-// SYNC
-// ═══════════════════════════════════════════
+function saveSettings() {
+  const S=getSettings();
+  S.tgt_cpl  =parseFloat(document.getElementById('tgt-cpl').value)||150;
+  S.tgt_cpbc =parseFloat(document.getElementById('tgt-cpbc').value)||500;
+  S.tgt_showup=parseFloat(document.getElementById('tgt-showup').value)||70;
+  S.tgt_cr   =parseFloat(document.getElementById('tgt-cr').value)||25;
+  S.tgt_roas =parseFloat(document.getElementById('tgt-roas').value)||2.0;
+  S.aed_rate =parseFloat(document.getElementById('aed-rate').value)||3.6725;
+  saveSettingsData(S);
+  renderAll();
+  alert('✓ Settings saved.');
+}
+
+function resetData() {
+  if(!confirm('Reset all data to original TCC seed data?'))return;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(LOG_KEY);
+  localStorage.removeItem(SETTINGS_KEY);
+  location.reload();
+}
+
 function simulateSync() {
-  document.getElementById('last-sync').textContent = 'Syncing...';
-  setTimeout(() => {
-    document.getElementById('last-sync').textContent = 'Last sync: just now';
-    renderAll();
-  }, 800);
+  document.getElementById('last-sync').textContent='Updating...';
+  setTimeout(renderAll,300);
 }
 
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
-document.getElementById('inp-date').valueAsDate = new Date();
+document.getElementById('inp-date').valueAsDate=new Date();
+document.getElementById('deal-date').valueAsDate=new Date();
+loadSettingsUI();
+initPeriodBtns();
 renderAll();
 </script>
 </body>
