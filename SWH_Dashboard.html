@@ -832,6 +832,12 @@ select.input-field option { background: var(--bg2); }
     </svg>
     Daily Input
   </div>
+  <div class="nav-item" onclick="switchTab('calls-log', this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M13.5 10.5c0 .3-.1.6-.2.9-.1.3-.3.5-.5.7-.4.4-.8.5-1.3.5-.3 0-.7-.1-1-.2s-.7-.2-1-.4c-.9-.5-1.7-1.2-2.4-2-.6-.7-1.2-1.5-1.7-2.4-.2-.3-.3-.6-.4-1-.1-.3-.1-.6-.1-.9 0-.5.1-.9.4-1.3.2-.4.6-.6 1-.6.1 0 .2 0 .3.1.1 0 .2.1.2.2l1.1 1.6c.1.1.1.2.1.3 0 .1-.1.2-.2.3l-.5.5c0 .1 0 .1.1.2.2.3.5.6.7.9.3.3.6.5.9.7l.2.1.5-.5c.1-.1.2-.2.3-.2h.1c.1 0 .2 0 .3.1l1.6 1.1c.1.1.2.1.2.2.1.1.1.2.1.3z"/>
+    </svg>
+    Log Booked Calls
+  </div>
   <div class="nav-item" onclick="switchTab('slack', this)">
     <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
       <path d="M6 2a2 2 0 0 0 0 4h2V2H6zM10 2a2 2 0 0 1 0 4H8V2h2zM2 6a2 2 0 0 1 4 0v2H2V6zM2 10a2 2 0 0 0 4 0V8H2v2zM14 6a2 2 0 0 0-4 0v2h4V6zM14 10a2 2 0 0 1-4 0V8h4v2zM6 14a2 2 0 0 1 0-4H8v4H6zM10 14a2 2 0 0 0 0-4H8v4h2z"/>
@@ -1440,6 +1446,73 @@ select.input-field option { background: var(--bg2); }
     </div>
   </div>
 </div>
+
+<!-- ══════════════════════════════════════
+     TAB: LOG BOOKED CALLS
+══════════════════════════════════════ -->
+<div id="tab-calls-log" class="tab-view">
+  <div class="section-label">Log booked calls</div>
+  <div class="chart-card" style="margin-bottom:10px">
+    <div class="chart-card-title" style="margin-bottom:16px">Quick call logger — add calls from ads or organic</div>
+    <div class="input-grid">
+      <div class="input-group">
+        <div class="input-label">Date</div>
+        <input class="input-field" type="date" id="cl-date">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Booked Calls from Ads</div>
+        <input class="input-field" type="number" id="cl-booked-ads" placeholder="e.g. 3" min="0">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Booked Calls from Organic</div>
+        <input class="input-field" type="number" id="cl-booked-org" placeholder="e.g. 2" min="0">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Show-Ups</div>
+        <input class="input-field" type="number" id="cl-shows" placeholder="e.g. 4" min="0">
+      </div>
+      <div class="input-group">
+        <div class="input-label">No-Shows</div>
+        <input class="input-field" type="number" id="cl-noshows" placeholder="e.g. 1" min="0">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Closer</div>
+        <select class="input-field" id="cl-closer">
+          <option value="">Select...</option>
+          <option>Frankie</option>
+          <option>Mehdi</option>
+          <option>Both</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:10px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">
+      This updates your booked calls count, show-up rate, CPBC and all related KPIs instantly for everyone
+    </div>
+    <button id="cl-submit-btn" class="submit-btn" onclick="submitCallLog()">Log Calls →</button>
+  </div>
+
+  <div class="section-label">Recent call logs</div>
+  <div class="chart-card">
+    <div class="deals-table-wrap">
+      <table class="deals-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Booked (Ads)</th>
+            <th>Booked (Organic)</th>
+            <th>Total Booked</th>
+            <th>Shows</th>
+            <th>No-Shows</th>
+            <th>Show Rate</th>
+            <th>Closer</th>
+          </tr>
+        </thead>
+        <tbody id="calls-log-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
   </div><!-- /content -->
 </div><!-- /main -->
 </div><!-- /shell -->
@@ -1452,13 +1525,13 @@ select.input-field option { background: var(--bg2); }
 // ═══════════════════════════════════════════
 
 const SUPABASE_URL = 'https://qstlyvauppjkdiwpgtql.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_czRZf2kLIUZQdBY5nlO3zw_cm9xbmPE';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzdGx5dmF1cHBqa2Rpd3BndHFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNzgzMTMsImV4cCI6MjA5MTg1NDMxM30.jA7y0LIf3CN2MNRlPPSB5U1ozlaULOlrQltARSZquW8';
 const AED_RATE = 3.6725;
 
 // ── Supabase API helper ─────────────────────
 async function sbFetch(path, options={}) {
   const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
-    ...options,
+    method: options.method || 'GET',
     headers: {
       'apikey': SUPABASE_KEY,
       'Authorization': 'Bearer ' + SUPABASE_KEY,
@@ -1466,6 +1539,7 @@ async function sbFetch(path, options={}) {
       'Prefer': options.prefer || 'return=representation',
       ...(options.headers||{}),
     },
+    body: options.body || undefined,
   });
   if (!res.ok) {
     const err = await res.text();
@@ -1592,6 +1666,7 @@ const PAGE_TITLES = {
   closers:   ['Closer Performance',    'Frankie vs Mehdi · live attribution'],
   lowticket: ['Low-Ticket',            '$27 course · GHL purchases'],
   daily:     ['Daily Input',           'Log today\'s numbers · saves instantly for everyone'],
+  'calls-log': ['Log Booked Calls',    'Log ads + organic calls · updates KPIs instantly'],
   deals:     ['Add New Deal',          'Log a closed deal · updates all metrics live'],
   slack:     ['Slack Reports',         'Daily & weekly summaries'],
   settings:  ['Settings',              'Targets · rates · thresholds'],
@@ -1607,11 +1682,12 @@ function switchTab(id,el) {
   document.getElementById('page-sub').textContent=sub;
   const showPeriod=['exec','calls','sales','closers','lowticket'].includes(id);
   document.getElementById('period-switcher').style.visibility=showPeriod?'visible':'hidden';
-  if(id==='closers')  renderCloserCharts();
-  if(id==='calls')    renderCallsTrend();
-  if(id==='sales')    renderSalesDeals();
-  if(id==='deals')    renderDealLog();
-  if(id==='slack')    renderSlack(computeMetrics(currentPeriod));
+  if(id==='closers')    renderCloserCharts();
+  if(id==='calls')      renderCallsTrend();
+  if(id==='sales')      renderSalesDeals();
+  if(id==='deals')      renderDealLog();
+  if(id==='calls-log')  renderCallsLogTable();
+  if(id==='slack')      renderSlack(computeMetrics(currentPeriod));
 }
 
 function setPeriod(p,btn) {
@@ -1726,10 +1802,29 @@ async function loadAndRender() {
   showLoading(true);
   try {
     [DB_DEALS, DB_LOG] = await Promise.all([getDeals(), getLog()]);
+    // Cache data locally as fallback
+    try {
+      localStorage.setItem('swh_cache_deals', JSON.stringify(DB_DEALS));
+      localStorage.setItem('swh_cache_log', JSON.stringify(DB_LOG));
+    } catch(e) {}
     renderAll();
   } catch(e) {
-    console.error(e);
-    showToast('Connection error — check your internet', 'error');
+    console.error('Supabase error:', e);
+    // Try to load from cache
+    try {
+      const cachedDeals = localStorage.getItem('swh_cache_deals');
+      const cachedLog = localStorage.getItem('swh_cache_log');
+      if (cachedDeals) DB_DEALS = JSON.parse(cachedDeals);
+      if (cachedLog) DB_LOG = JSON.parse(cachedLog);
+      if (DB_DEALS.length || DB_LOG.length) {
+        renderAll();
+        showToast('Using cached data — reconnecting...', 'error');
+      } else {
+        showToast('Connection error — check your internet', 'error');
+      }
+    } catch(e2) {
+      showToast('Connection error — check your internet', 'error');
+    }
   }
   showLoading(false);
 }
@@ -2249,11 +2344,105 @@ async function simulateSync() {
   await loadAndRender();
 }
 
+
+// ═══════════════════════════════════════════
+// LOG BOOKED CALLS TAB
+// ═══════════════════════════════════════════
+function renderCallsLogTable() {
+  const tbody = document.getElementById('calls-log-tbody');
+  if (!tbody) return;
+  const sorted = [...DB_LOG].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,20);
+  if (!sorted.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--t3);padding:24px">No call logs yet — use the form above</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sorted.map(l => {
+    const adsBooked = l.booked_ads || 0;
+    const orgBooked = l.booked_org || 0;
+    const total = l.booked || 0;
+    const showRate = total > 0 ? Math.round((l.shows||0)/total*100)+'%' : '—';
+    return `<tr>
+      <td>${l.date}</td>
+      <td style="color:var(--blue);font-weight:700">${adsBooked}</td>
+      <td style="color:var(--accent);font-weight:700">${orgBooked}</td>
+      <td style="font-weight:700">${total}</td>
+      <td>${l.shows||0}</td>
+      <td style="color:var(--red)">${l.noshows||0}</td>
+      <td style="color:${(l.shows||0)>=total*0.7?'var(--accent)':'var(--amber)'}">${showRate}</td>
+      <td>${l.closer||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function submitCallLog() {
+  const date     = document.getElementById('cl-date').value;
+  const bookedAds= parseInt(document.getElementById('cl-booked-ads').value)||0;
+  const bookedOrg= parseInt(document.getElementById('cl-booked-org').value)||0;
+  const shows    = parseInt(document.getElementById('cl-shows').value)||0;
+  const noshows  = parseInt(document.getElementById('cl-noshows').value)||0;
+  const closer   = document.getElementById('cl-closer').value;
+
+  if (!date) { showToast('Please select a date', 'error'); return; }
+  if (!bookedAds && !bookedOrg) { showToast('Enter at least one booked call', 'error'); return; }
+
+  const totalBooked = bookedAds + bookedOrg;
+  const btn = document.getElementById('cl-submit-btn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+
+  try {
+    // Check if entry exists for this date
+    const existing = DB_LOG.find(l => l.date === date);
+    if (existing) {
+      // Update existing entry — add to existing booked calls
+      const updated = {
+        ...existing,
+        booked: (existing.booked||0) + totalBooked,
+        booked_ads: (existing.booked_ads||0) + bookedAds,
+        booked_org: (existing.booked_org||0) + bookedOrg,
+        shows: (existing.shows||0) + shows,
+        noshows: (existing.noshows||0) + noshows,
+        closer: closer || existing.closer,
+      };
+      await sbFetch('daily_log?id=eq.'+existing.id, {
+        method: 'PATCH',
+        headers: { 'Prefer': 'return=representation' },
+        body: JSON.stringify(updated),
+      });
+    } else {
+      // Create new entry
+      await insertLog({
+        date, booked: totalBooked,
+        booked_ads: bookedAds, booked_org: bookedOrg,
+        shows, noshows, closer,
+        spend:0, leads:0, closes:0, cash:0, lt:0, source:'', notes:''
+      });
+    }
+
+    DB_LOG = await getLog();
+    renderCallsLogTable();
+    renderAll();
+    showToast('✓ Calls logged — dashboard updated for everyone');
+
+    // Clear form
+    document.getElementById('cl-booked-ads').value = '';
+    document.getElementById('cl-booked-org').value = '';
+    document.getElementById('cl-shows').value = '';
+    document.getElementById('cl-noshows').value = '';
+    document.getElementById('cl-closer').value = '';
+    document.getElementById('cl-date').valueAsDate = new Date();
+
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+  btn.textContent = 'Log Calls →'; btn.disabled = false;
+}
+
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
 document.getElementById('inp-date').valueAsDate=new Date();
 document.getElementById('deal-date').valueAsDate=new Date();
+document.getElementById('cl-date').valueAsDate=new Date();
 loadSettingsUI();
 initPeriodBtns();
 
