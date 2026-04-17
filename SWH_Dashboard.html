@@ -1724,10 +1724,24 @@ function computeMetrics(period) {
     const htOrg  = deals.filter(d=>d.source!=='Ads'&&d.usd>0).reduce((s,d)=>s+(d.usd||0),0);
     const contractTotal = deals.reduce((s,d)=>s+(d.contract||0),0);
     const pipeline = deals.filter(d=>!d.usd||d.usd===0).reduce((s,d)=>s+(d.contract||0),0);
+    // Pull live totals from DB_LOG for calls, leads, spend, lt
+    const dbSpend  = DB_LOG.reduce((s,l)=>s+(l.spend||0),0);
+    const dbLeads  = DB_LOG.reduce((s,l)=>s+(l.leads||0),0);
+    const dbBooked = DB_LOG.reduce((s,l)=>s+(l.booked||0),0);
+    const dbShows  = DB_LOG.reduce((s,l)=>s+(l.shows||0),0);
+    const dbNoshows= DB_LOG.reduce((s,l)=>s+(l.noshows||0),0);
+    const dbCloses = DB_LOG.reduce((s,l)=>s+(l.closes||0),0);
+    const dbLt     = DB_LOG.reduce((s,l)=>s+(l.lt||0),0);
+    // Use DB values if they exist and are bigger, otherwise use ALL_TIME verified totals
     return buildMetrics(
-      ALL_TIME.spend, ALL_TIME.leads, ALL_TIME.booked,
-      ALL_TIME.shows, ALL_TIME.noshows, ALL_TIME.closes,
-      ALL_TIME.lt, htCash, htAds, htOrg,
+      Math.max(dbSpend,  ALL_TIME.spend),
+      Math.max(dbLeads,  ALL_TIME.leads),
+      Math.max(dbBooked, ALL_TIME.booked),
+      Math.max(dbShows,  ALL_TIME.shows),
+      Math.max(dbNoshows,ALL_TIME.noshows),
+      Math.max(dbCloses, ALL_TIME.closes),
+      Math.max(dbLt,     ALL_TIME.lt),
+      htCash, htAds, htOrg,
       deals.filter(d=>d.usd>0), contractTotal, pipeline, deals
     );
   }
