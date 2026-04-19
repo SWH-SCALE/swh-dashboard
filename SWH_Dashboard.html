@@ -832,6 +832,12 @@ select.input-field option { background: var(--bg2); }
     </svg>
     Daily Input
   </div>
+  <div class="nav-item" onclick="switchTab('edit-log', this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M11 2l3 3-8 8H3v-3l8-8z"/><path d="M9 4l3 3"/>
+    </svg>
+    Edit Log
+  </div>
   <div class="nav-item" onclick="switchTab('calls-log', this)">
     <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
       <path d="M13.5 10.5c0 .3-.1.6-.2.9-.1.3-.3.5-.5.7-.4.4-.8.5-1.3.5-.3 0-.7-.1-1-.2s-.7-.2-1-.4c-.9-.5-1.7-1.2-2.4-2-.6-.7-1.2-1.5-1.7-2.4-.2-.3-.3-.6-.4-1-.1-.3-.1-.6-.1-.9 0-.5.1-.9.4-1.3.2-.4.6-.6 1-.6.1 0 .2 0 .3.1.1 0 .2.1.2.2l1.1 1.6c.1.1.1.2.1.3 0 .1-.1.2-.2.3l-.5.5c0 .1 0 .1.1.2.2.3.5.6.7.9.3.3.6.5.9.7l.2.1.5-.5c.1-.1.2-.2.3-.2h.1c.1 0 .2 0 .3.1l1.6 1.1c.1.1.2.1.2.2.1.1.1.2.1.3z"/>
@@ -1513,6 +1519,89 @@ select.input-field option { background: var(--bg2); }
   </div>
 </div>
 
+
+<!-- ══════════════════════════════════════
+     TAB: EDIT LOG
+══════════════════════════════════════ -->
+<div id="tab-edit-log" class="tab-view">
+  <div class="section-label">Edit daily log entries</div>
+  <div class="chart-card" style="margin-bottom:10px;padding:14px 16px">
+    <div style="font-size:11px;color:var(--t2);line-height:1.8">
+      Click <strong style="color:var(--accent)">Edit</strong> on any row to change the numbers.
+      Percentages are calculated automatically — you only edit raw numbers.
+    </div>
+  </div>
+
+  <!-- Inline edit form (hidden until Edit clicked) -->
+  <div id="edit-form-card" class="chart-card" style="margin-bottom:10px;display:none">
+    <div class="chart-card-title" style="margin-bottom:14px">
+      Editing: <span id="edit-form-date" style="color:var(--accent)"></span>
+    </div>
+    <div class="input-grid">
+      <div class="input-group">
+        <div class="input-label">Ad Spend (USD)</div>
+        <input class="input-field" type="number" id="edit-spend" min="0">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Leads</div>
+        <input class="input-field" type="number" id="edit-leads" min="0">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Booked Calls</div>
+        <input class="input-field" type="number" id="edit-booked" min="0">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Show-Ups</div>
+        <input class="input-field" type="number" id="edit-shows" min="0">
+      </div>
+      <div class="input-group">
+        <div class="input-label">No-Shows</div>
+        <input class="input-field" type="number" id="edit-noshows" min="0">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Closes</div>
+        <input class="input-field" type="number" id="edit-closes" min="0">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Cash Collected (USD)</div>
+        <input class="input-field" type="number" id="edit-cash" min="0">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Low-Ticket Revenue (USD)</div>
+        <input class="input-field" type="number" id="edit-lt" min="0">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button id="edit-save-btn" class="submit-btn" onclick="saveEditLog()" style="margin-top:0">Save Changes →</button>
+      <button onclick="cancelEdit()" style="background:var(--bg4);color:var(--t2);border:1px solid var(--border2);border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:var(--font-display);cursor:pointer">Cancel</button>
+    </div>
+  </div>
+
+  <div class="section-label">All logged entries</div>
+  <div class="chart-card">
+    <div class="deals-table-wrap">
+      <table class="deals-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Spend</th>
+            <th>Leads</th>
+            <th>Booked</th>
+            <th>Shows</th>
+            <th>No-Shows</th>
+            <th>Closes</th>
+            <th>Cash</th>
+            <th>LT Rev</th>
+            <th>Source</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="edit-log-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
   </div><!-- /content -->
 </div><!-- /main -->
 </div><!-- /shell -->
@@ -1667,6 +1756,7 @@ const PAGE_TITLES = {
   lowticket: ['Low-Ticket',            '$27 course · GHL purchases'],
   daily:     ['Daily Input',           'Log today\'s numbers · saves instantly for everyone'],
   'calls-log': ['Log Booked Calls',    'Log ads + organic calls · updates KPIs instantly'],
+  'edit-log':  ['Edit Log Entries',    'Fix any previously logged numbers'],
   deals:     ['Add New Deal',          'Log a closed deal · updates all metrics live'],
   slack:     ['Slack Reports',         'Daily & weekly summaries'],
   settings:  ['Settings',              'Targets · rates · thresholds'],
@@ -1687,6 +1777,7 @@ function switchTab(id,el) {
   if(id==='sales')      renderSalesDeals();
   if(id==='deals')      renderDealLog();
   if(id==='calls-log')  renderCallsLogTable();
+  if(id==='edit-log')   renderEditLog();
   if(id==='slack')      renderSlack(computeMetrics(currentPeriod));
 }
 
@@ -2273,7 +2364,13 @@ async function submitDaily() {
   const btn=document.getElementById('daily-submit-btn');
   btn.textContent='Saving...';btn.disabled=true;
   try {
-    await insertLog({date,spend,leads,booked,shows,noshows,closes,cash,lt,source,closer,notes});
+    // Upsert — updates existing entry for same date, or creates new one
+    await sbFetch('daily_log', {
+      method: 'POST',
+      prefer: 'resolution=merge-duplicates,return=representation',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify({date,spend,leads,booked,shows,noshows,closes,cash,lt,source,closer,notes}),
+    });
     DB_LOG = await getLog();
     renderAll();
     showToast('✓ Data saved — dashboard updated for everyone');
@@ -2423,12 +2520,16 @@ async function submitCallLog() {
         body: JSON.stringify(updated),
       });
     } else {
-      // Create new entry
-      await insertLog({
-        date, booked: totalBooked,
-        booked_ads: bookedAds, booked_org: bookedOrg,
-        shows, noshows, closer,
-        spend:0, leads:0, closes:0, cash:0, lt:0, source:'', notes:''
+      // Create new entry via upsert
+      await sbFetch('daily_log', {
+        method: 'POST',
+        headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify({
+          date, booked: totalBooked,
+          booked_ads: bookedAds, booked_org: bookedOrg,
+          shows, noshows, closer,
+          spend:0, leads:0, closes:0, cash:0, lt:0, source:'', notes:''
+        }),
       });
     }
 
@@ -2449,6 +2550,127 @@ async function submitCallLog() {
     showToast('Error: ' + e.message, 'error');
   }
   btn.textContent = 'Log Calls →'; btn.disabled = false;
+}
+
+
+// ═══════════════════════════════════════════
+// EDIT LOG TAB
+// ═══════════════════════════════════════════
+let editingLogId = null;
+
+function renderEditLog() {
+  const tbody = document.getElementById('edit-log-tbody');
+  if (!tbody) return;
+  const sorted = [...DB_LOG].sort((a,b) => new Date(b.date) - new Date(a.date));
+  if (!sorted.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--t3);padding:24px">No log entries yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sorted.map(l => `
+    <tr id="log-row-${l.id}">
+      <td style="color:var(--accent);font-weight:700">${l.date}</td>
+      <td>$${(l.spend||0).toLocaleString()}</td>
+      <td>${l.leads||0}</td>
+      <td>${l.booked||0}</td>
+      <td>${l.shows||0}</td>
+      <td style="color:var(--red)">${l.noshows||0}</td>
+      <td>${l.closes||0}</td>
+      <td>$${(l.cash||0).toLocaleString()}</td>
+      <td>$${(l.lt||0).toLocaleString()}</td>
+      <td style="color:var(--t3)">${l.source||'—'}</td>
+      <td>
+        <button onclick="startEditLog('${l.id}')"
+          style="background:var(--blued);color:var(--blue);border:none;border-radius:5px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font-mono)">
+          Edit
+        </button>
+        <button onclick="deleteLogEntry('${l.id}')"
+          style="background:var(--redd);color:var(--red);border:none;border-radius:5px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font-mono);margin-left:4px">
+          ×
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function startEditLog(id) {
+  const entry = DB_LOG.find(l => l.id === id);
+  if (!entry) return;
+  editingLogId = id;
+
+  // Populate form
+  document.getElementById('edit-form-date').textContent = entry.date;
+  document.getElementById('edit-spend').value   = entry.spend   || 0;
+  document.getElementById('edit-leads').value   = entry.leads   || 0;
+  document.getElementById('edit-booked').value  = entry.booked  || 0;
+  document.getElementById('edit-shows').value   = entry.shows   || 0;
+  document.getElementById('edit-noshows').value = entry.noshows || 0;
+  document.getElementById('edit-closes').value  = entry.closes  || 0;
+  document.getElementById('edit-cash').value    = entry.cash    || 0;
+  document.getElementById('edit-lt').value      = entry.lt      || 0;
+
+  // Show form
+  document.getElementById('edit-form-card').style.display = 'block';
+  document.getElementById('edit-form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Highlight row
+  document.querySelectorAll('#edit-log-tbody tr').forEach(r => r.style.background = '');
+  const row = document.getElementById('log-row-' + id);
+  if (row) row.style.background = 'rgba(0,245,168,0.05)';
+}
+
+async function saveEditLog() {
+  if (!editingLogId) return;
+  const entry = DB_LOG.find(l => l.id === editingLogId);
+  if (!entry) return;
+
+  const updated = {
+    ...entry,
+    spend:   parseFloat(document.getElementById('edit-spend').value)   || 0,
+    leads:   parseInt(document.getElementById('edit-leads').value)     || 0,
+    booked:  parseInt(document.getElementById('edit-booked').value)    || 0,
+    shows:   parseInt(document.getElementById('edit-shows').value)     || 0,
+    noshows: parseInt(document.getElementById('edit-noshows').value)   || 0,
+    closes:  parseInt(document.getElementById('edit-closes').value)    || 0,
+    cash:    parseFloat(document.getElementById('edit-cash').value)    || 0,
+    lt:      parseFloat(document.getElementById('edit-lt').value)      || 0,
+  };
+
+  const btn = document.getElementById('edit-save-btn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+
+  try {
+    await sbFetch('daily_log?id=eq.' + editingLogId, {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify(updated),
+    });
+    DB_LOG = await getLog();
+    renderEditLog();
+    renderAll();
+    cancelEdit();
+    showToast('✓ Entry updated — dashboard refreshed');
+  } catch(e) {
+    showToast('Error saving: ' + e.message, 'error');
+  }
+  btn.textContent = 'Save Changes →'; btn.disabled = false;
+}
+
+function cancelEdit() {
+  editingLogId = null;
+  document.getElementById('edit-form-card').style.display = 'none';
+  document.querySelectorAll('#edit-log-tbody tr').forEach(r => r.style.background = '');
+}
+
+async function deleteLogEntry(id) {
+  if (!confirm('Delete this log entry? This cannot be undone.')) return;
+  try {
+    await deleteRow('daily_log', id);
+    DB_LOG = await getLog();
+    renderEditLog();
+    renderAll();
+    showToast('✓ Entry deleted');
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
 }
 
 // ═══════════════════════════════════════════
