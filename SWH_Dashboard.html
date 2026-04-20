@@ -848,7 +848,7 @@ select.input-field option { background: var(--bg2); }
     <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
       <path d="M6 2a2 2 0 0 0 0 4h2V2H6zM10 2a2 2 0 0 1 0 4H8V2h2zM2 6a2 2 0 0 1 4 0v2H2V6zM2 10a2 2 0 0 0 4 0V8H2v2zM14 6a2 2 0 0 0-4 0v2h4V6zM14 10a2 2 0 0 1-4 0V8h4v2zM6 14a2 2 0 0 1 0-4H8v4H6zM10 14a2 2 0 0 0 0-4H8v4h2z"/>
     </svg>
-    Slack Reports
+    Daily Report
   </div>
   <div class="nav-item" onclick="switchTab('settings', this)">
     <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1293,41 +1293,180 @@ select.input-field option { background: var(--bg2); }
      TAB: SLACK REPORTS
 ══════════════════════════════════════ -->
 <div id="tab-slack" class="tab-view">
-  <div class="section-label">Daily report preview</div>
-  <div class="slack-card">
-    <div class="slack-header">
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="#00F5A8"><circle cx="6" cy="6" r="6"/></svg>
-      <span class="slack-channel">#ads-performance</span>
-      <span>· auto-sends 7:00 AM daily</span>
-    </div>
-    <div class="slack-body" id="slack-daily-body"></div>
+
+  <!-- ── PERIOD SELECTOR ── -->
+  <div class="section-label">Report period</div>
+  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    <button class="period-btn active" id="rpt-btn-today" onclick="setReportPeriod('today',this)">Today</button>
+    <button class="period-btn" id="rpt-btn-7d" onclick="setReportPeriod('7d',this)">Last 7 Days</button>
+    <button class="period-btn" id="rpt-btn-mtd" onclick="setReportPeriod('mtd',this)">Month to Date</button>
+    <button class="period-btn" id="rpt-btn-all" onclick="setReportPeriod('all',this)">All Time</button>
   </div>
 
-  <div class="section-label">Weekly report preview</div>
-  <div class="slack-card">
-    <div class="slack-header">
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="#FFB742"><circle cx="6" cy="6" r="6"/></svg>
-      <span class="slack-channel">#ads-performance</span>
-      <span>· auto-sends 8:00 AM Monday</span>
+  <!-- ── REPORT CARDS ── -->
+  <div class="section-label">Ad spend</div>
+  <div class="kpi-tier kpi-tier-4" style="margin-bottom:10px">
+    <div class="kpi-card accent">
+      <div class="kpi-label">Total Spend</div>
+      <div class="kpi-value mono" id="rpt-spend">—</div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="rpt-spend-sub"></span></div>
     </div>
-    <div class="slack-body" id="slack-weekly-body"></div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Leads Generated</div>
+      <div class="kpi-value" id="rpt-leads">—</div>
+      <div class="kpi-meta"><span class="kpi-badge neutral" id="rpt-cpl-badge">—</span></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Cost Per Lead</div>
+      <div class="kpi-value mono" id="rpt-cpl">—</div>
+      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-cpl-flag">target $150</span></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Cost Per Booked Call</div>
+      <div class="kpi-value mono" id="rpt-cpbc">—</div>
+      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-cpbc-flag">target $500</span></div>
+    </div>
   </div>
 
-  <div class="section-label">Setup instructions</div>
-  <div class="chart-card" style="padding:20px">
-    <div style="font-size:11px;color:var(--t2);font-family:var(--font-mono);line-height:2.2">
-      <div style="color:var(--t1);font-size:13px;font-weight:700;font-family:var(--font-display);margin-bottom:10px">Google Apps Script setup</div>
-      <div><span style="color:var(--accent)">1.</span> In your Google Sheet → Extensions → Apps Script</div>
-      <div><span style="color:var(--accent)">2.</span> Paste the sendDailyReport() function (see docs)</div>
-      <div><span style="color:var(--accent)">3.</span> Create Slack Incoming Webhook at api.slack.com/apps</div>
-      <div><span style="color:var(--accent)">4.</span> Replace YOUR_WEBHOOK_URL with your Slack webhook</div>
-      <div><span style="color:var(--accent)">5.</span> Add time trigger: daily at 7am, weekly on Mondays</div>
-      <div style="margin-top:12px;padding:10px;background:var(--bg4);border-radius:6px;color:var(--accent)">
-        const SLACK_WEBHOOK = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL";
+  <div class="section-label">Call performance</div>
+  <div class="kpi-tier kpi-tier-4" style="margin-bottom:10px">
+    <div class="kpi-card blue">
+      <div class="kpi-label">Booked Calls</div>
+      <div class="kpi-value" id="rpt-booked">—</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">total this period</span></div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">Show-Ups</div>
+      <div class="kpi-value" id="rpt-shows">—</div>
+      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-showup-badge">—% show rate</span></div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">No-Shows</div>
+      <div class="kpi-value" id="rpt-noshows">—</div>
+      <div class="kpi-meta"><span class="kpi-badge down" id="rpt-noshow-badge">—% no-show</span></div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">Show-Up Rate</div>
+      <div class="kpi-value mono" id="rpt-showrate">—</div>
+      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-showrate-flag">target 70%</span></div>
+    </div>
+  </div>
+
+  <div class="section-label">Revenue & returns</div>
+  <div class="kpi-tier kpi-tier-4" style="margin-bottom:10px">
+    <div class="kpi-card accent">
+      <div class="kpi-label">HT Cash Collected</div>
+      <div class="kpi-value mono" id="rpt-htcash">—</div>
+      <div class="kpi-meta"><span class="kpi-badge neutral" id="rpt-deals-badge">— deals</span></div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">HT from Ads</div>
+      <div class="kpi-value mono" id="rpt-htads">—</div>
+      <div class="kpi-meta"><span class="kpi-badge neutral" id="rpt-htads-pct">—% of HT</span></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Low-Ticket Revenue</div>
+      <div class="kpi-value mono" id="rpt-lt">—</div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="rpt-lt-sales">— purchases</span></div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">Total Cash</div>
+      <div class="kpi-value mono" id="rpt-total">—</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">HT + LT combined</span></div>
+    </div>
+  </div>
+
+  <div class="section-label">Efficiency metrics</div>
+  <div class="kpi-tier kpi-tier-4" style="margin-bottom:10px">
+    <div class="kpi-card accent">
+      <div class="kpi-label">ROAS (Cash)</div>
+      <div class="kpi-value mono" id="rpt-roas">—</div>
+      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-roas-flag">target 2x</span></div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">ROAS (Contracts)</div>
+      <div class="kpi-value mono" id="rpt-roas-con">—</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">signed deal value</span></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">CAC</div>
+      <div class="kpi-value mono" id="rpt-cac">—</div>
+      <div class="kpi-meta"><span class="kpi-badge neutral" id="rpt-cac-flag">cost per close</span></div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Close Rate</div>
+      <div class="kpi-value mono" id="rpt-cr">—</div>
+      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-cr-flag">target 25%</span></div>
+    </div>
+  </div>
+
+  <div class="section-label">P&L summary</div>
+  <div class="chart-card" style="margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:20px;padding:6px 0">
+      <div>
+        <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Gross Spend</div>
+        <div style="font-size:22px;font-weight:800;color:var(--red);font-family:var(--font-mono)" id="rpt-pl-spend">—</div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Total Cash In</div>
+        <div style="font-size:22px;font-weight:800;color:var(--accent);font-family:var(--font-mono)" id="rpt-pl-cash">—</div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Net P&L (Cash)</div>
+        <div style="font-size:22px;font-weight:800;font-family:var(--font-mono)" id="rpt-pl-net">—</div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Net P&L (Contracts)</div>
+        <div style="font-size:22px;font-weight:800;color:var(--blue);font-family:var(--font-mono)" id="rpt-pl-con">—</div>
       </div>
     </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <div id="rpt-verdict" style="font-size:13px;font-weight:700;line-height:1.6"></div>
+    </div>
   </div>
+
+  <div class="section-label">Closer breakdown</div>
+  <div class="chart-card" style="margin-bottom:10px">
+    <table class="deals-table">
+      <thead>
+        <tr>
+          <th>Closer</th>
+          <th>Deals</th>
+          <th>Cash Collected</th>
+          <th>Contracts Signed</th>
+          <th>Close Rate</th>
+          <th>HT from Ads</th>
+        </tr>
+      </thead>
+      <tbody id="rpt-closer-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="section-label">Daily breakdown — this period</div>
+  <div class="chart-card">
+    <table class="deals-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Spend</th>
+          <th>Leads</th>
+          <th>CPL</th>
+          <th>Booked</th>
+          <th>Shows</th>
+          <th>Show%</th>
+          <th>Closes</th>
+          <th>Cash</th>
+          <th>LT</th>
+          <th>ROAS</th>
+        </tr>
+      </thead>
+      <tbody id="rpt-daily-tbody"></tbody>
+    </table>
+  </div>
+
 </div>
+
+
 
 <!-- ══════════════════════════════════════
      TAB: SETTINGS
@@ -1758,7 +1897,7 @@ const PAGE_TITLES = {
   'calls-log': ['Log Booked Calls',    'Log ads + organic calls · updates KPIs instantly'],
   'edit-log':  ['Edit Log Entries',    'Fix any previously logged numbers'],
   deals:     ['Add New Deal',          'Log a closed deal · updates all metrics live'],
-  slack:     ['Slack Reports',         'Daily & weekly summaries'],
+  slack:     ['Daily Report',          'Full breakdown · spend · revenue · funnel · closers'],
   settings:  ['Settings',              'Targets · rates · thresholds'],
 };
 
@@ -1778,7 +1917,7 @@ function switchTab(id,el) {
   if(id==='deals')      renderDealLog();
   if(id==='calls-log')  renderCallsLogTable();
   if(id==='edit-log')   renderEditLog();
-  if(id==='slack')      renderSlack(computeMetrics(currentPeriod));
+  if(id==='slack')      { renderSlack(computeMetrics(currentPeriod)); renderDailyReport(); }
 }
 
 function setPeriod(p,btn) {
@@ -2673,6 +2812,185 @@ async function deleteLogEntry(id) {
   }
 }
 
+
+// ═══════════════════════════════════════════
+// DAILY REPORT TAB
+// ═══════════════════════════════════════════
+let reportPeriod = 'today';
+
+function setReportPeriod(p, btn) {
+  reportPeriod = p;
+  document.querySelectorAll('[id^="rpt-btn-"]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderDailyReport();
+}
+
+function renderDailyReport() {
+  const d = computeMetrics(reportPeriod);
+  const S = getSettings();
+  const log = DB_LOG;
+  const deals = DB_DEALS;
+  const today = new Date();
+
+  function inPeriod(dateStr) {
+    if (!dateStr) return false;
+    const dt = new Date(dateStr);
+    const todayStr = today.toISOString().split('T')[0];
+    if (reportPeriod==='today') return dateStr === todayStr;
+    if (reportPeriod==='7d') { const c=new Date(today); c.setDate(c.getDate()-7); return dt>=c; }
+    if (reportPeriod==='mtd') return dt.getFullYear()===today.getFullYear()&&dt.getMonth()===today.getMonth();
+    return true;
+  }
+
+  const cpl    = d.leads  ? d.spend/d.leads   : 0;
+  const cpbc   = d.booked ? d.spend/d.booked  : 0;
+  const showR  = d.booked ? d.shows/d.booked  : 0;
+  const noshowR= d.booked ? d.noshows/d.booked: 0;
+  const cr     = d.shows  ? d.rawDeals.length/d.shows : 0;
+  const roas   = d.spend  ? d.cash/d.spend    : 0;
+  const roasCon= d.spend  ? d.contractTotal/d.spend : 0;
+  const cac    = d.rawDeals.length ? d.spend/d.rawDeals.length : 0;
+  const netPL  = d.cash - d.spend;
+  const netCon = d.contractTotal - d.spend;
+  const ltSales= Math.round((d.lt||0)/27);
+
+  const periodLabels = { today:'Today', '7d':'Last 7 Days', mtd:'Month to Date', all:'All Time' };
+
+  // Ad spend section
+  set('rpt-spend', '$' + (d.spend||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
+  set('rpt-spend-sub', periodLabels[reportPeriod]);
+  set('rpt-leads', d.leads);
+  set('rpt-cpl-badge', d.leads ? '$'+Math.round(cpl)+' CPL' : '—');
+  set('rpt-cpl', d.leads ? '$'+Math.round(cpl) : '—');
+  set('rpt-cpl-flag', cpl > 0 ? (cpl <= S.tgt_cpl ? '✓ under $'+S.tgt_cpl : 'target $'+S.tgt_cpl) : '—');
+  badge('rpt-cpl-flag', cpl <= S.tgt_cpl && cpl > 0 ? 'up' : cpl > 0 ? 'warn' : 'neutral');
+  set('rpt-cpbc', d.booked ? '$'+Math.round(cpbc) : '—');
+  set('rpt-cpbc-flag', cpbc > 0 ? (cpbc <= S.tgt_cpbc ? '✓ under $'+S.tgt_cpbc : 'target $'+S.tgt_cpbc) : '—');
+  badge('rpt-cpbc-flag', cpbc <= S.tgt_cpbc && cpbc > 0 ? 'up' : cpbc > 0 ? 'warn' : 'neutral');
+
+  // Calls
+  set('rpt-booked', d.booked);
+  set('rpt-shows', d.shows);
+  set('rpt-showup-badge', d.booked ? Math.round(showR*100)+'% show rate' : '—');
+  badge('rpt-showup-badge', showR >= 0.70 && d.booked ? 'up' : d.booked ? 'warn' : 'neutral');
+  set('rpt-noshows', d.noshows);
+  set('rpt-noshow-badge', d.booked ? Math.round(noshowR*100)+'% no-show' : '—');
+  set('rpt-showrate', d.booked ? Math.round(showR*100)+'%' : '—');
+  set('rpt-showrate-flag', showR >= 0.70 && d.booked ? '✓ healthy' : d.booked ? 'target 70%' : '—');
+  badge('rpt-showrate-flag', showR >= 0.70 && d.booked ? 'up' : d.booked ? 'warn' : 'neutral');
+
+  // Revenue
+  set('rpt-htcash', '$'+(d.htCash||0).toLocaleString());
+  set('rpt-deals-badge', d.rawDeals.length + ' deals');
+  badge('rpt-deals-badge', d.rawDeals.length > 0 ? 'up' : 'neutral');
+  set('rpt-htads', '$'+(d.htAds||0).toLocaleString());
+  set('rpt-htads-pct', d.htCash ? Math.round(d.htAds/d.htCash*100)+'% of HT' : '—');
+  set('rpt-lt', '$'+(d.lt||0).toLocaleString());
+  set('rpt-lt-sales', ltSales + ' purchases @ $27');
+  set('rpt-total', '$'+d.cash.toLocaleString());
+
+  // Efficiency
+  set('rpt-roas', d.spend ? roas.toFixed(2)+'x' : '—');
+  set('rpt-roas-flag', roas >= 2 && d.spend ? '✓ healthy' : d.spend ? 'target 2x' : '—');
+  badge('rpt-roas-flag', roas >= 2 && d.spend ? 'up' : d.spend ? 'warn' : 'neutral');
+  set('rpt-roas-con', d.spend ? roasCon.toFixed(1)+'x' : '—');
+  set('rpt-cac', d.rawDeals.length ? '$'+Math.round(cac) : '—');
+  set('rpt-cac-flag', cac > 0 && cac <= 3000 ? '✓ under $3k' : cac > 0 ? 'review' : '—');
+  badge('rpt-cac-flag', cac > 0 && cac <= 3000 ? 'up' : cac > 0 ? 'warn' : 'neutral');
+  set('rpt-cr', d.shows ? Math.round(cr*100)+'%' : '—');
+  set('rpt-cr-flag', cr >= 0.25 && d.shows ? '✓ healthy' : d.shows ? 'target 25%' : '—');
+  badge('rpt-cr-flag', cr >= 0.25 && d.shows ? 'up' : d.shows ? 'warn' : 'neutral');
+
+  // P&L
+  set('rpt-pl-spend', '$'+(d.spend||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
+  set('rpt-pl-cash', '$'+d.cash.toLocaleString());
+  const plEl = document.getElementById('rpt-pl-net');
+  if (plEl) {
+    plEl.textContent = (netPL >= 0 ? '+' : '') + '$' + Math.abs(netPL).toLocaleString();
+    plEl.style.color = netPL >= 0 ? 'var(--accent)' : 'var(--red)';
+  }
+  set('rpt-pl-con', (netCon >= 0 ? '+' : '') + '$' + Math.abs(netCon).toLocaleString());
+
+  // Verdict
+  const verdictEl = document.getElementById('rpt-verdict');
+  if (verdictEl) {
+    const flags = [];
+    if (roas >= 2) flags.push('✅ ROAS healthy at ' + roas.toFixed(2)+'x');
+    else if (d.spend) flags.push('⚠️ Cash ROAS at ' + roas.toFixed(2)+'x — below 2x target. Contract ROAS is ' + roasCon.toFixed(1)+'x.');
+    if (showR >= 0.70 && d.booked) flags.push('✅ Show-up rate strong at ' + Math.round(showR*100)+'%');
+    else if (d.booked) flags.push('⚠️ Show-up rate at ' + Math.round(showR*100)+'% — target 70%+');
+    if (cr >= 0.25 && d.shows) flags.push('✅ Close rate strong at ' + Math.round(cr*100)+'%');
+    else if (d.shows) flags.push('⚠️ Close rate at ' + Math.round(cr*100)+'% — target 25%+');
+    if (cpl <= 150 && cpl > 0) flags.push('✅ CPL at $' + Math.round(cpl) + ' — under $150 target');
+    else if (cpl > 0) flags.push('⚠️ CPL at $' + Math.round(cpl) + ' — above $150 target');
+    if (netPL >= 0) flags.push('✅ Cash positive — collecting more than spending');
+    else if (d.spend) flags.push('⚠️ Cash P&L is -$' + Math.abs(netPL).toLocaleString() + ' — but contracts are +$' + Math.max(0,netCon).toLocaleString());
+    verdictEl.innerHTML = flags.join('<br>');
+  }
+
+  // Closer breakdown
+  const closerTbody = document.getElementById('rpt-closer-tbody');
+  if (closerTbody) {
+    const closerData = [
+      { name: 'Frankie', color: 'var(--purple)' },
+      { name: 'Mehdi',   color: 'var(--amber)'  },
+    ].map(c => {
+      const cDeals = d.rawDeals.filter(dl => dl.closer === c.name);
+      const cCash = cDeals.reduce((s,dl) => s+(dl.usd||0), 0);
+      const cContracts = cDeals.reduce((s,dl) => s+(dl.contract||0), 0);
+      const cShows = log.filter(l => inPeriod(l.date) && l.closer === c.name).reduce((s,l) => s+(l.shows||0), 0);
+      const cCR = cShows ? Math.round(cDeals.length/cShows*100) : 0;
+      const cAdsDeals = cDeals.filter(dl => dl.source === 'Ads');
+      const cAdsCash = cAdsDeals.reduce((s,dl) => s+(dl.usd||0), 0);
+      return `<tr>
+        <td style="color:${c.color};font-weight:700">${c.name}</td>
+        <td>${cDeals.length}</td>
+        <td style="color:var(--accent);font-family:var(--font-mono);font-weight:700">$${cCash.toLocaleString()}</td>
+        <td style="font-family:var(--font-mono)">$${cContracts.toLocaleString()}</td>
+        <td><span class="kpi-badge ${cCR >= 25 ? 'up' : 'warn'}">${cShows ? cCR+'%' : '—'}</span></td>
+        <td style="font-family:var(--font-mono)">$${cAdsCash.toLocaleString()}</td>
+      </tr>`;
+    });
+    closerTbody.innerHTML = closerData.join('') ||
+      '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:16px">No deals this period</td></tr>';
+  }
+
+  // Daily breakdown table
+  const dailyTbody = document.getElementById('rpt-daily-tbody');
+  if (dailyTbody) {
+    const pLog = log.filter(l => inPeriod(l.date)).sort((a,b) => new Date(b.date)-new Date(a.date));
+    if (!pLog.length) {
+      dailyTbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--t3);padding:16px">No data logged for this period</td></tr>';
+    } else {
+      dailyTbody.innerHTML = pLog.map(l => {
+        const lCPL  = l.leads  ? Math.round(l.spend/l.leads)  : 0;
+        const lShow = l.booked ? Math.round(l.shows/l.booked*100) : 0;
+        const lROAS = l.spend  ? (((l.cash||0)+(l.lt||0))/l.spend).toFixed(1) : '—';
+        const roasOk = l.spend && ((l.cash||0)+(l.lt||0))/l.spend >= 2;
+        return `<tr>
+          <td style="color:var(--accent);font-weight:700;font-family:var(--font-mono)">${l.date}</td>
+          <td style="font-family:var(--font-mono)">$${(l.spend||0).toLocaleString()}</td>
+          <td>${l.leads||0}</td>
+          <td style="color:${lCPL <= 150 && lCPL > 0 ? 'var(--accent)' : lCPL > 0 ? 'var(--amber)' : 'var(--t3)'}">
+            ${lCPL > 0 ? '$'+lCPL : '—'}
+          </td>
+          <td>${l.booked||0}</td>
+          <td>${l.shows||0}</td>
+          <td style="color:${lShow >= 70 ? 'var(--accent)' : lShow > 0 ? 'var(--amber)' : 'var(--t3)'}">
+            ${l.booked ? lShow+'%' : '—'}
+          </td>
+          <td>${l.closes||0}</td>
+          <td style="font-family:var(--font-mono);color:var(--accent)">$${(l.cash||0).toLocaleString()}</td>
+          <td style="font-family:var(--font-mono)">$${(l.lt||0).toLocaleString()}</td>
+          <td style="color:${roasOk ? 'var(--accent)' : typeof lROAS === 'string' && lROAS !== '—' ? 'var(--amber)' : 'var(--t3)'}">
+            ${lROAS !== '—' ? lROAS+'x' : '—'}
+          </td>
+        </tr>`;
+      }).join('');
+    }
+  }
+}
+
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
@@ -2689,7 +3007,7 @@ toast.style.cssText = 'position:fixed;bottom:24px;right:24px;padding:10px 20px;b
 document.body.appendChild(toast);
 
 // Load data and render
-seedIfEmpty().then(() => loadAndRender());
+seedIfEmpty().then(() => loadAndRender().then(() => renderDailyReport()));
 </script>
 </body>
 </html>
