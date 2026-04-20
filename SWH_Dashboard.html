@@ -1464,6 +1464,21 @@ select.input-field option { background: var(--bg2); }
     </table>
   </div>
 
+  <div class="section-label">Written report</div>
+  <div class="chart-card" style="margin-bottom:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <div>
+        <div class="chart-card-title">Auto-generated performance report</div>
+        <div class="chart-card-sub">Based on your live data · updates with your period selection</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="copyReport()" style="background:var(--bg4);color:var(--t1);border:1px solid var(--border2);border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;font-family:var(--font-display);cursor:pointer;transition:all 0.15s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg4)'">Copy Text</button>
+        <button onclick="downloadReport()" style="background:var(--accent);color:var(--bg);border:none;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:800;font-family:var(--font-display);cursor:pointer;transition:all 0.15s" onmouseover="this.style.background='var(--accent2)'" onmouseout="this.style.background='var(--accent)'">Download PDF</button>
+      </div>
+    </div>
+    <div id="rpt-written" style="font-size:13px;color:var(--t2);line-height:2;padding:16px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent);white-space:pre-line"></div>
+  </div>
+
 </div>
 
 
@@ -2823,6 +2838,7 @@ function setReportPeriod(p, btn) {
   document.querySelectorAll('[id^="rpt-btn-"]').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderDailyReport();
+  renderWrittenReport();
 }
 
 function renderDailyReport() {
@@ -2955,6 +2971,9 @@ function renderDailyReport() {
       '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:16px">No deals this period</td></tr>';
   }
 
+  // Written report
+  renderWrittenReport();
+
   // Daily breakdown table
   const dailyTbody = document.getElementById('rpt-daily-tbody');
   if (dailyTbody) {
@@ -2989,6 +3008,263 @@ function renderDailyReport() {
       }).join('');
     }
   }
+}
+
+
+// ═══════════════════════════════════════════
+// WRITTEN REPORT GENERATOR
+// ═══════════════════════════════════════════
+function generateWrittenReport() {
+  const d = computeMetrics(reportPeriod);
+  const S = getSettings();
+  const periodLabels = { today:'Today', '7d':'the last 7 days', mtd:'this month to date', all:'all time (Dec 2025 – present)' };
+  const periodLabel = periodLabels[reportPeriod] || reportPeriod;
+  const today = new Date().toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'});
+
+  const cpl    = d.leads  ? d.spend/d.leads   : 0;
+  const cpbc   = d.booked ? d.spend/d.booked  : 0;
+  const showR  = d.booked ? d.shows/d.booked  : 0;
+  const cr     = d.shows  ? d.rawDeals.length/d.shows : 0;
+  const roas   = d.spend  ? d.cash/d.spend    : 0;
+  const roasCon= d.spend  ? d.contractTotal/d.spend : 0;
+  const cac    = d.rawDeals.length ? d.spend/d.rawDeals.length : 0;
+  const netPL  = d.cash - d.spend;
+  const netCon = d.contractTotal - d.spend;
+  const ltSales= Math.round((d.lt||0)/27);
+  const topCloser = d.frankieCash >= d.mehdiCash ? 'Frankie' : 'Mehdi';
+  const topCloserCash = Math.max(d.frankieCash, d.mehdiCash);
+
+  // Build the written report
+  const lines = [];
+
+  lines.push(`SWH Ads Performance Report — ${today}`);
+  lines.push(`Period: ${periodLabel.charAt(0).toUpperCase() + periodLabel.slice(1)}`);
+  lines.push('');
+
+  // Spend & acquisition
+  lines.push(`Over ${periodLabel}, we spent $${d.spend.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} on paid advertising across our Meta campaigns. This generated ${d.leads} leads${d.leads ? ' at a cost per lead of $' + Math.round(cpl) : ''}, ${cpl <= 150 && cpl > 0 ? 'which is within our $150 target' : cpl > 150 ? 'which is above our $150 target and should be reviewed' : ''}.`);
+
+  // Calls
+  if (d.booked > 0) {
+    lines.push(`Our ads generated ${d.booked} booked calls at a cost of $${Math.round(cpbc)} per booked call. Of those, ${d.shows} showed up — a ${Math.round(showR*100)}% show-up rate${showR >= 0.70 ? ', which is above our 70% benchmark' : ', which is below our 70% benchmark — we should review our pre-call nurture sequences'}. ${d.noshows} call${d.noshows !== 1 ? 's' : ''} resulted in no-shows.`);
+  }
+
+  // Revenue
+  if (d.htCash > 0 || d.rawDeals.length > 0) {
+    lines.push(`On the sales side, we closed ${d.rawDeals.length} high-ticket deal${d.rawDeals.length !== 1 ? 's' : ''}, collecting $${d.htCash.toLocaleString()} in cash. Of this, $${d.htAds.toLocaleString()} (${d.htCash ? Math.round(d.htAds/d.htCash*100) : 0}%) came directly from our paid ads, with the remaining $${d.htOrg.toLocaleString()} attributed to organic sources. Our signed contract value for the period stands at $${d.contractTotal.toLocaleString()}.`);
+  }
+
+  // Low ticket
+  if (d.lt > 0) {
+    lines.push(`Our low-ticket front-end ($27 course) generated $${d.lt.toLocaleString()} in revenue from ${ltSales} purchase${ltSales !== 1 ? 's' : ''}, offsetting ${d.spend ? Math.round(d.lt/d.spend*100) : 0}% of our total ad spend.`);
+  }
+
+  // Total cash & P&L
+  lines.push(`In total, we collected $${d.cash.toLocaleString()} in cash this period against $${d.spend.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} in ad spend, resulting in a cash P&L of ${netPL >= 0 ? '+' : ''}$${netPL.toLocaleString()}. When factoring in signed contract values, our P&L improves to ${netCon >= 0 ? '+' : ''}$${netCon.toLocaleString()}.`);
+
+  // ROAS & efficiency
+  if (d.spend > 0) {
+    lines.push(`Our cash ROAS stands at ${roas.toFixed(2)}x${roas >= 2 ? ', which meets our 2x target' : ', which is below our 2x target — however our contract ROAS of ' + roasCon.toFixed(1) + 'x reflects the true value once clients complete their payment plans'}. Our customer acquisition cost (CAC) is $${d.rawDeals.length ? Math.round(cac).toLocaleString() : '—'}${cac > 0 && cac <= 3000 ? ', within the $3,000 target' : cac > 3000 ? ', above the $3,000 target' : ''}.`);
+  }
+
+  // Closers
+  if (d.frankieCash > 0 || d.mehdiCash > 0) {
+    lines.push(`Closer performance: ${topCloser} led this period with $${topCloserCash.toLocaleString()} in cash collected. Frankie closed ${d.frankieDeals} deal${d.frankieDeals !== 1 ? 's' : ''} ($${d.frankieCash.toLocaleString()}) and Mehdi closed ${d.mehdiDeals} deal${d.mehdiDeals !== 1 ? 's' : ''} ($${d.mehdiCash.toLocaleString()}).`);
+  }
+
+  // Close rate
+  if (d.shows > 0) {
+    lines.push(`Our overall close rate from showed calls is ${Math.round(cr*100)}%${cr >= 0.25 ? ', which is above our 25% benchmark — closers are performing well' : ', which is below our 25% benchmark — we should review pitch quality and lead qualification'}.`);
+  }
+
+  // Closing verdict
+  const allGreen = roas >= 2 && showR >= 0.70 && cr >= 0.25 && cpl <= 150;
+  const verdict = allGreen
+    ? `Overall, the funnel is performing well across all key metrics. We are in a strong position to increase ad spend with confidence.`
+    : netPL >= 0
+    ? `Overall, the funnel is cash positive and performing well on show-up and close rates. The primary focus should be on improving ROAS by increasing payment collection on signed contracts.`
+    : `Overall, while our show-up rate and close rate are strong, the cash P&L is currently negative at -$${Math.abs(netPL).toLocaleString()}. This is driven by payment plans on signed contracts ($${d.contractTotal.toLocaleString()} in contracts vs $${d.htCash.toLocaleString()} collected). We should focus on improving upfront payment collection before significantly scaling spend.`;
+
+  lines.push(verdict);
+
+  return lines.join('\n');
+}
+
+function renderWrittenReport() {
+  const text = generateWrittenReport();
+  const el = document.getElementById('rpt-written');
+  if (el) el.textContent = text;
+}
+
+function copyReport() {
+  const text = generateWrittenReport();
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('✓ Report copied to clipboard');
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('✓ Report copied to clipboard');
+  });
+}
+
+function downloadReport() {
+  const d = computeMetrics(reportPeriod);
+  const text = generateWrittenReport();
+  const today = new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'-');
+  const periodLabels = { today:'Today', '7d':'Last-7-Days', mtd:'MTD', all:'All-Time' };
+  const filename = `SWH-Ads-Report-${periodLabels[reportPeriod]}-${today}.pdf`;
+
+  // Build PDF using browser print
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>${filename}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: 'Helvetica Neue', Arial, sans-serif;
+          font-size: 13px;
+          line-height: 1.8;
+          color: #1a1a2e;
+          padding: 48px;
+          max-width: 800px;
+          margin: 0 auto;
+        }
+        .header {
+          border-bottom: 3px solid #00C882;
+          padding-bottom: 20px;
+          margin-bottom: 28px;
+        }
+        .logo { font-size: 22px; font-weight: 800; color: #00C882; letter-spacing: -0.5px; }
+        .title { font-size: 18px; font-weight: 700; color: #0d1117; margin-top: 6px; }
+        .subtitle { font-size: 12px; color: #8895A7; margin-top: 3px; }
+        .metrics-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 12px;
+          margin: 24px 0;
+        }
+        .metric {
+          background: #f8fafb;
+          border-radius: 8px;
+          padding: 12px;
+          border-top: 2px solid #00C882;
+        }
+        .metric-label { font-size: 9px; font-weight: 600; color: #8895A7; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
+        .metric-value { font-size: 18px; font-weight: 800; color: #0d1117; }
+        .metric-value.green { color: #00C882; }
+        .metric-value.red { color: #FF5252; }
+        .metric-value.amber { color: #FFB742; }
+        .section-title {
+          font-size: 10px;
+          font-weight: 700;
+          color: #8895A7;
+          text-transform: uppercase;
+          letter-spacing: 1.2px;
+          margin: 24px 0 8px;
+          padding-bottom: 6px;
+          border-bottom: 1px solid #eaeef2;
+        }
+        .report-text {
+          font-size: 13px;
+          line-height: 2;
+          color: #2d3748;
+          white-space: pre-line;
+        }
+        .footer {
+          margin-top: 40px;
+          padding-top: 16px;
+          border-top: 1px solid #eaeef2;
+          font-size: 10px;
+          color: #8895A7;
+          display: flex;
+          justify-content: space-between;
+        }
+        @media print {
+          body { padding: 32px; }
+          .no-print { display: none; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="logo">SWH</div>
+        <div class="title">Ads Performance Report</div>
+        <div class="subtitle">Generated ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} · Period: ${periodLabels[reportPeriod]||reportPeriod}</div>
+      </div>
+
+      <div class="metrics-grid">
+        <div class="metric">
+          <div class="metric-label">Ad Spend</div>
+          <div class="metric-value">$${(d.spend||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Total Cash</div>
+          <div class="metric-value green">$${d.cash.toLocaleString()}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">ROAS (Cash)</div>
+          <div class="metric-value ${d.spend && d.cash/d.spend >= 2 ? 'green' : 'amber'}">${d.spend ? (d.cash/d.spend).toFixed(2)+'x' : '—'}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Net P&L</div>
+          <div class="metric-value ${d.cash >= d.spend ? 'green' : 'red'}">${d.cash >= d.spend ? '+' : ''}$${(d.cash-d.spend).toLocaleString()}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Leads</div>
+          <div class="metric-value">${d.leads}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">CPL</div>
+          <div class="metric-value">${d.leads ? '$'+Math.round(d.spend/d.leads) : '—'}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Booked Calls</div>
+          <div class="metric-value">${d.booked}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Show-Up Rate</div>
+          <div class="metric-value ${d.booked && d.shows/d.booked >= 0.70 ? 'green' : 'amber'}">${d.booked ? Math.round(d.shows/d.booked*100)+'%' : '—'}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">HT Closes</div>
+          <div class="metric-value">${d.rawDeals.length}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Close Rate</div>
+          <div class="metric-value ${d.shows && d.rawDeals.length/d.shows >= 0.25 ? 'green' : 'amber'}">${d.shows ? Math.round(d.rawDeals.length/d.shows*100)+'%' : '—'}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Contracts</div>
+          <div class="metric-value">$${d.contractTotal.toLocaleString()}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">CAC</div>
+          <div class="metric-value">${d.rawDeals.length ? '$'+Math.round(d.spend/d.rawDeals.length).toLocaleString() : '—'}</div>
+        </div>
+      </div>
+
+      <div class="section-title">Performance Summary</div>
+      <div class="report-text">${text.split('\n').slice(3).join('\n')}</div>
+
+      <div class="footer">
+        <span>SWH Ads Command Center · swh-dashboard.vercel.app</span>
+        <span>Generated ${new Date().toLocaleString('en-GB')}</span>
+      </div>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  setTimeout(() => {
+    printWindow.print();
+  }, 500);
 }
 
 // ═══════════════════════════════════════════
