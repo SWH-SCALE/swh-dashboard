@@ -3117,7 +3117,48 @@ function downloadReport() {
   const text = generateWrittenReport();
   const today = new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'-');
   const periodLabels = { today:'Today', '7d':'Last-7-Days', mtd:'MTD', all:'All-Time' };
+  const periodFull = { today:'Today', '7d':'Last 7 Days', mtd:'Month to Date', all:'All Time' };
   const filename = `SWH-Ads-Report-${periodLabels[reportPeriod]}-${today}.pdf`;
+
+  const cpl    = d.leads  ? Math.round(d.spend/d.leads)   : 0;
+  const cpbc   = d.booked ? Math.round(d.spend/d.booked)  : 0;
+  const showR  = d.booked ? Math.round(d.shows/d.booked*100) : 0;
+  const cr     = d.shows  ? Math.round(d.rawDeals.length/d.shows*100) : 0;
+  const roas   = d.spend  ? (d.cash/d.spend).toFixed(2)   : '—';
+  const roasCon= d.spend  ? (d.contractTotal/d.spend).toFixed(1) : '—';
+  const cac    = d.rawDeals.length ? Math.round(d.spend/d.rawDeals.length) : 0;
+  const netPL  = d.cash - d.spend;
+  const netCon = d.contractTotal - d.spend;
+  const ltSales= Math.round((d.lt||0)/27);
+
+  // Build log table rows for period
+  const log = DB_LOG;
+  const todayStr = new Date().toISOString().split('T')[0];
+  function inPeriod(ds) {
+    if (!ds) return false;
+    const dt = new Date(ds);
+    if (reportPeriod==='today') return ds===todayStr;
+    if (reportPeriod==='7d') { const c=new Date(); c.setDate(c.getDate()-7); return dt>=c; }
+    if (reportPeriod==='mtd') { const n=new Date(); return dt.getFullYear()===n.getFullYear()&&dt.getMonth()===n.getMonth(); }
+    return true;
+  }
+  const pLog = log.filter(l=>inPeriod(l.date)).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const logRows = pLog.map(l => {
+    const lROAS = l.spend ? ((l.cash||0)+(l.lt||0))/l.spend : 0;
+    return `<tr>
+      <td>${l.date}</td>
+      <td>$${(l.spend||0).toLocaleString()}</td>
+      <td>${l.leads||0}</td>
+      <td>${l.leads&&l.spend?'$'+Math.round(l.spend/l.leads):'—'}</td>
+      <td>${l.booked||0}</td>
+      <td>${l.shows||0}</td>
+      <td>${l.booked?Math.round(l.shows/l.booked*100)+'%':'—'}</td>
+      <td>${l.closes||0}</td>
+      <td>$${(l.cash||0).toLocaleString()}</td>
+      <td>$${(l.lt||0).toLocaleString()}</td>
+      <td style="color:${lROAS>=2?'#00C882':lROAS>0?'#F5A623':'#888'}">${l.spend?lROAS.toFixed(1)+'x':'—'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="11" style="text-align:center;color:#888;padding:12px">No data for this period</td></tr>';
 
   // Build PDF using browser print
   const printWindow = window.open('', '_blank');
@@ -3127,135 +3168,119 @@ function downloadReport() {
     <head>
       <title>${filename}</title>
       <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-          font-family: 'Helvetica Neue', Arial, sans-serif;
-          font-size: 13px;
-          line-height: 1.8;
-          color: #1a1a2e;
-          padding: 48px;
-          max-width: 800px;
-          margin: 0 auto;
-        }
-        .header {
-          border-bottom: 3px solid #00C882;
-          padding-bottom: 20px;
-          margin-bottom: 28px;
-        }
-        .logo { font-size: 22px; font-weight: 800; color: #00C882; letter-spacing: -0.5px; }
-        .title { font-size: 18px; font-weight: 700; color: #0d1117; margin-top: 6px; }
-        .subtitle { font-size: 12px; color: #8895A7; margin-top: 3px; }
-        .metrics-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 12px;
-          margin: 24px 0;
-        }
-        .metric {
-          background: #f8fafb;
-          border-radius: 8px;
-          padding: 12px;
-          border-top: 2px solid #00C882;
-        }
-        .metric-label { font-size: 9px; font-weight: 600; color: #8895A7; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
-        .metric-value { font-size: 18px; font-weight: 800; color: #0d1117; }
-        .metric-value.green { color: #00C882; }
-        .metric-value.red { color: #FF5252; }
-        .metric-value.amber { color: #FFB742; }
-        .section-title {
-          font-size: 10px;
-          font-weight: 700;
-          color: #8895A7;
-          text-transform: uppercase;
-          letter-spacing: 1.2px;
-          margin: 24px 0 8px;
-          padding-bottom: 6px;
-          border-bottom: 1px solid #eaeef2;
-        }
-        .report-text {
-          font-size: 13px;
-          line-height: 2;
-          color: #2d3748;
-          white-space: pre-line;
-        }
-        .footer {
-          margin-top: 40px;
-          padding-top: 16px;
-          border-top: 1px solid #eaeef2;
-          font-size: 10px;
-          color: #8895A7;
-          display: flex;
-          justify-content: space-between;
-        }
-        @media print {
-          body { padding: 32px; }
-          .no-print { display: none; }
-        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#1a1a2e;padding:40px;max-width:900px;margin:0 auto}
+        .header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #00C882;padding-bottom:18px;margin-bottom:24px}
+        .logo{font-size:24px;font-weight:800;color:#00C882}
+        .logo-sub{font-size:10px;color:#8895A7;letter-spacing:1px;margin-top:2px}
+        .header-right{text-align:right}
+        .title{font-size:16px;font-weight:700;color:#0d1117}
+        .subtitle{font-size:11px;color:#8895A7;margin-top:3px}
+        .section-title{font-size:9px;font-weight:700;color:#8895A7;text-transform:uppercase;letter-spacing:1.2px;margin:20px 0 8px;padding-bottom:5px;border-bottom:1px solid #eaeef2}
+        .metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px}
+        .metric{background:#f8fafb;border-radius:6px;padding:10px 12px;border-top:2px solid #00C882}
+        .metric-label{font-size:8px;font-weight:700;color:#8895A7;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px}
+        .metric-value{font-size:16px;font-weight:800;color:#0d1117}
+        .green{color:#00C882}.red{color:#FF5252}.amber{color:#F5A623}.blue{color:#4D9DE0}
+        .pl-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}
+        .pl-box{background:#f8fafb;border-radius:6px;padding:12px;text-align:center}
+        .pl-label{font-size:9px;font-weight:700;color:#8895A7;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px}
+        .pl-val{font-size:20px;font-weight:800}
+        table{width:100%;border-collapse:collapse;font-size:10px;margin-top:4px}
+        th{text-align:left;padding:6px 8px;background:#f1f3f5;color:#8895A7;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:1px solid #eaeef2}
+        td{padding:6px 8px;border-bottom:1px solid #f1f3f5;color:#4a5568}
+        tr:last-child td{border-bottom:none}
+        .report-text{font-size:12px;line-height:1.9;color:#2d3748;white-space:pre-line;background:#f8fafb;padding:16px;border-radius:6px;border-left:3px solid #00C882}
+        .footer{margin-top:28px;padding-top:12px;border-top:1px solid #eaeef2;font-size:9px;color:#8895A7;display:flex;justify-content:space-between}
+        @media print{body{padding:28px}@page{margin:1cm}}
       </style>
     </head>
     <body>
       <div class="header">
-        <div class="logo">SWH</div>
-        <div class="title">Ads Performance Report</div>
-        <div class="subtitle">Generated ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} · Period: ${periodLabels[reportPeriod]||reportPeriod}</div>
+        <div>
+          <div class="logo">SWH</div>
+          <div class="logo-sub">ADS COMMAND CENTER</div>
+        </div>
+        <div class="header-right">
+          <div class="title">Ads Performance Report</div>
+          <div class="subtitle">Period: ${periodFull[reportPeriod]} &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
+        </div>
       </div>
 
+      <div class="section-title">Ad Spend + Acquisition</div>
       <div class="metrics-grid">
-        <div class="metric">
-          <div class="metric-label">Ad Spend</div>
-          <div class="metric-value">$${(d.spend||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Total Cash</div>
-          <div class="metric-value green">$${d.cash.toLocaleString()}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">ROAS (Cash)</div>
-          <div class="metric-value ${d.spend && d.cash/d.spend >= 2 ? 'green' : 'amber'}">${d.spend ? (d.cash/d.spend).toFixed(2)+'x' : '—'}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Net P&L</div>
-          <div class="metric-value ${d.cash >= d.spend ? 'green' : 'red'}">${d.cash >= d.spend ? '+' : ''}$${(d.cash-d.spend).toLocaleString()}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Leads</div>
-          <div class="metric-value">${d.leads}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">CPL</div>
-          <div class="metric-value">${d.leads ? '$'+Math.round(d.spend/d.leads) : '—'}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Booked Calls</div>
-          <div class="metric-value">${d.booked}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Show-Up Rate</div>
-          <div class="metric-value ${d.booked && d.shows/d.booked >= 0.70 ? 'green' : 'amber'}">${d.booked ? Math.round(d.shows/d.booked*100)+'%' : '—'}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">HT Closes</div>
-          <div class="metric-value">${d.rawDeals.length}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Close Rate</div>
-          <div class="metric-value ${d.shows && d.rawDeals.length/d.shows >= 0.25 ? 'green' : 'amber'}">${d.shows ? Math.round(d.rawDeals.length/d.shows*100)+'%' : '—'}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Contracts</div>
-          <div class="metric-value">$${d.contractTotal.toLocaleString()}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">CAC</div>
-          <div class="metric-value">${d.rawDeals.length ? '$'+Math.round(d.spend/d.rawDeals.length).toLocaleString() : '—'}</div>
-        </div>
+        <div class="metric"><div class="metric-label">Total Spend</div><div class="metric-value">$${(d.spend||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>
+        <div class="metric"><div class="metric-label">Leads</div><div class="metric-value">${d.leads}</div></div>
+        <div class="metric"><div class="metric-label">Cost Per Lead</div><div class="metric-value ${cpl<=150&&cpl>0?'green':cpl>0?'amber':''}">${cpl>0?'$'+cpl:'—'}</div></div>
+        <div class="metric"><div class="metric-label">Cost Per Booked Call</div><div class="metric-value ${cpbc<=500&&cpbc>0?'green':cpbc>0?'amber':''}">${cpbc>0?'$'+cpbc:'—'}</div></div>
       </div>
 
-      <div class="section-title">Performance Summary</div>
+      <div class="section-title">Call Performance</div>
+      <div class="metrics-grid">
+        <div class="metric"><div class="metric-label">Booked Calls</div><div class="metric-value">${d.booked}</div></div>
+        <div class="metric"><div class="metric-label">Show-Ups</div><div class="metric-value">${d.shows}</div></div>
+        <div class="metric"><div class="metric-label">No-Shows</div><div class="metric-value red">${d.noshows}</div></div>
+        <div class="metric"><div class="metric-label">Show-Up Rate</div><div class="metric-value ${showR>=70?'green':showR>0?'amber':''}">${showR>0?showR+'%':'—'}</div></div>
+      </div>
+
+      <div class="section-title">Revenue + Returns</div>
+      <div class="metrics-grid">
+        <div class="metric"><div class="metric-label">HT Cash Collected</div><div class="metric-value green">$${(d.htCash||0).toLocaleString()}</div></div>
+        <div class="metric"><div class="metric-label">HT from Ads</div><div class="metric-value">$${(d.htAds||0).toLocaleString()}</div></div>
+        <div class="metric"><div class="metric-label">Low-Ticket Rev</div><div class="metric-value">$${(d.lt||0).toLocaleString()}</div></div>
+        <div class="metric"><div class="metric-label">Total Cash</div><div class="metric-value green">$${d.cash.toLocaleString()}</div></div>
+      </div>
+
+      <div class="section-title">Efficiency Metrics</div>
+      <div class="metrics-grid">
+        <div class="metric"><div class="metric-label">ROAS (Cash)</div><div class="metric-value ${parseFloat(roas)>=2?'green':parseFloat(roas)>0?'amber':''}">${roas}${roas!=='—'?'x':''}</div></div>
+        <div class="metric"><div class="metric-label">ROAS (Contracts)</div><div class="metric-value blue">${roasCon}${roasCon!=='—'?'x':''}</div></div>
+        <div class="metric"><div class="metric-label">CAC</div><div class="metric-value ${cac>0&&cac<=3000?'green':cac>0?'amber':''}">${cac>0?'$'+cac.toLocaleString():'—'}</div></div>
+        <div class="metric"><div class="metric-label">Close Rate</div><div class="metric-value ${cr>=25?'green':cr>0?'amber':''}">${cr>0?cr+'%':'—'}</div></div>
+      </div>
+
+      <div class="section-title">P&L Summary</div>
+      <div class="pl-grid">
+        <div class="pl-box"><div class="pl-label">Gross Spend</div><div class="pl-val red">-$${(d.spend||0).toLocaleString()}</div></div>
+        <div class="pl-box"><div class="pl-label">Cash Collected</div><div class="pl-val green">+$${d.cash.toLocaleString()}</div></div>
+        <div class="pl-box"><div class="pl-label">Net P&L (Cash)</div><div class="pl-val ${netPL>=0?'green':'red'}">${netPL>=0?'+':''}$${netPL.toLocaleString()}</div></div>
+        <div class="pl-box"><div class="pl-label">Net P&L (Contracts)</div><div class="pl-val blue">${netCon>=0?'+':''}$${netCon.toLocaleString()}</div></div>
+      </div>
+
+      <div class="section-title">Closer Breakdown</div>
+      <table>
+        <thead><tr><th>Closer</th><th>Deals</th><th>Cash Collected</th><th>Contracts</th><th>Close Rate</th><th>HT from Ads</th></tr></thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:700;color:#B794F4">Frankie</td>
+            <td>${d.frankieDeals}</td>
+            <td style="font-weight:700">$${d.frankieCash.toLocaleString()}</td>
+            <td>$${DB_DEALS.filter(dl=>dl.closer==='Frankie').reduce((s,dl)=>s+(dl.contract||0),0).toLocaleString()}</td>
+            <td>${d.frankieShows?Math.round(d.frankieDeals/d.frankieShows*100)+'%':'—'}</td>
+            <td>$${DB_DEALS.filter(dl=>dl.closer==='Frankie'&&dl.source==='Ads').reduce((s,dl)=>s+(dl.usd||0),0).toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td style="font-weight:700;color:#FFB742">Mehdi</td>
+            <td>${d.mehdiDeals}</td>
+            <td style="font-weight:700">$${d.mehdiCash.toLocaleString()}</td>
+            <td>$${DB_DEALS.filter(dl=>dl.closer==='Mehdi').reduce((s,dl)=>s+(dl.contract||0),0).toLocaleString()}</td>
+            <td>${d.mehdiShows?Math.round(d.mehdiDeals/d.mehdiShows*100)+'%':'—'}</td>
+            <td>$${DB_DEALS.filter(dl=>dl.closer==='Mehdi'&&dl.source==='Ads').reduce((s,dl)=>s+(dl.usd||0),0).toLocaleString()}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="section-title">Daily Breakdown</div>
+      <table>
+        <thead><tr><th>Date</th><th>Spend</th><th>Leads</th><th>CPL</th><th>Booked</th><th>Shows</th><th>Show%</th><th>Closes</th><th>Cash</th><th>LT</th><th>ROAS</th></tr></thead>
+        <tbody>${logRows}</tbody>
+      </table>
+
+      <div class="section-title" style="margin-top:20px">Performance Summary</div>
       <div class="report-text">${text.split('\n').slice(3).join('\n')}</div>
 
       <div class="footer">
-        <span>SWH Ads Command Center · swh-dashboard.vercel.app</span>
+        <span>SWH Ads Command Center &nbsp;·&nbsp; swh-dashboard.vercel.app</span>
         <span>Generated ${new Date().toLocaleString('en-GB')}</span>
       </div>
     </body>
