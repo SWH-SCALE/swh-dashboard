@@ -1979,6 +1979,7 @@ function computeMetrics(period) {
     const dbLt     = DB_LOG.reduce((s,l)=>s+(l.lt||0),0);
     // Use live sheet count for LT if available
     const sheetLtRevenue = LT_FROM_SHEET > 0 ? LT_FROM_SHEET * 27 : 0;
+    console.log('All Time LT: sheet=', sheetLtRevenue, 'db=', dbLt, 'hardcoded=', ALL_TIME.lt);
     // Use DB values if they exist and are bigger, otherwise use ALL_TIME verified totals
     return buildMetrics(
       Math.max(dbSpend,  ALL_TIME.spend),
@@ -2015,7 +2016,9 @@ function computeMetrics(period) {
   const shows  = pLog.reduce((s,l)=>s+(l.shows||0),0);
   const noshows= pLog.reduce((s,l)=>s+(l.noshows||0),0);
   const closes = pLog.reduce((s,l)=>s+(l.closes||0),0);
-  const lt     = pLog.reduce((s,l)=>s+(l.lt||0),0);
+  const ltFromLog = pLog.reduce((s,l)=>s+(l.lt||0),0);
+  const ltFromSheetPeriod = getLTForPeriod(period);
+  const lt = Math.max(ltFromLog, ltFromSheetPeriod);
   const htCash = pDeals.reduce((s,d)=>s+(d.usd||0),0);
   const htAds  = pDeals.filter(d=>d.source==='Ads').reduce((s,d)=>s+(d.usd||0),0);
   const htOrg  = pDeals.filter(d=>d.source!=='Ads').reduce((s,d)=>s+(d.usd||0),0);
@@ -2064,24 +2067,66 @@ function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,ht
 // ═══════════════════════════════════════════
 // ── Google Sheets LT sync ───────────────────
 const SHEET_ID = '1_37SLqUWoNlZbTG_LyI75tJlVbZUzO0LO4SmuKFKI6Y';
-let LT_FROM_SHEET = 0; // number of purchases from Google Sheets
+let LT_FROM_SHEET = 0; // total purchases
+let LT_PURCHASES = []; // array of {date, amount} from sheet
 
 async function syncLTFromSheets() {
   try {
-    // Use the public CSV export — no API key needed
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Purchases`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Sheet fetch failed');
     const text = await res.text();
-    // Count rows (subtract 1 for header)
-    const rows = text.trim().split('\n').filter(r => r.trim() && !r.startsWith('"Date"') && r.includes('27'));
-    LT_FROM_SHEET = rows.length;
-    console.log('LT from Sheets:', LT_FROM_SHEET, 'purchases =', LT_FROM_SHEET * 27);
+    const rows = text.trim().split('\n');
+    LT_PURCHASES = [];
+    for (let i = 1; i < rows.length; i++) {
+      const cols = rows[i].split(',').map(c => c.replace(/^"|"$/g,'').trim());
+      if (!cols[0] || cols[0] === 'Date') continue;
+      // Parse date — GHL sends various formats
+      let dateStr = cols[0];
+      let parsedDate = null;
+      // Try parsing as-is first
+      const d = new Date(dateStr);
+      if (!isNaN(d)) {
+        parsedDate = d.toISOString().split('T')[0];
+      }
+      if (parsedDate) {
+        LT_PURCHASES.push({ date: parsedDate, amount: 27 });
+      }
+    }
+    LT_FROM_SHEET = LT_PURCHASES.length;
+    console.log('LT from Sheets:', LT_FROM_SHEET, 'purchases, latest:', LT_PURCHASES[LT_PURCHASES.length-1]);
+    // Cache for offline use
+    try { localStorage.setItem('swh_lt_purchases', JSON.stringify(LT_PURCHASES)); } catch(e) {}
     return LT_FROM_SHEET;
   } catch(e) {
     console.log('Sheets sync skipped:', e.message);
-    return 0;
+    // Try cache
+    try {
+      const cached = localStorage.getItem('swh_lt_purchases');
+      if (cached) { LT_PURCHASES = JSON.parse(cached); LT_FROM_SHEET = LT_PURCHASES.length; }
+    } catch(e2) {}
+    return LT_FROM_SHEET;
   }
+}
+
+// Get LT revenue for a specific period
+function getLTForPeriod(period) {
+  if (!LT_PURCHASES.length) return 0;
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  function inP(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (period === 'today' || period === 'latest') {
+      const mostRecent = DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr;
+      return dateStr === mostRecent || dateStr === todayStr;
+    }
+    if (period === '7d') { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
+    if (period === 'mtd') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
+    if (period === 'lm') { const l=new Date(today); l.setMonth(l.getMonth()-1); return d.getFullYear()===l.getFullYear()&&d.getMonth()===l.getMonth(); }
+    return true; // all
+  }
+  return LT_PURCHASES.filter(p => inP(p.date)).length * 27;
 }
 
 async function loadAndRender() {
