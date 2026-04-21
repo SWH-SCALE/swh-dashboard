@@ -1977,6 +1977,8 @@ function computeMetrics(period) {
     const dbNoshows= DB_LOG.reduce((s,l)=>s+(l.noshows||0),0);
     const dbCloses = DB_LOG.reduce((s,l)=>s+(l.closes||0),0);
     const dbLt     = DB_LOG.reduce((s,l)=>s+(l.lt||0),0);
+    // Use live sheet count for LT if available
+    const sheetLtRevenue = LT_FROM_SHEET > 0 ? LT_FROM_SHEET * 27 : 0;
     // Use DB values if they exist and are bigger, otherwise use ALL_TIME verified totals
     return buildMetrics(
       Math.max(dbSpend,  ALL_TIME.spend),
@@ -1985,7 +1987,7 @@ function computeMetrics(period) {
       Math.max(dbShows,  ALL_TIME.shows),
       Math.max(dbNoshows,ALL_TIME.noshows),
       Math.max(dbCloses, ALL_TIME.closes),
-      Math.max(dbLt,     ALL_TIME.lt),
+      Math.max(dbLt, sheetLtRevenue, ALL_TIME.lt),
       htCash, htAds, htOrg,
       deals.filter(d=>d.usd>0), contractTotal, pipeline, deals
     );
@@ -2060,14 +2062,37 @@ function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,ht
 // ═══════════════════════════════════════════
 // RENDER ALL
 // ═══════════════════════════════════════════
+// ── Google Sheets LT sync ───────────────────
+const SHEET_ID = '1_37SLqUWoNlZbTG_LyI75tJlVbZUzO0LO4SmuKFKI6Y';
+let LT_FROM_SHEET = 0; // number of purchases from Google Sheets
+
+async function syncLTFromSheets() {
+  try {
+    // Use the public CSV export — no API key needed
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Purchases`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Sheet fetch failed');
+    const text = await res.text();
+    // Count rows (subtract 1 for header)
+    const rows = text.trim().split('\n').filter(r => r.trim() && !r.startsWith('"Date"') && r.includes('27'));
+    LT_FROM_SHEET = rows.length;
+    console.log('LT from Sheets:', LT_FROM_SHEET, 'purchases =', LT_FROM_SHEET * 27);
+    return LT_FROM_SHEET;
+  } catch(e) {
+    console.log('Sheets sync skipped:', e.message);
+    return 0;
+  }
+}
+
 async function loadAndRender() {
   showLoading(true);
   try {
-    [DB_DEALS, DB_LOG] = await Promise.all([getDeals(), getLog()]);
+    [DB_DEALS, DB_LOG] = await Promise.all([getDeals(), getLog(), syncLTFromSheets()]);
     // Cache data locally as fallback
     try {
       localStorage.setItem('swh_cache_deals', JSON.stringify(DB_DEALS));
       localStorage.setItem('swh_cache_log', JSON.stringify(DB_LOG));
+      localStorage.setItem('swh_cache_lt', LT_FROM_SHEET.toString());
     } catch(e) {}
     renderAll();
   } catch(e) {
@@ -2076,8 +2101,10 @@ async function loadAndRender() {
     try {
       const cachedDeals = localStorage.getItem('swh_cache_deals');
       const cachedLog = localStorage.getItem('swh_cache_log');
+      const cachedLt = localStorage.getItem('swh_cache_lt');
       if (cachedDeals) DB_DEALS = JSON.parse(cachedDeals);
       if (cachedLog) DB_LOG = JSON.parse(cachedLog);
+      if (cachedLt) LT_FROM_SHEET = parseInt(cachedLt) || 0;
       if (DB_DEALS.length || DB_LOG.length) {
         renderAll();
         showToast('Using cached data — reconnecting...', 'error');
@@ -2423,7 +2450,8 @@ function renderLowTicket(d) {
   const ltCov=d.spend?Math.round(d.lt/d.spend*100):0;
   const netSpend=Math.max(0,d.spend-d.lt);
   const ltSales=Math.round((d.lt||0)/27);
-  set('lt-rev',fmtFull(d.lt)); set('lt-count',ltSales+' purchases @ $27');
+  const ltFromSheet = LT_FROM_SHEET > 0 ? LT_FROM_SHEET : ltSales;
+  set('lt-rev',fmtFull(d.lt)); set('lt-count',ltFromSheet+' purchases @ $27 · auto-synced from GHL');
   set('lt-spend',fmtFull(d.spend)); set('lt-net',fmtFull(netSpend));
   set('lt-cov',ltCov+'%');
   set('lt-cov-flag',ltCov>=100?'✓ fully covered':ltCov+'% of spend covered');
@@ -2609,6 +2637,7 @@ function saveSettings() {
 
 async function simulateSync() {
   document.getElementById('last-sync').textContent='Syncing...';
+  await syncLTFromSheets();
   await loadAndRender();
 }
 
