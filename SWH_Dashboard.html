@@ -879,7 +879,7 @@ select.input-field option { background: var(--bg2); }
     </div>
 
     <div class="period-switcher" id="period-switcher">
-      <button class="period-btn" onclick="setPeriod('today',this)">Today</button>
+      <button class="period-btn" onclick="setPeriod('today',this)">Latest Entry</button>
       <button class="period-btn" onclick="setPeriod('7d',this)">7 Days</button>
       <button class="period-btn active" onclick="setPeriod('mtd',this)">MTD</button>
       <button class="period-btn" onclick="setPeriod('lm',this)">Last Mo.</button>
@@ -1297,7 +1297,7 @@ select.input-field option { background: var(--bg2); }
   <!-- ── PERIOD SELECTOR ── -->
   <div class="section-label">Report period</div>
   <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-    <button class="period-btn active" id="rpt-btn-today" onclick="setReportPeriod('today',this)">Today</button>
+    <button class="period-btn active" id="rpt-btn-today" onclick="setReportPeriod('today',this)">Latest Entry</button>
     <button class="period-btn" id="rpt-btn-7d" onclick="setReportPeriod('7d',this)">Last 7 Days</button>
     <button class="period-btn" id="rpt-btn-mtd" onclick="setReportPeriod('mtd',this)">Month to Date</button>
     <button class="period-btn" id="rpt-btn-all" onclick="setReportPeriod('all',this)">All Time</button>
@@ -1946,7 +1946,7 @@ function initPeriodBtns() {
   const ps=document.getElementById('period-switcher');
   if(!ps)return;
   ps.innerHTML=`
-    <button class="period-btn" onclick="setPeriod('today',this)">Today</button>
+    <button class="period-btn" onclick="setPeriod('today',this)">Latest Entry</button>
     <button class="period-btn" onclick="setPeriod('7d',this)">7 Days</button>
     <button class="period-btn" onclick="setPeriod('mtd',this)">MTD</button>
     <button class="period-btn" onclick="setPeriod('lm',this)">Last Mo.</button>
@@ -1994,7 +1994,10 @@ function computeMetrics(period) {
   function inPeriod(dateStr) {
     if (!dateStr) return false;
     const d = new Date(dateStr);
-    if (period==='today') return dateStr===todayStr;
+    if (period==='today') {
+      const mostRecent = DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr;
+      return dateStr === mostRecent;
+    }
     if (period==='7d') { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
     if (period==='mtd') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
     if (period==='lm') { const l=new Date(today); l.setMonth(l.getMonth()-1); return d.getFullYear()===l.getFullYear()&&d.getMonth()===l.getMonth(); }
@@ -2852,7 +2855,11 @@ function renderDailyReport() {
     if (!dateStr) return false;
     const dt = new Date(dateStr);
     const todayStr = today.toISOString().split('T')[0];
-    if (reportPeriod==='today') return dateStr === todayStr;
+    if (reportPeriod==='today') {
+      // Show most recent entry, not necessarily today
+      const mostRecent = DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr;
+      return dateStr === mostRecent;
+    }
     if (reportPeriod==='7d') { const c=new Date(today); c.setDate(c.getDate()-7); return dt>=c; }
     if (reportPeriod==='mtd') return dt.getFullYear()===today.getFullYear()&&dt.getMonth()===today.getMonth();
     return true;
@@ -3137,7 +3144,10 @@ function downloadReport() {
   function inPeriod(ds) {
     if (!ds) return false;
     const dt = new Date(ds);
-    if (reportPeriod==='today') return ds===todayStr;
+    if (reportPeriod==='today') {
+      const mostRecent = DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr;
+      return ds === mostRecent;
+    }
     if (reportPeriod==='7d') { const c=new Date(); c.setDate(c.getDate()-7); return dt>=c; }
     if (reportPeriod==='mtd') { const n=new Date(); return dt.getFullYear()===n.getFullYear()&&dt.getMonth()===n.getMonth(); }
     return true;
