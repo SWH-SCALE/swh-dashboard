@@ -2114,19 +2114,27 @@ function getLTForPeriod(period) {
   if (!LT_PURCHASES.length) return 0;
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
+  // Get yesterday too since updates often happen day after
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate()-1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+
   function inP(dateStr) {
     if (!dateStr) return false;
     const d = new Date(dateStr);
-    if (period === 'today' || period === 'latest') {
+    if (period === 'today') {
+      // For latest entry — show today OR yesterday's purchases
+      // Also match against most recent log entry date
       const mostRecent = DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr;
-      return dateStr === mostRecent || dateStr === todayStr;
+      return dateStr === todayStr || dateStr === yesterdayStr || dateStr === mostRecent;
     }
     if (period === '7d') { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
     if (period === 'mtd') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
     if (period === 'lm') { const l=new Date(today); l.setMonth(l.getMonth()-1); return d.getFullYear()===l.getFullYear()&&d.getMonth()===l.getMonth(); }
     return true; // all
   }
-  return LT_PURCHASES.filter(p => inP(p.date)).length * 27;
+  const count = LT_PURCHASES.filter(p => inP(p.date)).length;
+  console.log('LT for period', period, ':', count, 'purchases');
+  return count * 27;
 }
 
 async function loadAndRender() {
