@@ -2177,9 +2177,8 @@ async function seedIfEmpty() {
 }
 
 // ── All-time verified totals from spreadsheet ─
-// Note: 'leads' intentionally omitted — Leads KPI now reads live from FU_LEADS.length (followup_leads table)
 const ALL_TIME = {
-  spend:25677.90, booked:54, shows:17,
+  spend:25677.90, leads:303, booked:54, shows:17,
   noshows:5, closes:7, lt:3564, cash:21000,
 };
 
@@ -2304,7 +2303,7 @@ function computeMetrics(period) {
     // Use DB values if they exist and are bigger, otherwise use ALL_TIME verified totals
     return buildMetrics(
       Math.max(dbSpend,  ALL_TIME.spend),
-      Math.max(dbLeads, sheetLeads, fuTotal),
+      Math.max(dbLeads, sheetLeads, fuTotal, ALL_TIME.leads),
       Math.max(dbBooked, ALL_TIME.booked),
       Math.max(dbShows,  ALL_TIME.shows),
       Math.max(dbNoshows,ALL_TIME.noshows),
@@ -4401,39 +4400,6 @@ document.body.appendChild(toast);
 
 // Load data and render
 seedIfEmpty().then(() => loadAndRender().then(() => renderDailyReport()));
-
-// ── Auto-sync every 2 minutes ──────────────
-// Pulls fresh data from Google Sheets + Supabase silently in the background
-// so the dashboard stays live without anyone clicking Sync.
-const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
-async function autoSync() {
-  // Skip if tab is hidden — don't waste cycles when no one is looking
-  if (document.hidden) return;
-  try {
-    // Pull any new leads/purchases from Sheets into followup_leads
-    await syncSheetsToFollowUpTracker({ silent: true });
-    // Refresh the supporting data (KPIs, deals, log) without a full page reload
-    await Promise.all([
-      syncLTFromSheets(),
-      syncLeadsFromSheets(),
-      (async () => { DB_DEALS = await getDeals(); })(),
-      (async () => { DB_LOG = await getLog(); })(),
-      (async () => { CALL_OUTCOMES = await getCallOutcomes(); })(),
-      (async () => { FU_LEADS = await getFollowUpLeads(); })(),
-    ]);
-    renderAll();
-    if (typeof renderFollowUpTracker === 'function') renderFollowUpTracker();
-    showLoading(false); // updates the "Updated: HH:MM" stamp
-    console.log('Auto-sync complete at', new Date().toLocaleTimeString());
-  } catch(e) {
-    console.warn('Auto-sync error:', e.message);
-  }
-}
-setInterval(autoSync, AUTO_SYNC_INTERVAL_MS);
-// Also sync immediately when the user comes back to the tab after being away
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) autoSync();
-});
 </script>
 </body>
 </html>
