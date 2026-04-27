@@ -1993,6 +1993,7 @@ select.input-field option { background: var(--bg2); }
       <option>Mehdi</option>
     </select>
     <input type="text" id="fu-search" class="input-field" placeholder="Search name, email, phone..." style="width:220px;padding:6px 12px;font-size:11px" oninput="renderFollowUpTracker()">
+    <button id="fu-sync-btn" class="submit-btn" style="margin-left:auto;padding:6px 14px;font-size:11px;width:auto" onclick="syncSheetsToFollowUpTracker()">↻ Sync from Sheets</button>
   </div>
 
   <div class="chart-card">
@@ -2503,10 +2504,217 @@ function getLTForPeriod(period) {
   return count * 27;
 }
 
+// ── Sheets → Follow-Up Tracker sync ───────────────────
+// Reads Leads + Purchases tabs, dedupes against existing followup_leads,
+// inserts new leads, marks purchasers as "TCC Purchased".
+// Match key: email primary, phone fallback. Existing rows untouched
+// unless they need their stage upgraded to TCC Purchased.
+
+const FU_LEADS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ7ymoXb6lKpuGHPF1LeCpXS9bK0zGTe6mKCkuj0xpjqrSZnm_wCRZEeA36U0nycNPAcehhC4Rzt3K0/pub?gid=0&single=true&output=csv';
+const FU_PURCHASES_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ7ymoXb6lKpuGHPF1LeCpXS9bK0zGTe6mKCkuj0xpjqrSZnm_wCRZEeA36U0nycNPAcehhC4Rzt3K0/pub?gid=1742995176&single=true&output=csv';
+
+// Robust CSV row parser — handles quoted fields with commas inside.
+function parseCsvRow(line) {
+  const out = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (c === ',' && !inQ) {
+      out.push(cur.trim()); cur = '';
+    } else { cur += c; }
+  }
+  out.push(cur.trim());
+  return out;
+}
+
+function parseCsvText(text) {
+  const lines = text.replace(/\r/g,'').split('\n').filter(l => l.trim());
+  if (!lines.length) return [];
+  const headers = parseCsvRow(lines[0]).map(h => h.toLowerCase());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCsvRow(lines[i]);
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = (cols[idx] || '').trim(); });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+// Normalise email/phone for matching
+function normEmail(e) { return (e || '').toLowerCase().trim(); }
+function normPhone(p) { return (p || '').replace(/[^\d]/g, ''); } // digits only
+
+// Build a key for dedup — email if present, else phone, else name+date
+function leadKey(row) {
+  const e = normEmail(row.email);
+  if (e) return 'e:' + e;
+  const p = normPhone(row.phone);
+  if (p) return 'p:' + p;
+  return 'n:' + (row.name||'').toLowerCase() + '|' + (row.date||'');
+}
+
+function parseSheetDate(s) {
+  if (!s) return null;
+  const d = new Date(s);
+  if (!isNaN(d)) return d.toISOString().split('T')[0];
+  // Try DD/MM/YYYY
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (m) {
+    const yy = m[3].length === 2 ? '20'+m[3] : m[3];
+    return `${yy}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  }
+  return null;
+}
+
+async function syncSheetsToFollowUpTracker(opts={}) {
+  const silent = !!opts.silent;
+  const btn = document.getElementById('fu-sync-btn');
+  if (btn) { btn.textContent = '⟳ Syncing...'; btn.disabled = true; }
+
+  try {
+    // 1. Fetch both CSVs in parallel
+    const [leadsRes, purchasesRes] = await Promise.all([
+      fetch(FU_LEADS_CSV_URL).then(r => r.ok ? r.text() : Promise.reject(new Error('Leads CSV fetch failed'))),
+      fetch(FU_PURCHASES_CSV_URL).then(r => r.ok ? r.text() : Promise.reject(new Error('Purchases CSV fetch failed'))),
+    ]);
+    const leadRows = parseCsvText(leadsRes);
+    const purchRows = parseCsvText(purchasesRes);
+
+    // 2. Get current followup_leads from Supabase to dedupe against
+    const existing = await sbFetch('followup_leads?select=id,name,email,phone,stage');
+    const existingByKey = new Map();
+    for (const r of existing) {
+      const e = normEmail(r.email);
+      const p = normPhone(r.phone);
+      if (e) existingByKey.set('e:'+e, r);
+      if (p) existingByKey.set('p:'+p, r);
+    }
+
+    let insertedLeads = 0, insertedPurchasers = 0, upgradedToPurchaser = 0;
+
+    // 3. Process Leads tab — insert if new
+    for (const row of leadRows) {
+      const name  = row.name || '';
+      const email = row.email || '';
+      const phone = row.phone || '';
+      const date  = parseSheetDate(row.date);
+      const source = row.source || 'Calendly';
+      if (!name && !email && !phone) continue;
+
+      const k = leadKey({ email, phone, name, date });
+      if (existingByKey.has(k)) continue; // already in tracker — leave alone
+
+      const newRow = {
+        name, email, phone,
+        ig: '', date, source,
+        stage: 'New Lead',
+        assigned: '',
+        notes: ''
+      };
+      try {
+        const inserted = await sbFetch('followup_leads', {
+          method: 'POST',
+          body: JSON.stringify(newRow),
+        });
+        insertedLeads++;
+        // Track in map so a later purchase row matches against this just-inserted row
+        const insertedRow = Array.isArray(inserted) ? inserted[0] : inserted;
+        if (insertedRow) {
+          if (normEmail(email)) existingByKey.set('e:'+normEmail(email), insertedRow);
+          if (normPhone(phone)) existingByKey.set('p:'+normPhone(phone), insertedRow);
+        }
+      } catch(e) { console.warn('Lead insert failed', e.message, newRow); }
+    }
+
+    // 4. Process Purchases tab — match existing or insert as new purchaser
+    for (const row of purchRows) {
+      const name  = row.name || '';
+      const email = row.email || '';
+      // Purchases tab has no phone column, but normalise just in case
+      const phone = row.phone || '';
+      const date  = parseSheetDate(row.date);
+      if (!name && !email) continue;
+
+      const k = leadKey({ email, phone, name, date });
+      const match = existingByKey.get(k);
+
+      if (match) {
+        // Already in tracker — only patch stage if not already a "purchased/won/etc" terminal stage
+        const upgradeFrom = ['New Lead','Contacted','Call Back','No Answer 1','No Answer 2','No Answer 3 | Weekly Outreach',''];
+        if (upgradeFrom.includes(match.stage || '')) {
+          try {
+            await sbFetch('followup_leads?id=eq.'+match.id, {
+              method: 'PATCH',
+              body: JSON.stringify({ stage: 'TCC Purchased' }),
+            });
+            match.stage = 'TCC Purchased';
+            upgradedToPurchaser++;
+          } catch(e) { console.warn('Stage upgrade failed', e.message); }
+        }
+      } else {
+        // Brand new purchaser — insert with TCC Purchased stage
+        const newRow = {
+          name, email, phone,
+          ig: '', date,
+          source: 'Direct Purchase',
+          stage: 'TCC Purchased',
+          assigned: '',
+          notes: ''
+        };
+        try {
+          const inserted = await sbFetch('followup_leads', {
+            method: 'POST',
+            body: JSON.stringify(newRow),
+          });
+          insertedPurchasers++;
+          const insertedRow = Array.isArray(inserted) ? inserted[0] : inserted;
+          if (insertedRow) {
+            if (normEmail(email)) existingByKey.set('e:'+normEmail(email), insertedRow);
+            if (normPhone(phone)) existingByKey.set('p:'+normPhone(phone), insertedRow);
+          }
+        } catch(e) { console.warn('Purchaser insert failed', e.message, newRow); }
+      }
+    }
+
+    // 5. Reload tracker
+    FU_LEADS = await getFollowUpLeads();
+    if (typeof renderFollowUpTracker === 'function') renderFollowUpTracker();
+
+    const total = insertedLeads + insertedPurchasers + upgradedToPurchaser;
+    if (!silent) {
+      if (total === 0) {
+        showToast('✓ Already up to date — no new leads from Sheets');
+      } else {
+        const parts = [];
+        if (insertedLeads) parts.push(insertedLeads + ' new lead' + (insertedLeads===1?'':'s'));
+        if (insertedPurchasers) parts.push(insertedPurchasers + ' new purchaser' + (insertedPurchasers===1?'':'s'));
+        if (upgradedToPurchaser) parts.push(upgradedToPurchaser + ' upgraded to purchased');
+        showToast('✓ Synced ' + parts.join(', '));
+      }
+    }
+    console.log('Sheets→FU sync:', { insertedLeads, insertedPurchasers, upgradedToPurchaser, leadRows: leadRows.length, purchRows: purchRows.length });
+    return { insertedLeads, insertedPurchasers, upgradedToPurchaser };
+
+  } catch(e) {
+    console.error('Sheets→FU sync error:', e);
+    if (!silent) showToast('Sync error: ' + e.message, 'error');
+    return null;
+  } finally {
+    if (btn) { btn.textContent = '↻ Sync from Sheets'; btn.disabled = false; }
+  }
+}
+
 async function loadAndRender() {
   showLoading(true);
   try {
     [DB_DEALS, DB_LOG, CALL_OUTCOMES, FU_LEADS] = await Promise.all([getDeals(), getLog(), syncLTFromSheets().then(()=>Promise.resolve([])), getCallOutcomes(), syncLeadsFromSheets().then(()=>Promise.resolve([])), getFollowUpLeads()]);
+    // Background: pull any new leads from Sheets into followup_leads
+    // Don't block initial render — kick off after, then refresh tracker silently
+    syncSheetsToFollowUpTracker({ silent: true }).catch(()=>{});
     // Cache data locally as fallback
     try {
       localStorage.setItem('swh_cache_deals', JSON.stringify(DB_DEALS));
