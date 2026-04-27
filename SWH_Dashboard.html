@@ -850,6 +850,12 @@ select.input-field option { background: var(--bg2); }
     </svg>
     Call Outcomes
   </div>
+  <div class="nav-item" onclick="switchTab('followup', this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M2 4h12M2 8h8M2 12h5"/><circle cx="12" cy="11" r="3"/><path d="M12 10v1l1 1"/>
+    </svg>
+    Follow-Up Tracker
+  </div>
   <div class="nav-item" onclick="switchTab('slack', this)">
     <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
       <path d="M6 2a2 2 0 0 0 0 4h2V2H6zM10 2a2 2 0 0 1 0 4H8V2h2zM2 6a2 2 0 0 1 4 0v2H2V6zM2 10a2 2 0 0 0 4 0V8H2v2zM14 6a2 2 0 0 0-4 0v2h4V6zM14 10a2 2 0 0 1-4 0V8h4v2zM6 14a2 2 0 0 1 0-4H8v4H6zM10 14a2 2 0 0 0 0-4H8v4h2z"/>
@@ -1862,6 +1868,197 @@ select.input-field option { background: var(--bg2); }
 
 </div>
 
+
+<!-- ══════════════════════════════════════
+     TAB: FOLLOW-UP TRACKER
+══════════════════════════════════════ -->
+<div id="tab-followup" class="tab-view">
+
+  <!-- Stats bar -->
+  <div class="kpi-tier kpi-tier-4" style="margin-bottom:10px">
+    <div class="kpi-card blue">
+      <div class="kpi-label">Total Leads</div>
+      <div class="kpi-value" id="fu-total">—</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">in tracker</span></div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">Response Rate</div>
+      <div class="kpi-value mono" id="fu-response">—</div>
+      <div class="kpi-meta"><span class="kpi-badge neutral" id="fu-response-badge">contacted / total</span></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Booking Rate</div>
+      <div class="kpi-value mono" id="fu-booking">—</div>
+      <div class="kpi-meta"><span class="kpi-badge neutral" id="fu-booking-badge">booked / contacted</span></div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">Close Rate</div>
+      <div class="kpi-value mono" id="fu-close">—</div>
+      <div class="kpi-meta"><span class="kpi-badge neutral" id="fu-close-badge">closed / showed</span></div>
+    </div>
+  </div>
+
+  <!-- Add new lead form -->
+  <div class="section-label">Add a lead manually</div>
+  <div class="chart-card" style="margin-bottom:10px">
+    <div class="input-grid">
+      <div class="input-group">
+        <div class="input-label">Name</div>
+        <input class="input-field" type="text" id="fu-name" placeholder="e.g. John Smith">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Phone</div>
+        <input class="input-field" type="text" id="fu-phone" placeholder="+44...">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Email</div>
+        <input class="input-field" type="text" id="fu-email" placeholder="email@...">
+      </div>
+      <div class="input-group">
+        <div class="input-label">IG Handle</div>
+        <input class="input-field" type="text" id="fu-ig" placeholder="@handle">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Date Added</div>
+        <input class="input-field" type="date" id="fu-date">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Source</div>
+        <select class="input-field" id="fu-source">
+          <option value="TCC">TCC</option>
+          <option value="Ads">Ads</option>
+          <option value="Organic">Organic</option>
+          <option value="Referral">Referral</option>
+          <option value="Calendly">Calendly</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <div class="input-label">Pipeline Stage</div>
+        <select class="input-field" id="fu-stage">
+          <option value="New Lead">New Lead</option>
+          <option value="Contacted">Contacted</option>
+          <option value="Call Back">Call Back</option>
+          <option value="Unqualified">Unqualified</option>
+          <option value="No Answer 1">No Answer 1</option>
+          <option value="No Answer 2">No Answer 2</option>
+          <option value="No Answer 3 | Weekly Outreach">No Answer 3 | Weekly Outreach</option>
+          <option value="TCC Purchased">TCC Purchased</option>
+          <option value="Call Booked">Call Booked</option>
+          <option value="No Show">No Show</option>
+          <option value="Cancelled">Cancelled</option>
+          <option value="Call Completed">Call Completed</option>
+          <option value="Deposit">Deposit</option>
+          <option value="Closed - Won (Cash Collected)">Closed - Won</option>
+          <option value="Offered - Follow Up">Offered - Follow Up</option>
+          <option value="Deal Lost">Deal Lost</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <div class="input-label">Assigned To</div>
+        <select class="input-field" id="fu-assigned">
+          <option value="">Unassigned</option>
+          <option>Salima</option>
+          <option>Frankie</option>
+          <option>Mehdi</option>
+        </select>
+      </div>
+    </div>
+    <div class="input-group" style="margin-top:8px">
+      <div class="input-label">Notes</div>
+      <input class="input-field" type="text" id="fu-notes" placeholder="e.g. Interested but needs to think it over">
+    </div>
+    <button id="fu-submit-btn" class="submit-btn" onclick="submitFollowUp()">Add Lead →</button>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="section-label">All leads</div>
+  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+    <select id="fu-filter-stage" class="input-field" style="width:auto;padding:6px 12px;font-size:11px" onchange="renderFollowUpTracker()">
+      <option value="">All Stages</option>
+      <option>New Lead</option>
+      <option>Contacted</option>
+      <option>Call Booked</option>
+      <option>No Show</option>
+      <option>Call Completed</option>
+      <option>Closed - Won (Cash Collected)</option>
+      <option>Offered - Follow Up</option>
+      <option>Deal Lost</option>
+      <option>Unqualified</option>
+      <option>TCC Purchased</option>
+    </select>
+    <select id="fu-filter-assigned" class="input-field" style="width:auto;padding:6px 12px;font-size:11px" onchange="renderFollowUpTracker()">
+      <option value="">All Team</option>
+      <option>Salima</option>
+      <option>Frankie</option>
+      <option>Mehdi</option>
+    </select>
+    <input type="text" id="fu-search" class="input-field" placeholder="Search name, email, phone..." style="width:220px;padding:6px 12px;font-size:11px" oninput="renderFollowUpTracker()">
+  </div>
+
+  <div class="chart-card">
+    <div class="deals-table-wrap">
+      <table class="deals-table" id="fu-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>IG</th>
+            <th>Date</th>
+            <th>Source</th>
+            <th>Stage</th>
+            <th>Assigned</th>
+            <th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="fu-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="fu-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center">
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:24px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-size:14px;font-weight:700;color:var(--t1)">Edit Lead</div>
+        <button onclick="closeFuModal()" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px">×</button>
+      </div>
+      <div class="input-grid">
+        <div class="input-group"><div class="input-label">Name</div><input class="input-field" type="text" id="fu-edit-name"></div>
+        <div class="input-group"><div class="input-label">Phone</div><input class="input-field" type="text" id="fu-edit-phone"></div>
+        <div class="input-group"><div class="input-label">Email</div><input class="input-field" type="text" id="fu-edit-email"></div>
+        <div class="input-group"><div class="input-label">IG Handle</div><input class="input-field" type="text" id="fu-edit-ig"></div>
+        <div class="input-group"><div class="input-label">Pipeline Stage</div>
+          <select class="input-field" id="fu-edit-stage">
+            <option>New Lead</option><option>Contacted</option><option>Call Back</option>
+            <option>Unqualified</option><option>No Answer 1</option><option>No Answer 2</option>
+            <option>No Answer 3 | Weekly Outreach</option><option>TCC Purchased</option>
+            <option>Call Booked</option><option>No Show</option><option>Cancelled</option>
+            <option>Call Completed</option><option>Deposit</option>
+            <option>Closed - Won (Cash Collected)</option>
+            <option>Offered - Follow Up</option><option>Deal Lost</option>
+          </select>
+        </div>
+        <div class="input-group"><div class="input-label">Assigned To</div>
+          <select class="input-field" id="fu-edit-assigned">
+            <option value="">Unassigned</option><option>Salima</option><option>Frankie</option><option>Mehdi</option>
+          </select>
+        </div>
+      </div>
+      <div class="input-group" style="margin-top:8px"><div class="input-label">Notes</div>
+        <input class="input-field" type="text" id="fu-edit-notes">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button id="fu-edit-save-btn" onclick="saveFuEdit()" class="submit-btn" style="margin-top:0">Save Changes →</button>
+        <button onclick="closeFuModal()" style="background:var(--bg4);color:var(--t2);border:1px solid var(--border2);border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:var(--font-display);cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
   </div><!-- /content -->
 </div><!-- /main -->
 </div><!-- /shell -->
@@ -2018,6 +2215,7 @@ const PAGE_TITLES = {
   'calls-log': ['Log Booked Calls',    'Log ads + organic calls · updates KPIs instantly'],
   'edit-log':     ['Edit Log Entries',    'Fix any previously logged numbers'],
   'call-outcomes':['Call Outcomes',       'Log what happened on each call · 20 seconds per call'],
+  'followup':     ['Follow-Up Tracker',  'Track all leads · pipeline stages · conversion rates'],
   deals:     ['Add New Deal',          'Log a closed deal · updates all metrics live'],
   slack:     ['Daily Report',          'Full breakdown · spend · revenue · funnel · closers'],
   settings:  ['Settings',              'Targets · rates · thresholds'],
@@ -2040,6 +2238,7 @@ function switchTab(id,el) {
   if(id==='calls-log')  renderCallsLogTable();
   if(id==='edit-log')      renderEditLog();
   if(id==='call-outcomes') renderCallOutcomes();
+  if(id==='followup')      renderFollowUpTracker();
   if(id==='slack')      { renderSlack(computeMetrics(currentPeriod)); renderDailyReport(); }
 }
 
@@ -2080,6 +2279,7 @@ function computeMetrics(period) {
     // Pull live totals from DB_LOG for calls, leads, spend, lt
     const dbSpend  = DB_LOG.reduce((s,l)=>s+(l.spend||0),0);
     const dbLeads  = DB_LOG.reduce((s,l)=>s+(l.leads||0),0);
+    const sheetLeads = LEADS_FROM_SHEET > 0 ? LEADS_FROM_SHEET : 0;
     const dbBooked = DB_LOG.reduce((s,l)=>s+(l.booked||0),0);
     const dbShows  = DB_LOG.reduce((s,l)=>s+(l.shows||0),0);
     const dbNoshows= DB_LOG.reduce((s,l)=>s+(l.noshows||0),0);
@@ -2091,7 +2291,7 @@ function computeMetrics(period) {
     // Use DB values if they exist and are bigger, otherwise use ALL_TIME verified totals
     return buildMetrics(
       Math.max(dbSpend,  ALL_TIME.spend),
-      Math.max(dbLeads,  ALL_TIME.leads),
+      Math.max(dbLeads, sheetLeads, ALL_TIME.leads),
       Math.max(dbBooked, ALL_TIME.booked),
       Math.max(dbShows,  ALL_TIME.shows),
       Math.max(dbNoshows,ALL_TIME.noshows),
@@ -2119,7 +2319,7 @@ function computeMetrics(period) {
   const pDeals = deals.filter(d=>inPeriod(d.date)&&d.usd>0);
 
   const spend  = pLog.reduce((s,l)=>s+(l.spend||0),0);
-  const leads  = pLog.reduce((s,l)=>s+(l.leads||0),0);
+  const leadsRaw = pLog.reduce((s,l)=>s+(l.leads||0),0);
   const booked = pLog.reduce((s,l)=>s+(l.booked||0),0);
   const shows  = pLog.reduce((s,l)=>s+(l.shows||0),0);
   const noshows= pLog.reduce((s,l)=>s+(l.noshows||0),0);
@@ -2127,6 +2327,10 @@ function computeMetrics(period) {
   const ltFromLog = pLog.reduce((s,l)=>s+(l.lt||0),0);
   const ltFromSheetPeriod = getLTForPeriod(period);
   const lt = Math.max(ltFromLog, ltFromSheetPeriod);
+  const leadsFromLog = pLog.reduce((s,l)=>s+(l.leads||0),0);
+  const leadsFromSheet = getLeadsForPeriod(period);
+  // Use sheet leads if available and bigger
+  const leads = Math.max(leadsFromLog, leadsFromSheet);
   const htCash = pDeals.reduce((s,d)=>s+(d.usd||0),0);
   const htAds  = pDeals.filter(d=>d.source==='Ads').reduce((s,d)=>s+(d.usd||0),0);
   const htOrg  = pDeals.filter(d=>d.source!=='Ads').reduce((s,d)=>s+(d.usd||0),0);
@@ -2177,6 +2381,60 @@ function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,ht
 const SHEET_ID = '1_37SLqUWoNlZbTG_LyI75tJlVbZUzO0LO4SmuKFKI6Y';
 let LT_FROM_SHEET = 0; // total purchases
 let LT_PURCHASES = []; // array of {date, amount} from sheet
+
+let LEADS_FROM_SHEET = 0;
+let LEADS_DATA = []; // array of {date} from leads sheet
+
+async function syncLeadsFromSheets() {
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Leads`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Leads sheet fetch failed');
+    const text = await res.text();
+    const rows = text.trim().split('\n');
+    LEADS_DATA = [];
+    for (let i = 1; i < rows.length; i++) {
+      const cols = rows[i].split(',').map(c => c.replace(/^"|"$/g,'').trim());
+      if (!cols[0] || cols[0] === 'Date') continue;
+      const d = new Date(cols[0]);
+      if (!isNaN(d)) {
+        LEADS_DATA.push({ date: d.toISOString().split('T')[0] });
+      }
+    }
+    LEADS_FROM_SHEET = LEADS_DATA.length;
+    console.log('Leads from Sheets:', LEADS_FROM_SHEET);
+    try { localStorage.setItem('swh_leads_data', JSON.stringify(LEADS_DATA)); } catch(e) {}
+    return LEADS_FROM_SHEET;
+  } catch(e) {
+    console.log('Leads sync skipped:', e.message);
+    try {
+      const cached = localStorage.getItem('swh_leads_data');
+      if (cached) { LEADS_DATA = JSON.parse(cached); LEADS_FROM_SHEET = LEADS_DATA.length; }
+    } catch(e2) {}
+    return LEADS_FROM_SHEET;
+  }
+}
+
+function getLeadsForPeriod(period) {
+  if (!LEADS_DATA.length) return 0;
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate()-1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  function inP(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (period==='today') {
+      const mostRecent = DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr;
+      return dateStr===todayStr||dateStr===yesterdayStr||dateStr===mostRecent;
+    }
+    if (period==='7d') { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
+    if (period==='mtd') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
+    if (period==='lm') { const l=new Date(today); l.setMonth(l.getMonth()-1); return d.getFullYear()===l.getFullYear()&&d.getMonth()===l.getMonth(); }
+    return true;
+  }
+  return LEADS_DATA.filter(l => inP(l.date)).length;
+}
 
 async function syncLTFromSheets() {
   try {
@@ -2248,7 +2506,7 @@ function getLTForPeriod(period) {
 async function loadAndRender() {
   showLoading(true);
   try {
-    [DB_DEALS, DB_LOG, CALL_OUTCOMES] = await Promise.all([getDeals(), getLog(), syncLTFromSheets().then(()=>Promise.resolve([])), getCallOutcomes()]);
+    [DB_DEALS, DB_LOG, CALL_OUTCOMES, FU_LEADS] = await Promise.all([getDeals(), getLog(), syncLTFromSheets().then(()=>Promise.resolve([])), getCallOutcomes(), syncLeadsFromSheets().then(()=>Promise.resolve([])), getFollowUpLeads()]);
     // Cache data locally as fallback
     try {
       localStorage.setItem('swh_cache_deals', JSON.stringify(DB_DEALS));
@@ -3637,6 +3895,252 @@ async function deleteCallOutcome(id) {
   renderCallOutcomes();
 }
 
+
+// ═══════════════════════════════════════════
+// FOLLOW-UP TRACKER
+// ═══════════════════════════════════════════
+let FU_LEADS = [];
+let fuEditingId = null;
+
+const STAGE_COLORS = {
+  'New Lead':                    '#5B9CF6',
+  'Contacted':                   '#FFB742',
+  'Call Back':                   '#FFB742',
+  'Unqualified':                 '#FF5252',
+  'No Answer 1':                 '#8895A7',
+  'No Answer 2':                 '#8895A7',
+  'No Answer 3 | Weekly Outreach':'#8895A7',
+  'TCC Purchased':               '#00F5A8',
+  'Call Booked':                 '#B794F4',
+  'No Show':                     '#FF5252',
+  'Cancelled':                   '#FF5252',
+  'Call Completed':              '#00C882',
+  'Deposit':                     '#00F5A8',
+  'Closed - Won (Cash Collected)':'#00F5A8',
+  'Offered - Follow Up':         '#FFB742',
+  'Deal Lost':                   '#FF5252',
+};
+
+async function getFollowUpLeads() {
+  try {
+    return await sbFetch('followup_leads?order=created_at.desc');
+  } catch(e) {
+    console.log('Follow-up table not ready:', e.message);
+    return [];
+  }
+}
+
+async function loadFollowUpLeads() {
+  FU_LEADS = await getFollowUpLeads();
+  return FU_LEADS;
+}
+
+function renderFollowUpTracker() {
+  // Stats
+  const total = FU_LEADS.length;
+  const contacted = FU_LEADS.filter(l => !['New Lead','No Answer 1','No Answer 2','No Answer 3 | Weekly Outreach'].includes(l.stage)).length;
+  const booked = FU_LEADS.filter(l => ['Call Booked','No Show','Cancelled','Call Completed','Deposit','Closed - Won (Cash Collected)','Offered - Follow Up'].includes(l.stage)).length;
+  const showed = FU_LEADS.filter(l => ['Call Completed','Deposit','Closed - Won (Cash Collected)','Offered - Follow Up'].includes(l.stage)).length;
+  const closed = FU_LEADS.filter(l => l.stage === 'Closed - Won (Cash Collected)').length;
+
+  set('fu-total', total);
+  const responseRate = total ? Math.round(contacted/total*100) : 0;
+  const bookingRate  = contacted ? Math.round(booked/contacted*100) : 0;
+  const closeRate    = showed ? Math.round(closed/showed*100) : 0;
+
+  set('fu-response', responseRate+'%');
+  set('fu-response-badge', contacted+' of '+total+' responded');
+  badge('fu-response', responseRate >= 60 ? 'up' : responseRate > 0 ? 'warn' : 'neutral');
+
+  set('fu-booking', bookingRate+'%');
+  set('fu-booking-badge', booked+' of '+contacted+' booked');
+  badge('fu-booking', bookingRate >= 30 ? 'up' : bookingRate > 0 ? 'warn' : 'neutral');
+
+  set('fu-close', closeRate+'%');
+  set('fu-close-badge', closed+' of '+showed+' closed');
+  badge('fu-close', closeRate >= 25 ? 'up' : closeRate > 0 ? 'warn' : 'neutral');
+
+  // Filter leads
+  const stageFilter    = document.getElementById('fu-filter-stage')?.value || '';
+  const assignedFilter = document.getElementById('fu-filter-assigned')?.value || '';
+  const search         = (document.getElementById('fu-search')?.value || '').toLowerCase();
+
+  let leads = [...FU_LEADS];
+  if (stageFilter)    leads = leads.filter(l => l.stage === stageFilter);
+  if (assignedFilter) leads = leads.filter(l => l.assigned === assignedFilter);
+  if (search)         leads = leads.filter(l =>
+    (l.name||'').toLowerCase().includes(search) ||
+    (l.email||'').toLowerCase().includes(search) ||
+    (l.phone||'').toLowerCase().includes(search) ||
+    (l.ig||'').toLowerCase().includes(search)
+  );
+
+  const tbody = document.getElementById('fu-tbody');
+  if (!tbody) return;
+
+  if (!leads.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--t3);padding:24px">' +
+      (FU_LEADS.length ? 'No leads match your filters' : 'No leads yet — add one above or they will auto-populate from GHL') +
+      '</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = leads.map((l, i) => {
+    const stageColor = STAGE_COLORS[l.stage] || '#8895A7';
+    return `<tr>
+      <td style="color:var(--t3);font-family:var(--font-mono)">${i+1}</td>
+      <td style="font-weight:700;color:var(--t1)">${l.name||'—'}</td>
+      <td style="font-family:var(--font-mono);font-size:11px">${l.phone||'—'}</td>
+      <td style="font-size:11px;color:var(--t2)">${l.email||'—'}</td>
+      <td style="color:var(--blue)">${l.ig||'—'}</td>
+      <td style="font-family:var(--font-mono);font-size:11px">${l.date||'—'}</td>
+      <td><span class="pill">${l.source||'—'}</span></td>
+      <td>
+        <select onchange="updateLeadStage('${l.id}', this.value)"
+          style="background:${stageColor}22;color:${stageColor};border:1px solid ${stageColor}44;border-radius:5px;padding:3px 6px;font-size:10px;font-weight:700;font-family:var(--font-mono);cursor:pointer;max-width:160px">
+          ${['New Lead','Contacted','Call Back','Unqualified','No Answer 1','No Answer 2','No Answer 3 | Weekly Outreach','TCC Purchased','Call Booked','No Show','Cancelled','Call Completed','Deposit','Closed - Won (Cash Collected)','Offered - Follow Up','Deal Lost']
+            .map(s => `<option value="${s}" ${l.stage===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select onchange="updateLeadAssigned('${l.id}', this.value)"
+          style="background:var(--bg4);color:var(--t2);border:1px solid var(--border2);border-radius:5px;padding:3px 6px;font-size:10px;cursor:pointer">
+          <option value="" ${!l.assigned?'selected':''}>—</option>
+          <option value="Salima" ${l.assigned==='Salima'?'selected':''}>Salima</option>
+          <option value="Frankie" ${l.assigned==='Frankie'?'selected':''}>Frankie</option>
+          <option value="Mehdi" ${l.assigned==='Mehdi'?'selected':''}>Mehdi</option>
+        </select>
+      </td>
+      <td style="color:var(--t3);font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.notes||'—'}</td>
+      <td style="display:flex;gap:4px">
+        <button onclick="openFuEdit('${l.id}')"
+          style="background:var(--blued);color:var(--blue);border:none;border-radius:4px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer">Edit</button>
+        <button onclick="deleteFuLead('${l.id}')"
+          style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer">×</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function submitFollowUp() {
+  const name     = document.getElementById('fu-name').value.trim();
+  const phone    = document.getElementById('fu-phone').value.trim();
+  const email    = document.getElementById('fu-email').value.trim();
+  const ig       = document.getElementById('fu-ig').value.trim();
+  const date     = document.getElementById('fu-date').value;
+  const source   = document.getElementById('fu-source').value;
+  const stage    = document.getElementById('fu-stage').value;
+  const assigned = document.getElementById('fu-assigned').value;
+  const notes    = document.getElementById('fu-notes').value.trim();
+
+  if (!name) { showToast('Please enter a name', 'error'); return; }
+
+  const btn = document.getElementById('fu-submit-btn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+
+  try {
+    await sbFetch('followup_leads', {
+      method: 'POST',
+      body: JSON.stringify({ name, phone, email, ig, date, source, stage, assigned, notes }),
+    });
+    FU_LEADS = await getFollowUpLeads();
+    renderFollowUpTracker();
+    showToast('✓ Lead added to tracker');
+    ['fu-name','fu-phone','fu-email','fu-ig','fu-notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('fu-date').valueAsDate = new Date();
+  } catch(e) {
+    if (e.message.includes('does not exist') || e.message.includes('42P01')) {
+      showToast('Run the SQL setup first in Supabase', 'error');
+    } else {
+      showToast('Error: ' + e.message, 'error');
+    }
+  }
+  btn.textContent = 'Add Lead →'; btn.disabled = false;
+}
+
+async function updateLeadStage(id, stage) {
+  try {
+    await sbFetch('followup_leads?id=eq.'+id, {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify({ stage }),
+    });
+    const lead = FU_LEADS.find(l => l.id === id);
+    if (lead) lead.stage = stage;
+    renderFollowUpTracker();
+    showToast('✓ Stage updated');
+  } catch(e) { showToast('Error: '+e.message, 'error'); }
+}
+
+async function updateLeadAssigned(id, assigned) {
+  try {
+    await sbFetch('followup_leads?id=eq.'+id, {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify({ assigned }),
+    });
+    const lead = FU_LEADS.find(l => l.id === id);
+    if (lead) lead.assigned = assigned;
+    showToast('✓ Assigned updated');
+  } catch(e) { showToast('Error: '+e.message, 'error'); }
+}
+
+function openFuEdit(id) {
+  const l = FU_LEADS.find(l => l.id === id);
+  if (!l) return;
+  fuEditingId = id;
+  document.getElementById('fu-edit-name').value     = l.name    || '';
+  document.getElementById('fu-edit-phone').value    = l.phone   || '';
+  document.getElementById('fu-edit-email').value    = l.email   || '';
+  document.getElementById('fu-edit-ig').value       = l.ig      || '';
+  document.getElementById('fu-edit-stage').value    = l.stage   || 'New Lead';
+  document.getElementById('fu-edit-assigned').value = l.assigned|| '';
+  document.getElementById('fu-edit-notes').value    = l.notes   || '';
+  document.getElementById('fu-edit-modal').style.display = 'flex';
+}
+
+function closeFuModal() {
+  fuEditingId = null;
+  document.getElementById('fu-edit-modal').style.display = 'none';
+}
+
+async function saveFuEdit() {
+  if (!fuEditingId) return;
+  const updated = {
+    name:     document.getElementById('fu-edit-name').value.trim(),
+    phone:    document.getElementById('fu-edit-phone').value.trim(),
+    email:    document.getElementById('fu-edit-email').value.trim(),
+    ig:       document.getElementById('fu-edit-ig').value.trim(),
+    stage:    document.getElementById('fu-edit-stage').value,
+    assigned: document.getElementById('fu-edit-assigned').value,
+    notes:    document.getElementById('fu-edit-notes').value.trim(),
+  };
+  const btn = document.getElementById('fu-edit-save-btn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+  try {
+    await sbFetch('followup_leads?id=eq.'+fuEditingId, {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify(updated),
+    });
+    FU_LEADS = await getFollowUpLeads();
+    renderFollowUpTracker();
+    closeFuModal();
+    showToast('✓ Lead updated');
+  } catch(e) { showToast('Error: '+e.message, 'error'); }
+  btn.textContent = 'Save Changes →'; btn.disabled = false;
+}
+
+async function deleteFuLead(id) {
+  if (!confirm('Delete this lead from the tracker?')) return;
+  try {
+    await deleteRow('followup_leads', id);
+    FU_LEADS = await getFollowUpLeads();
+    renderFollowUpTracker();
+    showToast('✓ Lead removed');
+  } catch(e) { showToast('Error: '+e.message, 'error'); }
+}
+
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
@@ -3644,6 +4148,7 @@ document.getElementById('inp-date').valueAsDate=new Date();
 document.getElementById('deal-date').valueAsDate=new Date();
 document.getElementById('cl-date').valueAsDate=new Date();
 document.getElementById('co-date').valueAsDate=new Date();
+document.getElementById('fu-date').valueAsDate=new Date();
 loadSettingsUI();
 initPeriodBtns();
 
