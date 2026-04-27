@@ -844,6 +844,12 @@ select.input-field option { background: var(--bg2); }
     </svg>
     Log Booked Calls
   </div>
+  <div class="nav-item" onclick="switchTab('call-outcomes', this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <circle cx="8" cy="8" r="6"/><path d="M5 8l2 2 4-4"/>
+    </svg>
+    Call Outcomes
+  </div>
   <div class="nav-item" onclick="switchTab('slack', this)">
     <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
       <path d="M6 2a2 2 0 0 0 0 4h2V2H6zM10 2a2 2 0 0 1 0 4H8V2h2zM2 6a2 2 0 0 1 4 0v2H2V6zM2 10a2 2 0 0 0 4 0V8H2v2zM14 6a2 2 0 0 0-4 0v2h4V6zM14 10a2 2 0 0 1-4 0V8h4v2zM6 14a2 2 0 0 1 0-4H8v4H6zM10 14a2 2 0 0 0 0-4H8v4h2z"/>
@@ -1756,6 +1762,106 @@ select.input-field option { background: var(--bg2); }
   </div>
 </div>
 
+
+<!-- ══════════════════════════════════════
+     TAB: CALL OUTCOMES
+══════════════════════════════════════ -->
+<div id="tab-call-outcomes" class="tab-view">
+
+  <div class="section-label">Log a call outcome</div>
+  <div class="chart-card" style="margin-bottom:10px">
+    <div class="chart-card-title" style="margin-bottom:4px">Quick call logger for closers</div>
+    <div class="chart-card-sub" style="margin-bottom:16px">Takes 20 seconds · updates show-up rate, close rate and CAC instantly</div>
+    <div class="input-grid">
+      <div class="input-group">
+        <div class="input-label">Date of Call</div>
+        <input class="input-field" type="date" id="co-date">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Prospect Name</div>
+        <input class="input-field" type="text" id="co-name" placeholder="e.g. John Smith">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Closer</div>
+        <select class="input-field" id="co-closer">
+          <option value="">Select...</option>
+          <option>Frankie</option>
+          <option>Mehdi</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <div class="input-label">Call Source</div>
+        <select class="input-field" id="co-source">
+          <option value="">Select...</option>
+          <option>Ads</option>
+          <option>Organic</option>
+          <option>Referral</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <div class="input-label">Did They Show Up?</div>
+        <select class="input-field" id="co-showed">
+          <option value="">Select...</option>
+          <option value="showed">✅ Showed Up</option>
+          <option value="noshow">❌ No Show</option>
+          <option value="rescheduled">🔄 Rescheduled</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <div class="input-label">Outcome</div>
+        <select class="input-field" id="co-outcome">
+          <option value="">Select...</option>
+          <option value="closed">🏆 Closed</option>
+          <option value="followup">🔁 Follow-Up</option>
+          <option value="notqualified">❌ Not Qualified</option>
+          <option value="thinking">🤔 Thinking It Over</option>
+          <option value="noshow">⛔ No Show</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <div class="input-label">Cash Collected (USD)</div>
+        <input class="input-field" type="number" id="co-cash" placeholder="e.g. 3000 (if closed)">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Contract Value (USD)</div>
+        <input class="input-field" type="number" id="co-contract" placeholder="e.g. 10000 (if closed)">
+      </div>
+    </div>
+    <div class="input-group" style="margin-top:8px">
+      <div class="input-label">Notes</div>
+      <input class="input-field" type="text" id="co-notes" placeholder="e.g. Strong lead, needs to speak with spouse first">
+    </div>
+    <div style="margin-top:10px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2);line-height:1.7">
+      If <strong>Closed</strong> is selected, a deal is automatically logged in Add New Deal and all KPIs update instantly.
+    </div>
+    <button id="co-submit-btn" class="submit-btn" onclick="submitCallOutcome()">Log Outcome →</button>
+  </div>
+
+  <div class="section-label">Recent call outcomes</div>
+  <div class="chart-card">
+    <div class="deals-table-wrap">
+      <table class="deals-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Prospect</th>
+            <th>Closer</th>
+            <th>Source</th>
+            <th>Showed</th>
+            <th>Outcome</th>
+            <th>Cash</th>
+            <th>Contract</th>
+            <th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="co-log-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
   </div><!-- /content -->
 </div><!-- /main -->
 </div><!-- /shell -->
@@ -1910,7 +2016,8 @@ const PAGE_TITLES = {
   lowticket: ['Low-Ticket',            '$27 course · GHL purchases'],
   daily:     ['Daily Input',           'Log today\'s numbers · saves instantly for everyone'],
   'calls-log': ['Log Booked Calls',    'Log ads + organic calls · updates KPIs instantly'],
-  'edit-log':  ['Edit Log Entries',    'Fix any previously logged numbers'],
+  'edit-log':     ['Edit Log Entries',    'Fix any previously logged numbers'],
+  'call-outcomes':['Call Outcomes',       'Log what happened on each call · 20 seconds per call'],
   deals:     ['Add New Deal',          'Log a closed deal · updates all metrics live'],
   slack:     ['Daily Report',          'Full breakdown · spend · revenue · funnel · closers'],
   settings:  ['Settings',              'Targets · rates · thresholds'],
@@ -1931,7 +2038,8 @@ function switchTab(id,el) {
   if(id==='sales')      renderSalesDeals();
   if(id==='deals')      renderDealLog();
   if(id==='calls-log')  renderCallsLogTable();
-  if(id==='edit-log')   renderEditLog();
+  if(id==='edit-log')      renderEditLog();
+  if(id==='call-outcomes') renderCallOutcomes();
   if(id==='slack')      { renderSlack(computeMetrics(currentPeriod)); renderDailyReport(); }
 }
 
@@ -2140,7 +2248,7 @@ function getLTForPeriod(period) {
 async function loadAndRender() {
   showLoading(true);
   try {
-    [DB_DEALS, DB_LOG] = await Promise.all([getDeals(), getLog(), syncLTFromSheets()]);
+    [DB_DEALS, DB_LOG, CALL_OUTCOMES] = await Promise.all([getDeals(), getLog(), syncLTFromSheets().then(()=>Promise.resolve([])), getCallOutcomes()]);
     // Cache data locally as fallback
     try {
       localStorage.setItem('swh_cache_deals', JSON.stringify(DB_DEALS));
@@ -3384,12 +3492,158 @@ function downloadReport() {
   }, 500);
 }
 
+
+// ═══════════════════════════════════════════
+// CALL OUTCOMES TAB
+// ═══════════════════════════════════════════
+let CALL_OUTCOMES = [];
+
+async function getCallOutcomes() {
+  try {
+    return await sbFetch('call_outcomes?order=date.desc&limit=50');
+  } catch(e) {
+    // Table might not exist yet - return empty
+    console.log('Call outcomes table not ready:', e.message);
+    return [];
+  }
+}
+
+async function loadCallOutcomes() {
+  CALL_OUTCOMES = await getCallOutcomes();
+  return CALL_OUTCOMES;
+}
+
+function renderCallOutcomes() {
+  const tbody = document.getElementById('co-log-tbody');
+  if (!tbody) return;
+  if (!CALL_OUTCOMES.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:24px">No call outcomes logged yet — use the form above</td></tr>';
+    return;
+  }
+  const outcomeColors = {
+    closed: 'var(--accent)', followup: 'var(--blue)',
+    notqualified: 'var(--red)', thinking: 'var(--amber)', noshow: 'var(--t3)'
+  };
+  const outcomeLabels = {
+    closed: '🏆 Closed', followup: '🔁 Follow-Up',
+    notqualified: '❌ Not Qualified', thinking: '🤔 Thinking', noshow: '⛔ No Show'
+  };
+  tbody.innerHTML = CALL_OUTCOMES.map(c => `
+    <tr>
+      <td style="font-family:var(--font-mono)">${c.date}</td>
+      <td style="font-weight:600">${c.name||'—'}</td>
+      <td><span class="pill ${(c.closer||'').toLowerCase()}">${c.closer||'—'}</span></td>
+      <td><span class="pill ${(c.source||'').toLowerCase()}">${c.source||'—'}</span></td>
+      <td style="color:${c.showed==='showed'?'var(--accent)':c.showed==='noshow'?'var(--red)':'var(--amber)'}">
+        ${c.showed==='showed'?'✅ Showed':c.showed==='noshow'?'❌ No Show':'🔄 Rescheduled'}
+      </td>
+      <td style="color:${outcomeColors[c.outcome]||'var(--t2)'}">
+        ${outcomeLabels[c.outcome]||c.outcome||'—'}
+      </td>
+      <td style="font-family:var(--font-mono);color:var(--accent)">${c.cash?'$'+c.cash.toLocaleString():'—'}</td>
+      <td style="font-family:var(--font-mono)">${c.contract?'$'+c.contract.toLocaleString():'—'}</td>
+      <td style="color:var(--t3);font-size:11px">${c.notes||'—'}</td>
+      <td><button onclick="deleteCallOutcome('${c.id}')" style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer">×</button></td>
+    </tr>`).join('');
+}
+
+async function submitCallOutcome() {
+  const date     = document.getElementById('co-date').value;
+  const name     = document.getElementById('co-name').value.trim();
+  const closer   = document.getElementById('co-closer').value;
+  const source   = document.getElementById('co-source').value;
+  const showed   = document.getElementById('co-showed').value;
+  const outcome  = document.getElementById('co-outcome').value;
+  const cash     = parseFloat(document.getElementById('co-cash').value)||0;
+  const contract = parseFloat(document.getElementById('co-contract').value)||0;
+  const notes    = document.getElementById('co-notes').value.trim();
+
+  if (!date || !showed || !outcome) {
+    showToast('Please fill in date, showed, and outcome', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('co-submit-btn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+
+  try {
+    // Save to call_outcomes table
+    await sbFetch('call_outcomes', {
+      method: 'POST',
+      body: JSON.stringify({ date, name, closer, source, showed, outcome, cash, contract, notes }),
+    });
+
+    // If closed, also auto-log as a deal
+    if (outcome === 'closed' && (cash > 0 || contract > 0)) {
+      await insertDeal({
+        name: name || 'Deal from call',
+        date, usd: cash, contract, source, closer,
+        setter: 'Salima',
+        notes: 'Auto-logged from Call Outcomes'
+      });
+      showToast('✓ Outcome logged + deal added automatically!');
+    } else {
+      showToast('✓ Call outcome logged');
+    }
+
+    // Update the daily log shows/noshows count
+    if (showed === 'showed' || showed === 'noshow') {
+      const existingLog = DB_LOG.find(l => l.date === date);
+      if (existingLog) {
+        const updated = {
+          ...existingLog,
+          shows:   (existingLog.shows||0)   + (showed==='showed'?1:0),
+          noshows: (existingLog.noshows||0) + (showed==='noshow'?1:0),
+          closes:  (existingLog.closes||0)  + (outcome==='closed'?1:0),
+          cash:    (existingLog.cash||0)    + (outcome==='closed'?cash:0),
+        };
+        await sbFetch('daily_log?id=eq.'+existingLog.id, {
+          method: 'PATCH',
+          headers: { 'Prefer': 'return=representation' },
+          body: JSON.stringify(updated),
+        });
+      }
+    }
+
+    // Reload everything
+    [DB_DEALS, DB_LOG, CALL_OUTCOMES] = await Promise.all([getDeals(), getLog(), getCallOutcomes()]);
+    renderCallOutcomes();
+    renderAll();
+
+    // Clear form
+    ['co-name','co-notes','co-cash','co-contract'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    ['co-closer','co-source','co-showed','co-outcome'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('co-date').valueAsDate = new Date();
+
+  } catch(e) {
+    // If table doesn't exist, show helpful message
+    if (e.message.includes('does not exist') || e.message.includes('42P01')) {
+      showToast('Run the SQL setup first — see instructions below', 'error');
+    } else {
+      showToast('Error: ' + e.message, 'error');
+    }
+  }
+  btn.textContent = 'Log Outcome →'; btn.disabled = false;
+}
+
+async function deleteCallOutcome(id) {
+  if (!confirm('Delete this call outcome?')) return;
+  await deleteRow('call_outcomes', id);
+  CALL_OUTCOMES = await getCallOutcomes();
+  renderCallOutcomes();
+}
+
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
 document.getElementById('inp-date').valueAsDate=new Date();
 document.getElementById('deal-date').valueAsDate=new Date();
 document.getElementById('cl-date').valueAsDate=new Date();
+document.getElementById('co-date').valueAsDate=new Date();
 loadSettingsUI();
 initPeriodBtns();
 
