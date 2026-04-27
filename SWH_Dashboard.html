@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SWH — Ads Command Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 :root {
@@ -32,8 +33,8 @@
   --t2: #8895A7;
   --t3: #4A5568;
   --t4: #2D3748;
-  --font-display: 'Syne', sans-serif;
-  --font-mono:    'JetBrains Mono', monospace;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -272,13 +273,23 @@ body {
   margin-bottom: 8px;
 }
 .kpi-value {
-  font-size: 26px;
-  font-weight: 800;
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 600;
   color: var(--t1);
   line-height: 1;
-  letter-spacing: -1px;
+  letter-spacing: -0.02em;
+  font-feature-settings: "tnum" 1, "ss01" 1, "zero" 1;
+  font-variant-numeric: tabular-nums;
 }
-.kpi-value.mono { font-family: var(--font-mono); font-size: 20px; letter-spacing: -0.5px; }
+.kpi-value.mono {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-feature-settings: "tnum" 1, "ss01" 1, "zero" 1;
+  font-variant-numeric: tabular-nums;
+}
 .kpi-meta {
   display: flex;
   align-items: center;
@@ -459,7 +470,7 @@ body {
   border-top: 1px solid var(--border);
 }
 .closer-cash-label { font-size: 10px; color: var(--t3); font-family: var(--font-mono); }
-.closer-cash-val { font-size: 20px; font-weight: 800; font-family: var(--font-mono); letter-spacing: -0.5px; }
+.closer-cash-val { font-size: 20px; font-weight: 600; font-family: var(--font-mono); letter-spacing: -0.02em; font-feature-settings: "tnum" 1, "ss01" 1, "zero" 1; font-variant-numeric: tabular-nums; }
 
 /* ─── SCALE READINESS ─── */
 .scale-card {
@@ -490,7 +501,7 @@ body {
   align-items: center;
   justify-content: center;
 }
-.scale-ring-num .big { font-size: 22px; font-weight: 800; font-family: var(--font-mono); }
+.scale-ring-num .big { font-size: 22px; font-weight: 600; font-family: var(--font-mono); letter-spacing: -0.02em; font-feature-settings: "tnum" 1, "ss01" 1, "zero" 1; font-variant-numeric: tabular-nums; }
 .scale-ring-num .small { font-size: 9px; color: var(--t3); font-family: var(--font-mono); margin-top: -2px; }
 .scale-verdict {
   font-size: 24px;
@@ -966,12 +977,19 @@ select.input-field option { background: var(--bg2); }
   </div>
 
   <div class="section-label">Conversion + revenue</div>
-  <div class="kpi-tier kpi-tier-5">
+  <div class="kpi-tier kpi-tier-6">
     <div class="kpi-card accent">
       <div class="kpi-label">Show-Up Rate</div>
       <div class="kpi-value mono" id="k-showup">0%</div>
       <div class="kpi-meta">
         <span class="kpi-badge warn" id="k-showup-flag">target 75%</span>
+      </div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Close Rate (Ads)</div>
+      <div class="kpi-value mono" id="k-close-rate">0%</div>
+      <div class="kpi-meta">
+        <span class="kpi-badge neutral" id="k-close-rate-meta">— ads deals</span>
       </div>
     </div>
     <div class="kpi-card purple">
@@ -2717,6 +2735,13 @@ function renderExec(d) {
   const showOk=showR>=(S.tgt_showup/100)&&d.booked>0;
   set('k-showup-flag', d.booked?(showOk?'✓ healthy':'target '+S.tgt_showup+'%'):'—');
   badge('k-showup-flag', showOk?'up':d.booked?'warn':'neutral');
+
+  // Close Rate (Ads) — deals from ads source / showed calls
+  const adsDeals = d.rawDeals.filter(dl => dl.source === 'Ads').length;
+  const closeRateAds = d.shows > 0 ? adsDeals / d.shows : 0;
+  set('k-close-rate', d.shows ? Math.round(closeRateAds*100)+'%' : '—');
+  set('k-close-rate-meta', d.shows ? (adsDeals + ' of ' + d.shows + ' shows closed') : '— ads deals');
+  badge('k-close-rate-meta', closeRateAds >= 0.25 && d.shows > 0 ? 'up' : d.shows > 0 ? 'warn' : 'neutral');
 
   set('k-ht-ads', fmtFull(d.htAds));
   set('k-ht-count', d.rawDeals.length+' deals · $'+d.contractTotal.toLocaleString()+' contracts');
