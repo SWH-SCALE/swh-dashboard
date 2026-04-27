@@ -3923,7 +3923,7 @@ const STAGE_COLORS = {
 
 async function getFollowUpLeads() {
   try {
-    return await sbFetch('followup_leads?order=created_at.desc');
+    return await sbFetch('followup_leads?order=date.desc.nullslast,created_at.desc');
   } catch(e) {
     console.log('Follow-up table not ready:', e.message);
     return [];
