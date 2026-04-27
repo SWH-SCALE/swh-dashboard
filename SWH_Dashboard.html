@@ -1907,7 +1907,56 @@ select.input-field option { background: var(--bg2); }
     </div>
   </div>
 
-  <!-- Add new lead form -->
+  <!-- Filter bar -->
+  <div class="section-label">All leads</div>
+  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+    <select id="fu-filter-stage" class="input-field" style="width:auto;padding:6px 12px;font-size:11px" onchange="renderFollowUpTracker()">
+      <option value="">All Stages</option>
+      <option>New Lead</option>
+      <option>Contacted</option>
+      <option>Call Booked</option>
+      <option>No Show</option>
+      <option>Call Completed</option>
+      <option>Closed - Won (Cash Collected)</option>
+      <option>Offered - Follow Up</option>
+      <option>Deal Lost</option>
+      <option>Unqualified</option>
+      <option>TCC Purchased</option>
+    </select>
+    <select id="fu-filter-assigned" class="input-field" style="width:auto;padding:6px 12px;font-size:11px" onchange="renderFollowUpTracker()">
+      <option value="">All Team</option>
+      <option>Salima</option>
+      <option>Frankie</option>
+      <option>Mehdi</option>
+    </select>
+    <input type="text" id="fu-search" class="input-field" placeholder="Search name, email, phone..." style="width:220px;padding:6px 12px;font-size:11px" oninput="renderFollowUpTracker()">
+    <button id="fu-sync-btn" class="submit-btn" style="margin-left:auto;padding:6px 14px;font-size:11px;width:auto" onclick="syncSheetsToFollowUpTracker()">↻ Sync from Sheets</button>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:20px">
+    <div class="deals-table-wrap">
+      <table class="deals-table" id="fu-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>IG</th>
+            <th>Date</th>
+            <th>Source</th>
+            <th>Stage</th>
+            <th>Assigned</th>
+            <th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="fu-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Add new lead form (moved to bottom — used less often than viewing the table) -->
   <div class="section-label">Add a lead manually</div>
   <div class="chart-card" style="margin-bottom:10px">
     <div class="input-grid">
@@ -1977,55 +2026,6 @@ select.input-field option { background: var(--bg2); }
       <input class="input-field" type="text" id="fu-notes" placeholder="e.g. Interested but needs to think it over">
     </div>
     <button id="fu-submit-btn" class="submit-btn" onclick="submitFollowUp()">Add Lead →</button>
-  </div>
-
-  <!-- Filter bar -->
-  <div class="section-label">All leads</div>
-  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-    <select id="fu-filter-stage" class="input-field" style="width:auto;padding:6px 12px;font-size:11px" onchange="renderFollowUpTracker()">
-      <option value="">All Stages</option>
-      <option>New Lead</option>
-      <option>Contacted</option>
-      <option>Call Booked</option>
-      <option>No Show</option>
-      <option>Call Completed</option>
-      <option>Closed - Won (Cash Collected)</option>
-      <option>Offered - Follow Up</option>
-      <option>Deal Lost</option>
-      <option>Unqualified</option>
-      <option>TCC Purchased</option>
-    </select>
-    <select id="fu-filter-assigned" class="input-field" style="width:auto;padding:6px 12px;font-size:11px" onchange="renderFollowUpTracker()">
-      <option value="">All Team</option>
-      <option>Salima</option>
-      <option>Frankie</option>
-      <option>Mehdi</option>
-    </select>
-    <input type="text" id="fu-search" class="input-field" placeholder="Search name, email, phone..." style="width:220px;padding:6px 12px;font-size:11px" oninput="renderFollowUpTracker()">
-    <button id="fu-sync-btn" class="submit-btn" style="margin-left:auto;padding:6px 14px;font-size:11px;width:auto" onclick="syncSheetsToFollowUpTracker()">↻ Sync from Sheets</button>
-  </div>
-
-  <div class="chart-card">
-    <div class="deals-table-wrap">
-      <table class="deals-table" id="fu-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Email</th>
-            <th>IG</th>
-            <th>Date</th>
-            <th>Source</th>
-            <th>Stage</th>
-            <th>Assigned</th>
-            <th>Notes</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="fu-tbody"></tbody>
-      </table>
-    </div>
   </div>
 
   <!-- Edit modal -->
@@ -2177,6 +2177,8 @@ async function seedIfEmpty() {
 }
 
 // ── All-time verified totals from spreadsheet ─
+// Note: 'leads' acts as a safety floor — actual displayed value is max(this, FU_LEADS.length)
+// so the number grows automatically as new leads sync into followup_leads
 const ALL_TIME = {
   spend:25677.90, leads:303, booked:54, shows:17,
   noshows:5, closes:7, lt:3564, cash:21000,
@@ -2605,7 +2607,19 @@ async function syncSheetsToFollowUpTracker(opts={}) {
       if (p) existingByKey.set('p:'+p, r);
     }
 
-    let insertedLeads = 0, insertedPurchasers = 0, upgradedToPurchaser = 0, skippedDupes = 0;
+    let insertedLeads = 0, insertedPurchasers = 0, upgradedToPurchaser = 0, skippedDupes = 0, enrichedExisting = 0;
+
+    // Today's date for auto-fill when sheet doesn't provide one
+    const today = new Date().toISOString().split('T')[0];
+
+    // Helper: read a field from a CSV row trying multiple possible header names
+    function pickField(row, ...names) {
+      for (const n of names) {
+        const v = row[n.toLowerCase()];
+        if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();
+      }
+      return '';
+    }
 
     // Helper: insert with graceful unique-constraint handling.
     // If insert fails due to DB unique index (race condition), find the existing row and treat as match.
@@ -2626,21 +2640,49 @@ async function syncSheetsToFollowUpTracker(opts={}) {
       }
     }
 
-    // 3. Process Leads tab — insert if new
+    // Helper: enrich an existing row with new data (e.g. IG handle that came in later)
+    // Only patches FIELDS that are currently empty/missing — never overwrites real data.
+    async function enrichRow(existingRow, newData) {
+      const patch = {};
+      for (const [k, v] of Object.entries(newData)) {
+        if (v && (!existingRow[k] || existingRow[k] === '')) {
+          patch[k] = v;
+        }
+      }
+      if (Object.keys(patch).length === 0) return false;
+      try {
+        await sbFetch('followup_leads?id=eq.'+existingRow.id, {
+          method: 'PATCH',
+          body: JSON.stringify(patch),
+        });
+        Object.assign(existingRow, patch);
+        return true;
+      } catch(e) { console.warn('Enrich failed', e.message); return false; }
+    }
+
+    // 3. Process Leads tab — insert if new, enrich if exists
     for (const row of leadRows) {
-      const name  = row.name || '';
-      const email = row.email || '';
-      const phone = row.phone || '';
-      const date  = parseSheetDate(row.date);
-      const source = row.source || 'Calendly';
+      const name  = pickField(row, 'name');
+      const email = pickField(row, 'email');
+      const phone = pickField(row, 'phone', 'number');
+      const ig    = pickField(row, 'ig handle', 'ig', 'instagram');
+      const date  = parseSheetDate(pickField(row, 'date')) || today; // default to today if missing
+      const source = pickField(row, 'source') || 'Calendly';
       if (!name && !email && !phone) continue;
 
       const k = leadKey({ email, phone, name, date });
-      if (existingByKey.has(k)) continue; // already in tracker — leave alone
+      const match = existingByKey.get(k);
+
+      if (match) {
+        // Already in tracker — top up any missing fields (e.g. IG)
+        const enriched = await enrichRow(match, { ig, phone, name });
+        if (enriched) enrichedExisting++;
+        continue;
+      }
 
       const newRow = {
         name, email, phone,
-        ig: '', date, source,
+        ig, date, source,
         stage: 'New Lead',
         assigned: '',
         notes: ''
@@ -2659,17 +2701,21 @@ async function syncSheetsToFollowUpTracker(opts={}) {
 
     // 4. Process Purchases tab — match existing or insert as new purchaser
     for (const row of purchRows) {
-      const name  = row.name || '';
-      const email = row.email || '';
-      const phone = row.phone || '';
-      const date  = parseSheetDate(row.date);
+      const name  = pickField(row, 'name');
+      const email = pickField(row, 'email');
+      const phone = pickField(row, 'phone', 'number');
+      const ig    = pickField(row, 'ig handle', 'ig', 'instagram');
+      const date  = parseSheetDate(pickField(row, 'date')) || today;
       if (!name && !email) continue;
 
       const k = leadKey({ email, phone, name, date });
       const match = existingByKey.get(k);
 
       if (match) {
-        // Already in tracker — only patch stage if not already a "purchased/won/etc" terminal stage
+        // Top up missing fields (IG, phone, etc.) regardless of stage
+        const enriched = await enrichRow(match, { ig, phone, name });
+        if (enriched) enrichedExisting++;
+        // Patch stage to TCC Purchased if currently in early-funnel stage
         const upgradeFrom = ['New Lead','Contacted','Call Back','No Answer 1','No Answer 2','No Answer 3 | Weekly Outreach',''];
         if (upgradeFrom.includes(match.stage || '')) {
           try {
@@ -2685,7 +2731,7 @@ async function syncSheetsToFollowUpTracker(opts={}) {
         // Brand new purchaser — insert with TCC Purchased stage
         const newRow = {
           name, email, phone,
-          ig: '', date,
+          ig, date,
           source: 'Direct Purchase',
           stage: 'TCC Purchased',
           assigned: '',
@@ -2698,7 +2744,6 @@ async function syncSheetsToFollowUpTracker(opts={}) {
             if (normEmail(email)) existingByKey.set('e:'+normEmail(email), result.row);
             if (normPhone(phone)) existingByKey.set('p:'+normPhone(phone), result.row);
           } else if (result.dupe) {
-            // DB has it but our client map didn't — fetch and upgrade if needed
             skippedDupes++;
           }
         } catch(e) { console.warn('Purchaser insert failed', e.message, newRow); }
@@ -2711,18 +2756,19 @@ async function syncSheetsToFollowUpTracker(opts={}) {
 
     const total = insertedLeads + insertedPurchasers + upgradedToPurchaser;
     if (!silent) {
-      if (total === 0) {
+      if (total === 0 && enrichedExisting === 0) {
         showToast('✓ Already up to date — no new leads from Sheets');
       } else {
         const parts = [];
         if (insertedLeads) parts.push(insertedLeads + ' new lead' + (insertedLeads===1?'':'s'));
         if (insertedPurchasers) parts.push(insertedPurchasers + ' new purchaser' + (insertedPurchasers===1?'':'s'));
         if (upgradedToPurchaser) parts.push(upgradedToPurchaser + ' upgraded to purchased');
+        if (enrichedExisting) parts.push(enrichedExisting + ' updated');
         showToast('✓ Synced ' + parts.join(', '));
       }
     }
-    console.log('Sheets→FU sync:', { insertedLeads, insertedPurchasers, upgradedToPurchaser, skippedDupes, leadRows: leadRows.length, purchRows: purchRows.length });
-    return { insertedLeads, insertedPurchasers, upgradedToPurchaser, skippedDupes };
+    console.log('Sheets→FU sync:', { insertedLeads, insertedPurchasers, upgradedToPurchaser, enrichedExisting, skippedDupes, leadRows: leadRows.length, purchRows: purchRows.length });
+    return { insertedLeads, insertedPurchasers, upgradedToPurchaser, enrichedExisting, skippedDupes };
 
   } catch(e) {
     console.error('Sheets→FU sync error:', e);
@@ -4400,6 +4446,39 @@ document.body.appendChild(toast);
 
 // Load data and render
 seedIfEmpty().then(() => loadAndRender().then(() => renderDailyReport()));
+
+// ── Auto-sync every 2 minutes ──────────────
+// Pulls fresh data from Google Sheets + Supabase silently in the background
+// so the dashboard stays live without anyone clicking Sync.
+const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+async function autoSync() {
+  // Skip if tab is hidden — don't waste cycles when no one is looking
+  if (document.hidden) return;
+  try {
+    // Pull any new leads/purchases from Sheets into followup_leads
+    await syncSheetsToFollowUpTracker({ silent: true });
+    // Refresh the supporting data (KPIs, deals, log) without a full page reload
+    await Promise.all([
+      syncLTFromSheets(),
+      syncLeadsFromSheets(),
+      (async () => { DB_DEALS = await getDeals(); })(),
+      (async () => { DB_LOG = await getLog(); })(),
+      (async () => { CALL_OUTCOMES = await getCallOutcomes(); })(),
+      (async () => { FU_LEADS = await getFollowUpLeads(); })(),
+    ]);
+    renderAll();
+    if (typeof renderFollowUpTracker === 'function') renderFollowUpTracker();
+    showLoading(false); // updates the "Updated: HH:MM" stamp
+    console.log('Auto-sync complete at', new Date().toLocaleTimeString());
+  } catch(e) {
+    console.warn('Auto-sync error:', e.message);
+  }
+}
+setInterval(autoSync, AUTO_SYNC_INTERVAL_MS);
+// Also sync immediately when the user comes back to the tab after being away
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) autoSync();
+});
 </script>
 </body>
 </html>
