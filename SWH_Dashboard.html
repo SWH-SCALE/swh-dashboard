@@ -2290,6 +2290,8 @@ function computeMetrics(period) {
     const dbSpend  = DB_LOG.reduce((s,l)=>s+(l.spend||0),0);
     const dbLeads  = DB_LOG.reduce((s,l)=>s+(l.leads||0),0);
     const sheetLeads = LEADS_FROM_SHEET > 0 ? LEADS_FROM_SHEET : 0;
+    // Authoritative all-time lead count: unique people in followup_leads (deduped at DB level)
+    const fuTotal = (typeof FU_LEADS !== 'undefined' && FU_LEADS) ? FU_LEADS.length : 0;
     const dbBooked = DB_LOG.reduce((s,l)=>s+(l.booked||0),0);
     const dbShows  = DB_LOG.reduce((s,l)=>s+(l.shows||0),0);
     const dbNoshows= DB_LOG.reduce((s,l)=>s+(l.noshows||0),0);
@@ -2301,7 +2303,7 @@ function computeMetrics(period) {
     // Use DB values if they exist and are bigger, otherwise use ALL_TIME verified totals
     return buildMetrics(
       Math.max(dbSpend,  ALL_TIME.spend),
-      Math.max(dbLeads, sheetLeads, ALL_TIME.leads),
+      Math.max(dbLeads, sheetLeads, fuTotal, ALL_TIME.leads),
       Math.max(dbBooked, ALL_TIME.booked),
       Math.max(dbShows,  ALL_TIME.shows),
       Math.max(dbNoshows,ALL_TIME.noshows),
