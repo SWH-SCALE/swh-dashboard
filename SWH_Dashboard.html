@@ -844,13 +844,13 @@ select.input-field option { background: var(--bg2); }
     <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
       <path d="M13.5 10.5c0 .3-.1.6-.2.9-.1.3-.3.5-.5.7-.4.4-.8.5-1.3.5-.3 0-.7-.1-1-.2s-.7-.2-1-.4c-.9-.5-1.7-1.2-2.4-2-.6-.7-1.2-1.5-1.7-2.4-.2-.3-.3-.6-.4-1-.1-.3-.1-.6-.1-.9 0-.5.1-.9.4-1.3.2-.4.6-.6 1-.6.1 0 .2 0 .3.1.1 0 .2.1.2.2l1.1 1.6c.1.1.1.2.1.3 0 .1-.1.2-.2.3l-.5.5c0 .1 0 .1.1.2.2.3.5.6.7.9.3.3.6.5.9.7l.2.1.5-.5c.1-.1.2-.2.3-.2h.1c.1 0 .2 0 .3.1l1.6 1.1c.1.1.2.1.2.2.1.1.1.2.1.3z"/>
     </svg>
-    Log Booked Calls
+    Setters Daily Tracker
   </div>
   <div class="nav-item" onclick="switchTab('call-outcomes', this)">
     <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
       <circle cx="8" cy="8" r="6"/><path d="M5 8l2 2 4-4"/>
     </svg>
-    Call Outcomes
+    Closers Daily Tracker
   </div>
   <div class="nav-item" onclick="switchTab('followup', this)">
     <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1230,9 +1230,10 @@ select.input-field option { background: var(--bg2); }
      TAB: DAILY INPUT
 ══════════════════════════════════════ -->
 <div id="tab-daily" class="tab-view">
-  <div class="section-label">Log today's data</div>
+  <div class="section-label">Log daily ad spend</div>
   <div class="chart-card" style="margin-bottom:10px">
-    <div class="chart-card-title" style="margin-bottom:16px">Ad Performance</div>
+    <div class="chart-card-title" style="margin-bottom:6px">Ads manager — daily spend logger</div>
+    <div class="chart-card-sub" style="margin-bottom:16px">Lead counts auto-sync from Sheets · Booked calls captured in Setters Daily Tracker · Show-ups + outcomes captured in Closers Daily Tracker</div>
     <div class="input-grid">
       <div class="input-group">
         <div class="input-label">Date</div>
@@ -1241,14 +1242,6 @@ select.input-field option { background: var(--bg2); }
       <div class="input-group">
         <div class="input-label">Ad Spend (USD)</div>
         <input class="input-field" type="number" id="inp-spend" placeholder="e.g. 500" oninput="updatePreview()">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Leads</div>
-        <input class="input-field" type="number" id="inp-leads" placeholder="e.g. 12" oninput="updatePreview()">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Booked Calls</div>
-        <input class="input-field" type="number" id="inp-booked" placeholder="e.g. 4" oninput="updatePreview()">
       </div>
       <div class="input-group">
         <div class="input-label">Campaign (optional)</div>
@@ -1265,49 +1258,13 @@ select.input-field option { background: var(--bg2); }
     </div>
   </div>
 
-  <div class="chart-card" style="margin-bottom:10px">
-    <div class="chart-card-title" style="margin-bottom:16px">Call Outcomes</div>
-    <div class="input-grid">
-      <div class="input-group">
-        <div class="input-label">Show-Ups</div>
-        <input class="input-field" type="number" id="inp-shows" placeholder="e.g. 3" oninput="updatePreview()">
-      </div>
-      <div class="input-group">
-        <div class="input-label">No-Shows</div>
-        <input class="input-field" type="number" id="inp-noshows" placeholder="e.g. 1">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Closes</div>
-        <input class="input-field" type="number" id="inp-closes" placeholder="e.g. 2" oninput="updatePreview()">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Cash Collected (USD)</div>
-        <input class="input-field" type="number" id="inp-cash" placeholder="e.g. 8000" oninput="updatePreview()">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Closer</div>
-        <select class="input-field" id="inp-closer">
-          <option value="">Select...</option>
-          <option>Frankie</option><option>Mehdi</option><option>Both</option>
-        </select>
-      </div>
-      <div class="input-group">
-        <div class="input-label">Low-Ticket (USD)</div>
-        <input class="input-field" type="number" id="inp-lt" placeholder="e.g. 300" oninput="updatePreview()">
-      </div>
-    </div>
-  </div>
-
   <div class="preview-bar" id="preview-bar">
     <div class="preview-item">CPL: <span id="prev-cpl">—</span></div>
     <div class="preview-item">CPBC: <span id="prev-cpbc">—</span></div>
-    <div class="preview-item">Show rate: <span id="prev-show">—</span></div>
-    <div class="preview-item">Close rate: <span id="prev-cr">—</span></div>
     <div class="preview-item">ROAS: <span id="prev-roas">—</span></div>
-    <div class="preview-item">CAC: <span id="prev-cac">—</span></div>
   </div>
 
-  <button id="daily-submit-btn" class="submit-btn" onclick="submitDaily()">Log Today's Data →</button>
+  <button id="daily-submit-btn" class="submit-btn" onclick="submitDaily()">Log Ad Spend →</button>
 </div>
 
 <!-- ══════════════════════════════════════
@@ -1317,187 +1274,68 @@ select.input-field option { background: var(--bg2); }
 
   <!-- ── PERIOD SELECTOR ── -->
   <div class="section-label">Report period</div>
-  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
     <button class="period-btn active" id="rpt-btn-today" onclick="setReportPeriod('today',this)">Latest Entry</button>
     <button class="period-btn" id="rpt-btn-7d" onclick="setReportPeriod('7d',this)">Last 7 Days</button>
     <button class="period-btn" id="rpt-btn-mtd" onclick="setReportPeriod('mtd',this)">Month to Date</button>
     <button class="period-btn" id="rpt-btn-all" onclick="setReportPeriod('all',this)">All Time</button>
+    <button onclick="downloadReport()" style="margin-left:auto;background:var(--accent);color:var(--bg);border:none;border-radius:8px;padding:10px 20px;font-size:12px;font-weight:800;font-family:var(--font-display);cursor:pointer;letter-spacing:0.5px">↓ Download PDF Report</button>
   </div>
 
-  <!-- ── REPORT CARDS ── -->
-  <div class="section-label">Ad spend</div>
+  <!-- ── KEY METRICS GRID ── -->
+  <div class="section-label">Key performance metrics</div>
   <div class="kpi-tier kpi-tier-4" style="margin-bottom:10px">
     <div class="kpi-card accent">
-      <div class="kpi-label">Total Spend</div>
+      <div class="kpi-label">Ad Spend</div>
       <div class="kpi-value mono" id="rpt-spend">—</div>
-      <div class="kpi-meta"><span class="kpi-sublabel" id="rpt-spend-sub"></span></div>
-    </div>
-    <div class="kpi-card blue">
-      <div class="kpi-label">Leads Generated</div>
-      <div class="kpi-value" id="rpt-leads">—</div>
-      <div class="kpi-meta"><span class="kpi-badge neutral" id="rpt-cpl-badge">—</span></div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="rpt-spend-sub">this period</span></div>
     </div>
     <div class="kpi-card amber">
       <div class="kpi-label">Cost Per Lead</div>
       <div class="kpi-value mono" id="rpt-cpl">—</div>
-      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-cpl-flag">target $150</span></div>
+      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-cpl-flag">—</span></div>
     </div>
     <div class="kpi-card amber">
       <div class="kpi-label">Cost Per Booked Call</div>
       <div class="kpi-value mono" id="rpt-cpbc">—</div>
-      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-cpbc-flag">target $500</span></div>
+      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-cpbc-flag">—</span></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Cost to Acquire Client</div>
+      <div class="kpi-value mono" id="rpt-cac">—</div>
+      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-cac-flag">—</span></div>
     </div>
   </div>
 
-  <div class="section-label">Call performance</div>
-  <div class="kpi-tier kpi-tier-4" style="margin-bottom:10px">
-    <div class="kpi-card blue">
-      <div class="kpi-label">Booked Calls</div>
-      <div class="kpi-value" id="rpt-booked">—</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">total this period</span></div>
-    </div>
-    <div class="kpi-card accent">
-      <div class="kpi-label">Show-Ups</div>
-      <div class="kpi-value" id="rpt-shows">—</div>
-      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-showup-badge">—% show rate</span></div>
-    </div>
-    <div class="kpi-card red">
-      <div class="kpi-label">No-Shows</div>
-      <div class="kpi-value" id="rpt-noshows">—</div>
-      <div class="kpi-meta"><span class="kpi-badge down" id="rpt-noshow-badge">—% no-show</span></div>
-    </div>
+  <div class="kpi-tier kpi-tier-3" style="margin-bottom:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
     <div class="kpi-card accent">
       <div class="kpi-label">Show-Up Rate</div>
       <div class="kpi-value mono" id="rpt-showrate">—</div>
       <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-showrate-flag">target 70%</span></div>
     </div>
-  </div>
-
-  <div class="section-label">Revenue & returns</div>
-  <div class="kpi-tier kpi-tier-4" style="margin-bottom:10px">
-    <div class="kpi-card accent">
-      <div class="kpi-label">HT Cash Collected</div>
-      <div class="kpi-value mono" id="rpt-htcash">—</div>
-      <div class="kpi-meta"><span class="kpi-badge neutral" id="rpt-deals-badge">— deals</span></div>
-    </div>
-    <div class="kpi-card purple">
-      <div class="kpi-label">HT from Ads</div>
-      <div class="kpi-value mono" id="rpt-htads">—</div>
-      <div class="kpi-meta"><span class="kpi-badge neutral" id="rpt-htads-pct">—% of HT</span></div>
-    </div>
-    <div class="kpi-card amber">
-      <div class="kpi-label">Low-Ticket Revenue</div>
-      <div class="kpi-value mono" id="rpt-lt">—</div>
-      <div class="kpi-meta"><span class="kpi-sublabel" id="rpt-lt-sales">— purchases</span></div>
-    </div>
-    <div class="kpi-card accent">
-      <div class="kpi-label">Total Cash</div>
-      <div class="kpi-value mono" id="rpt-total">—</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">HT + LT combined</span></div>
-    </div>
-  </div>
-
-  <div class="section-label">Efficiency metrics</div>
-  <div class="kpi-tier kpi-tier-4" style="margin-bottom:10px">
-    <div class="kpi-card accent">
-      <div class="kpi-label">ROAS (Cash)</div>
-      <div class="kpi-value mono" id="rpt-roas">—</div>
-      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-roas-flag">target 2x</span></div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Lead → Purchase Rate</div>
+      <div class="kpi-value mono" id="rpt-l2p">—</div>
+      <div class="kpi-meta"><span class="kpi-badge neutral" id="rpt-l2p-sub">— / — leads</span></div>
     </div>
     <div class="kpi-card blue">
-      <div class="kpi-label">ROAS (Contracts)</div>
-      <div class="kpi-value mono" id="rpt-roas-con">—</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">signed deal value</span></div>
-    </div>
-    <div class="kpi-card amber">
-      <div class="kpi-label">CAC</div>
-      <div class="kpi-value mono" id="rpt-cac">—</div>
-      <div class="kpi-meta"><span class="kpi-badge neutral" id="rpt-cac-flag">cost per close</span></div>
-    </div>
-    <div class="kpi-card blue">
-      <div class="kpi-label">Close Rate</div>
-      <div class="kpi-value mono" id="rpt-cr">—</div>
-      <div class="kpi-meta"><span class="kpi-badge warn" id="rpt-cr-flag">target 25%</span></div>
+      <div class="kpi-label">Purchase → Booked Call</div>
+      <div class="kpi-value mono" id="rpt-p2b">—</div>
+      <div class="kpi-meta"><span class="kpi-badge neutral" id="rpt-p2b-sub">— / — purchases</span></div>
     </div>
   </div>
 
-  <div class="section-label">P&L summary</div>
-  <div class="chart-card" style="margin-bottom:10px">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:20px;padding:6px 0">
-      <div>
-        <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Gross Spend</div>
-        <div style="font-size:22px;font-weight:800;color:var(--red);font-family:var(--font-mono)" id="rpt-pl-spend">—</div>
-      </div>
-      <div>
-        <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Total Cash In</div>
-        <div style="font-size:22px;font-weight:800;color:var(--accent);font-family:var(--font-mono)" id="rpt-pl-cash">—</div>
-      </div>
-      <div>
-        <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Net P&L (Cash)</div>
-        <div style="font-size:22px;font-weight:800;font-family:var(--font-mono)" id="rpt-pl-net">—</div>
-      </div>
-      <div>
-        <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Net P&L (Contracts)</div>
-        <div style="font-size:22px;font-weight:800;color:var(--blue);font-family:var(--font-mono)" id="rpt-pl-con">—</div>
-      </div>
+  <!-- ── HIGHLIGHTS ── -->
+  <div class="section-label">What's working & what needs improvement</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    <div class="chart-card" style="border-left:3px solid var(--accent)">
+      <div class="chart-card-title" style="color:var(--accent);margin-bottom:10px">✓ Doing well</div>
+      <div id="rpt-wins" style="font-size:13px;color:var(--t1);line-height:1.9"></div>
     </div>
-    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-      <div id="rpt-verdict" style="font-size:13px;font-weight:700;line-height:1.6"></div>
+    <div class="chart-card" style="border-left:3px solid var(--amber)">
+      <div class="chart-card-title" style="color:var(--amber);margin-bottom:10px">⚠ Needs improvement</div>
+      <div id="rpt-gaps" style="font-size:13px;color:var(--t1);line-height:1.9"></div>
     </div>
-  </div>
-
-  <div class="section-label">Closer breakdown</div>
-  <div class="chart-card" style="margin-bottom:10px">
-    <table class="deals-table">
-      <thead>
-        <tr>
-          <th>Closer</th>
-          <th>Deals</th>
-          <th>Cash Collected</th>
-          <th>Contracts Signed</th>
-          <th>Close Rate</th>
-          <th>HT from Ads</th>
-        </tr>
-      </thead>
-      <tbody id="rpt-closer-tbody"></tbody>
-    </table>
-  </div>
-
-  <div class="section-label">Daily breakdown — this period</div>
-  <div class="chart-card">
-    <table class="deals-table">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Spend</th>
-          <th>Leads</th>
-          <th>CPL</th>
-          <th>Booked</th>
-          <th>Shows</th>
-          <th>Show%</th>
-          <th>Closes</th>
-          <th>Cash</th>
-          <th>LT</th>
-          <th>ROAS</th>
-        </tr>
-      </thead>
-      <tbody id="rpt-daily-tbody"></tbody>
-    </table>
-  </div>
-
-  <div class="section-label">Written report</div>
-  <div class="chart-card" style="margin-bottom:10px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
-      <div>
-        <div class="chart-card-title">Auto-generated performance report</div>
-        <div class="chart-card-sub">Based on your live data · updates with your period selection</div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button onclick="copyReport()" style="background:var(--bg4);color:var(--t1);border:1px solid var(--border2);border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;font-family:var(--font-display);cursor:pointer;transition:all 0.15s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg4)'">Copy Text</button>
-        <button onclick="downloadReport()" style="background:var(--accent);color:var(--bg);border:none;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:800;font-family:var(--font-display);cursor:pointer;transition:all 0.15s" onmouseover="this.style.background='var(--accent2)'" onmouseout="this.style.background='var(--accent)'">Download PDF</button>
-      </div>
-    </div>
-    <div id="rpt-written" style="font-size:13px;color:var(--t2);line-height:2;padding:16px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent);white-space:pre-line"></div>
   </div>
 
 </div>
@@ -1632,9 +1470,9 @@ select.input-field option { background: var(--bg2); }
      TAB: LOG BOOKED CALLS
 ══════════════════════════════════════ -->
 <div id="tab-calls-log" class="tab-view">
-  <div class="section-label">Log booked calls</div>
+  <div class="section-label">Log appointments</div>
   <div class="chart-card" style="margin-bottom:10px">
-    <div class="chart-card-title" style="margin-bottom:16px">Quick call logger — add calls from ads or organic</div>
+    <div class="chart-card-title" style="margin-bottom:16px">Setter daily input — appointments booked, outreach, follow-ups</div>
     <div class="input-grid">
       <div class="input-group">
         <div class="input-label">Date</div>
@@ -1649,30 +1487,28 @@ select.input-field option { background: var(--bg2); }
         <input class="input-field" type="number" id="cl-booked-org" placeholder="e.g. 2" min="0">
       </div>
       <div class="input-group">
-        <div class="input-label">Show-Ups</div>
-        <input class="input-field" type="number" id="cl-shows" placeholder="e.g. 4" min="0">
+        <div class="input-label">Outreach Done</div>
+        <input class="input-field" type="number" id="cl-outreach" placeholder="e.g. 50" min="0">
       </div>
       <div class="input-group">
-        <div class="input-label">No-Shows</div>
-        <input class="input-field" type="number" id="cl-noshows" placeholder="e.g. 1" min="0">
+        <div class="input-label">Follow-Ups Done</div>
+        <input class="input-field" type="number" id="cl-followups" placeholder="e.g. 25" min="0">
       </div>
       <div class="input-group">
-        <div class="input-label">Closer</div>
-        <select class="input-field" id="cl-closer">
+        <div class="input-label">Setter (optional)</div>
+        <select class="input-field" id="cl-setter">
           <option value="">Select...</option>
-          <option>Frankie</option>
-          <option>Mehdi</option>
-          <option>Both</option>
+          <option>Salima</option>
         </select>
       </div>
     </div>
     <div style="margin-top:10px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">
-      This updates your booked calls count, show-up rate, CPBC and all related KPIs instantly for everyone
+      Booked calls update the Executive dashboard instantly. Show-ups and call outcomes are logged separately by closers in the Closers Daily Tracker.
     </div>
-    <button id="cl-submit-btn" class="submit-btn" onclick="submitCallLog()">Log Calls →</button>
+    <button id="cl-submit-btn" class="submit-btn" onclick="submitCallLog()">Log Appointments →</button>
   </div>
 
-  <div class="section-label">Recent call logs</div>
+  <div class="section-label">Recent setter activity</div>
   <div class="chart-card">
     <div class="deals-table-wrap">
       <table class="deals-table">
@@ -1682,10 +1518,9 @@ select.input-field option { background: var(--bg2); }
             <th>Booked (Ads)</th>
             <th>Booked (Organic)</th>
             <th>Total Booked</th>
-            <th>Shows</th>
-            <th>No-Shows</th>
-            <th>Show Rate</th>
-            <th>Closer</th>
+            <th>Outreach</th>
+            <th>Follow-Ups</th>
+            <th>Setter</th>
           </tr>
         </thead>
         <tbody id="calls-log-tbody"></tbody>
@@ -2224,9 +2059,9 @@ const PAGE_TITLES = {
   closers:   ['Closer Performance',    'Frankie vs Mehdi · live attribution'],
   lowticket: ['Low-Ticket',            '$27 course · GHL purchases'],
   daily:     ['Daily Input',           'Log today\'s numbers · saves instantly for everyone'],
-  'calls-log': ['Log Booked Calls',    'Log ads + organic calls · updates KPIs instantly'],
+  'calls-log': ['Setters Daily Tracker',    'Log appointments · outreach · follow-ups'],
   'edit-log':     ['Edit Log Entries',    'Fix any previously logged numbers'],
-  'call-outcomes':['Call Outcomes',       'Log what happened on each call · 20 seconds per call'],
+  'call-outcomes':['Closers Daily Tracker', 'Log every call outcome · 20 seconds per call'],
   'followup':     ['Follow-Up Tracker',  'Track all leads · pipeline stages · conversion rates'],
   deals:     ['Add New Deal',          'Log a closed deal · updates all metrics live'],
   slack:     ['Daily Report',          'Full breakdown · spend · revenue · funnel · closers'],
@@ -2297,6 +2132,9 @@ function computeMetrics(period) {
     const dbBooked = DB_LOG.reduce((s,l)=>s+(l.booked||0),0);
     const dbShows  = DB_LOG.reduce((s,l)=>s+(l.shows||0),0);
     const dbNoshows= DB_LOG.reduce((s,l)=>s+(l.noshows||0),0);
+    // Closer-logged shows/noshows from call_outcomes table
+    const coShows   = (typeof CALL_OUTCOMES !== 'undefined' && CALL_OUTCOMES) ? CALL_OUTCOMES.filter(c=>c.showed==='showed').length : 0;
+    const coNoshows = (typeof CALL_OUTCOMES !== 'undefined' && CALL_OUTCOMES) ? CALL_OUTCOMES.filter(c=>c.showed==='noshow').length : 0;
     const dbCloses = DB_LOG.reduce((s,l)=>s+(l.closes||0),0);
     const dbLt     = DB_LOG.reduce((s,l)=>s+(l.lt||0),0);
     // Use live sheet count for LT if available
@@ -2307,8 +2145,8 @@ function computeMetrics(period) {
       Math.max(dbSpend,  ALL_TIME.spend),
       Math.max(dbLeads, sheetLeads, fuTotal, ALL_TIME.leads),
       Math.max(dbBooked, ALL_TIME.booked),
-      Math.max(dbShows,  ALL_TIME.shows),
-      Math.max(dbNoshows,ALL_TIME.noshows),
+      Math.max(dbShows,  coShows,   ALL_TIME.shows),
+      Math.max(dbNoshows,coNoshows, ALL_TIME.noshows),
       Math.max(dbCloses, ALL_TIME.closes),
       Math.max(dbLt, sheetLtRevenue, ALL_TIME.lt),
       htCash, htAds, htOrg,
@@ -2335,8 +2173,14 @@ function computeMetrics(period) {
   const spend  = pLog.reduce((s,l)=>s+(l.spend||0),0);
   const leadsRaw = pLog.reduce((s,l)=>s+(l.leads||0),0);
   const booked = pLog.reduce((s,l)=>s+(l.booked||0),0);
-  const shows  = pLog.reduce((s,l)=>s+(l.shows||0),0);
-  const noshows= pLog.reduce((s,l)=>s+(l.noshows||0),0);
+  // Shows/noshows: prefer larger of daily_log entries OR call_outcomes (closer-logged) entries
+  const showsLog   = pLog.reduce((s,l)=>s+(l.shows||0),0);
+  const noshowsLog = pLog.reduce((s,l)=>s+(l.noshows||0),0);
+  const pCallOut   = (typeof CALL_OUTCOMES !== 'undefined' && CALL_OUTCOMES) ? CALL_OUTCOMES.filter(c=>inPeriod(c.date)) : [];
+  const showsCO    = pCallOut.filter(c=>c.showed==='showed').length;
+  const noshowsCO  = pCallOut.filter(c=>c.showed==='noshow').length;
+  const shows  = Math.max(showsLog, showsCO);
+  const noshows= Math.max(noshowsLog, noshowsCO);
   const closes = pLog.reduce((s,l)=>s+(l.closes||0),0);
   const ltFromLog = pLog.reduce((s,l)=>s+(l.lt||0),0);
   const ltFromSheetPeriod = getLTForPeriod(period);
@@ -3220,54 +3064,58 @@ async function deleteDeal(id) {
 }
 
 // ═══════════════════════════════════════════
-// DAILY INPUT
+// DAILY INPUT (Ad spend logger)
 // ═══════════════════════════════════════════
 function updatePreview() {
   const spend=parseFloat(document.getElementById('inp-spend').value)||0;
-  const leads=parseInt(document.getElementById('inp-leads').value)||0;
-  const booked=parseInt(document.getElementById('inp-booked').value)||0;
-  const shows=parseInt(document.getElementById('inp-shows').value)||0;
-  const closes=parseInt(document.getElementById('inp-closes').value)||0;
-  const cash=parseFloat(document.getElementById('inp-cash').value)||0;
+  // Use live KPI sources for preview math: leads from followup_leads, booked from daily_log totals, cash from deals
+  const leads = (typeof FU_LEADS !== 'undefined' && FU_LEADS) ? FU_LEADS.length : 0;
+  const booked = DB_LOG.reduce((s,l)=>s+(l.booked||0),0);
+  const cashTotal = (DB_DEALS||[]).filter(d=>d.usd>0).reduce((s,d)=>s+(d.usd||0),0);
   set('prev-cpl',  leads&&spend?'$'+Math.round(spend/leads):'—');
   set('prev-cpbc', booked&&spend?'$'+Math.round(spend/booked):'—');
-  set('prev-show', booked&&shows?Math.round(shows/booked*100)+'%':'—');
-  set('prev-cr',   shows&&closes?Math.round(closes/shows*100)+'%':'—');
-  set('prev-roas', spend&&cash?(cash/spend).toFixed(1)+'x':'—');
-  set('prev-cac',  closes&&spend?'$'+Math.round(spend/closes):'—');
+  set('prev-roas', spend&&cashTotal?(cashTotal/spend).toFixed(1)+'x':'—');
 }
 
 async function submitDaily() {
-  const date   =document.getElementById('inp-date').value;
-  const spend  =parseFloat(document.getElementById('inp-spend').value)||0;
-  const leads  =parseInt(document.getElementById('inp-leads').value)||0;
-  const booked =parseInt(document.getElementById('inp-booked').value)||0;
-  const shows  =parseInt(document.getElementById('inp-shows').value)||0;
-  const noshows=parseInt(document.getElementById('inp-noshows').value)||0;
-  const closes =parseInt(document.getElementById('inp-closes').value)||0;
-  const cash   =parseFloat(document.getElementById('inp-cash').value)||0;
-  const lt     =parseFloat(document.getElementById('inp-lt').value)||0;
-  const source =document.getElementById('inp-source').value;
-  const closer =document.getElementById('inp-closer').value;
-  const notes  =document.getElementById('inp-campaign').value;
-  if(!date){showToast('Please select a date','error');return;}
+  const date   = document.getElementById('inp-date').value;
+  const spend  = parseFloat(document.getElementById('inp-spend').value)||0;
+  const source = document.getElementById('inp-source').value;
+  const notes  = document.getElementById('inp-campaign').value;
+  if (!date) { showToast('Please select a date','error'); return; }
+  if (!spend) { showToast('Enter an ad spend amount','error'); return; }
   const btn=document.getElementById('daily-submit-btn');
   btn.textContent='Saving...';btn.disabled=true;
   try {
-    // Upsert — updates existing entry for same date, or creates new one
-    await sbFetch('daily_log', {
-      method: 'POST',
-      prefer: 'resolution=merge-duplicates,return=representation',
-      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
-      body: JSON.stringify({date,spend,leads,booked,shows,noshows,closes,cash,lt,source,closer,notes}),
-    });
+    // Check if entry exists for this date — if so, only update spend/source/notes; preserve booked/outreach/etc.
+    const existing = DB_LOG.find(l => l.date === date);
+    if (existing) {
+      await sbFetch('daily_log?id=eq.'+existing.id, {
+        method: 'PATCH',
+        headers: { 'Prefer': 'return=representation' },
+        body: JSON.stringify({ spend, source, notes }),
+      });
+    } else {
+      await sbFetch('daily_log', {
+        method: 'POST',
+        headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify({
+          date, spend, source, notes,
+          leads:0, booked:0, shows:0, noshows:0, closes:0, cash:0, lt:0
+        }),
+      });
+    }
     DB_LOG = await getLog();
     renderAll();
-    showToast('✓ Data saved — dashboard updated for everyone');
+    showToast('✓ Ad spend saved — dashboard updated for everyone');
+    // Clear form
+    document.getElementById('inp-spend').value = '';
+    document.getElementById('inp-campaign').value = '';
+    document.getElementById('inp-source').value = '';
   } catch(e) {
     showToast('Error: '+e.message,'error');
   }
-  btn.textContent="Log Today's Data →";btn.disabled=false;
+  btn.textContent='Log Ad Spend →';btn.disabled=false;
 }
 
 // ═══════════════════════════════════════════
@@ -3355,23 +3203,21 @@ function renderCallsLogTable() {
   if (!tbody) return;
   const sorted = [...DB_LOG].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,20);
   if (!sorted.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--t3);padding:24px">No call logs yet — use the form above</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:24px">No setter activity logged yet — use the form above</td></tr>';
     return;
   }
   tbody.innerHTML = sorted.map(l => {
     const adsBooked = l.booked_ads || 0;
     const orgBooked = l.booked_org || 0;
     const total = l.booked || 0;
-    const showRate = total > 0 ? Math.round((l.shows||0)/total*100)+'%' : '—';
     return `<tr>
       <td>${l.date}</td>
       <td style="color:var(--blue);font-weight:700">${adsBooked}</td>
       <td style="color:var(--accent);font-weight:700">${orgBooked}</td>
       <td style="font-weight:700">${total}</td>
-      <td>${l.shows||0}</td>
-      <td style="color:var(--red)">${l.noshows||0}</td>
-      <td style="color:${(l.shows||0)>=total*0.7?'var(--accent)':'var(--amber)'}">${showRate}</td>
-      <td>${l.closer||'—'}</td>
+      <td>${l.outreach||0}</td>
+      <td>${l.followups||0}</td>
+      <td>${l.setter || l.closer || '—'}</td>
     </tr>`;
   }).join('');
 }
@@ -3380,12 +3226,14 @@ async function submitCallLog() {
   const date     = document.getElementById('cl-date').value;
   const bookedAds= parseInt(document.getElementById('cl-booked-ads').value)||0;
   const bookedOrg= parseInt(document.getElementById('cl-booked-org').value)||0;
-  const shows    = parseInt(document.getElementById('cl-shows').value)||0;
-  const noshows  = parseInt(document.getElementById('cl-noshows').value)||0;
-  const closer   = document.getElementById('cl-closer').value;
+  const outreach = parseInt(document.getElementById('cl-outreach').value)||0;
+  const followups= parseInt(document.getElementById('cl-followups').value)||0;
+  const setter   = document.getElementById('cl-setter').value;
 
   if (!date) { showToast('Please select a date', 'error'); return; }
-  if (!bookedAds && !bookedOrg) { showToast('Enter at least one booked call', 'error'); return; }
+  if (!bookedAds && !bookedOrg && !outreach && !followups) {
+    showToast('Enter at least one number', 'error'); return;
+  }
 
   const totalBooked = bookedAds + bookedOrg;
   const btn = document.getElementById('cl-submit-btn');
@@ -3395,52 +3243,61 @@ async function submitCallLog() {
     // Check if entry exists for this date
     const existing = DB_LOG.find(l => l.date === date);
     if (existing) {
-      // Update existing entry — add to existing booked calls
+      // Update existing entry — add to existing booked calls + outreach/followups
       const updated = {
         ...existing,
         booked: (existing.booked||0) + totalBooked,
         booked_ads: (existing.booked_ads||0) + bookedAds,
         booked_org: (existing.booked_org||0) + bookedOrg,
-        shows: (existing.shows||0) + shows,
-        noshows: (existing.noshows||0) + noshows,
-        closer: closer || existing.closer,
+        outreach: (existing.outreach||0) + outreach,
+        followups: (existing.followups||0) + followups,
       };
+      // Only set setter if user picked one
+      if (setter) updated.setter = setter;
       await sbFetch('daily_log?id=eq.'+existing.id, {
         method: 'PATCH',
         headers: { 'Prefer': 'return=representation' },
         body: JSON.stringify(updated),
       });
     } else {
-      // Create new entry via upsert
+      // Create new entry
+      const newRow = {
+        date, booked: totalBooked,
+        booked_ads: bookedAds, booked_org: bookedOrg,
+        outreach, followups,
+        spend:0, leads:0, shows:0, noshows:0, closes:0, cash:0, lt:0, source:'', notes:''
+      };
+      if (setter) newRow.setter = setter;
       await sbFetch('daily_log', {
         method: 'POST',
         headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
-        body: JSON.stringify({
-          date, booked: totalBooked,
-          booked_ads: bookedAds, booked_org: bookedOrg,
-          shows, noshows, closer,
-          spend:0, leads:0, closes:0, cash:0, lt:0, source:'', notes:''
-        }),
+        body: JSON.stringify(newRow),
       });
     }
 
     DB_LOG = await getLog();
     renderCallsLogTable();
     renderAll();
-    showToast('✓ Calls logged — dashboard updated for everyone');
+    showToast('✓ Appointments logged — dashboard updated for everyone');
 
     // Clear form
     document.getElementById('cl-booked-ads').value = '';
     document.getElementById('cl-booked-org').value = '';
-    document.getElementById('cl-shows').value = '';
-    document.getElementById('cl-noshows').value = '';
-    document.getElementById('cl-closer').value = '';
+    document.getElementById('cl-outreach').value = '';
+    document.getElementById('cl-followups').value = '';
+    document.getElementById('cl-setter').value = '';
     document.getElementById('cl-date').valueAsDate = new Date();
 
   } catch(e) {
-    showToast('Error: ' + e.message, 'error');
+    // If column doesn't exist yet (outreach/followups), the API will reject —
+    // give a helpful error instead of silent failure
+    if ((e.message||'').toLowerCase().includes('column') || (e.message||'').includes('PGRST204')) {
+      showToast('DB schema update needed — run the outreach/followups SQL in Supabase', 'error');
+    } else {
+      showToast('Error: ' + e.message, 'error');
+    }
   }
-  btn.textContent = 'Log Calls →'; btn.disabled = false;
+  btn.textContent = 'Log Appointments →'; btn.disabled = false;
 }
 
 
@@ -3581,174 +3438,94 @@ function setReportPeriod(p, btn) {
 function renderDailyReport() {
   const d = computeMetrics(reportPeriod);
   const S = getSettings();
-  const log = DB_LOG;
-  const deals = DB_DEALS;
-  const today = new Date();
-
-  function inPeriod(dateStr) {
-    if (!dateStr) return false;
-    const dt = new Date(dateStr);
-    const todayStr = today.toISOString().split('T')[0];
-    if (reportPeriod==='today') {
-      // Show most recent entry, not necessarily today
-      const mostRecent = DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr;
-      return dateStr === mostRecent;
-    }
-    if (reportPeriod==='7d') { const c=new Date(today); c.setDate(c.getDate()-7); return dt>=c; }
-    if (reportPeriod==='mtd') return dt.getFullYear()===today.getFullYear()&&dt.getMonth()===today.getMonth();
-    return true;
-  }
 
   const cpl    = d.leads  ? d.spend/d.leads   : 0;
   const cpbc   = d.booked ? d.spend/d.booked  : 0;
   const showR  = d.booked ? d.shows/d.booked  : 0;
-  const noshowR= d.booked ? d.noshows/d.booked: 0;
-  const cr     = d.shows  ? d.rawDeals.length/d.shows : 0;
-  const roas   = d.spend  ? d.cash/d.spend    : 0;
-  const roasCon= d.spend  ? d.contractTotal/d.spend : 0;
   const cac    = d.rawDeals.length ? d.spend/d.rawDeals.length : 0;
-  const netPL  = d.cash - d.spend;
-  const netCon = d.contractTotal - d.spend;
-  const ltSales= Math.round((d.lt||0)/27);
+  const ltCount = d.lt > 0 ? Math.round(d.lt/27) : 0;
+  // Lead → Purchase: of all leads, what % bought the $27 LT
+  const l2pRate = d.leads > 0 ? (ltCount / d.leads) : 0;
+  // Purchase → Booked Call: of LT purchasers, what % booked a call
+  const p2bRate = ltCount > 0 ? (d.booked / ltCount) : 0;
 
-  const periodLabels = { today:'Today', '7d':'Last 7 Days', mtd:'Month to Date', all:'All Time' };
+  const periodLabels = { today:'Latest entry', '7d':'Last 7 days', mtd:'Month to date', all:'All time' };
 
-  // Ad spend section
+  // ─── Metric values ───
   set('rpt-spend', '$' + (d.spend||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
   set('rpt-spend-sub', periodLabels[reportPeriod]);
-  set('rpt-leads', d.leads);
-  set('rpt-cpl-badge', d.leads ? '$'+Math.round(cpl)+' CPL' : '—');
-  set('rpt-cpl', d.leads ? '$'+Math.round(cpl) : '—');
-  set('rpt-cpl-flag', cpl > 0 ? (cpl <= S.tgt_cpl ? '✓ under $'+S.tgt_cpl : 'target $'+S.tgt_cpl) : '—');
-  badge('rpt-cpl-flag', cpl <= S.tgt_cpl && cpl > 0 ? 'up' : cpl > 0 ? 'warn' : 'neutral');
-  set('rpt-cpbc', d.booked ? '$'+Math.round(cpbc) : '—');
-  set('rpt-cpbc-flag', cpbc > 0 ? (cpbc <= S.tgt_cpbc ? '✓ under $'+S.tgt_cpbc : 'target $'+S.tgt_cpbc) : '—');
-  badge('rpt-cpbc-flag', cpbc <= S.tgt_cpbc && cpbc > 0 ? 'up' : cpbc > 0 ? 'warn' : 'neutral');
 
-  // Calls
-  set('rpt-booked', d.booked);
-  set('rpt-shows', d.shows);
-  set('rpt-showup-badge', d.booked ? Math.round(showR*100)+'% show rate' : '—');
-  badge('rpt-showup-badge', showR >= 0.70 && d.booked ? 'up' : d.booked ? 'warn' : 'neutral');
-  set('rpt-noshows', d.noshows);
-  set('rpt-noshow-badge', d.booked ? Math.round(noshowR*100)+'% no-show' : '—');
+  set('rpt-cpl', d.leads ? '$'+Math.round(cpl) : '—');
+  set('rpt-cpl-flag', cpl > 0 ? (cpl <= S.tgt_cpl ? '✓ under $'+S.tgt_cpl+' target' : 'target $'+S.tgt_cpl) : '—');
+  badge('rpt-cpl-flag', cpl > 0 && cpl <= S.tgt_cpl ? 'up' : cpl > 0 ? 'warn' : 'neutral');
+
+  set('rpt-cpbc', d.booked ? '$'+Math.round(cpbc) : '—');
+  set('rpt-cpbc-flag', cpbc > 0 ? (cpbc <= S.tgt_cpbc ? '✓ under $'+S.tgt_cpbc+' target' : 'target $'+S.tgt_cpbc) : '—');
+  badge('rpt-cpbc-flag', cpbc > 0 && cpbc <= S.tgt_cpbc ? 'up' : cpbc > 0 ? 'warn' : 'neutral');
+
+  set('rpt-cac', d.rawDeals.length ? '$'+Math.round(cac).toLocaleString() : '—');
+  set('rpt-cac-flag', cac > 0 ? (cac <= 3000 ? '✓ under $3,000 target' : 'target $3,000') : '—');
+  badge('rpt-cac-flag', cac > 0 && cac <= 3000 ? 'up' : cac > 0 ? 'warn' : 'neutral');
+
   set('rpt-showrate', d.booked ? Math.round(showR*100)+'%' : '—');
-  set('rpt-showrate-flag', showR >= 0.70 && d.booked ? '✓ healthy' : d.booked ? 'target 70%' : '—');
+  set('rpt-showrate-flag', d.booked ? (showR >= 0.70 ? '✓ above 70% target' : 'target 70%') : '—');
   badge('rpt-showrate-flag', showR >= 0.70 && d.booked ? 'up' : d.booked ? 'warn' : 'neutral');
 
-  // Revenue
-  set('rpt-htcash', '$'+(d.htCash||0).toLocaleString());
-  set('rpt-deals-badge', d.rawDeals.length + ' deals');
-  badge('rpt-deals-badge', d.rawDeals.length > 0 ? 'up' : 'neutral');
-  set('rpt-htads', '$'+(d.htAds||0).toLocaleString());
-  set('rpt-htads-pct', d.htCash ? Math.round(d.htAds/d.htCash*100)+'% of HT' : '—');
-  set('rpt-lt', '$'+(d.lt||0).toLocaleString());
-  set('rpt-lt-sales', ltSales + ' purchases @ $27');
-  set('rpt-total', '$'+d.cash.toLocaleString());
+  set('rpt-l2p', d.leads > 0 ? Math.round(l2pRate*100)+'%' : '—');
+  set('rpt-l2p-sub', d.leads > 0 ? ltCount+' / '+d.leads+' leads bought' : '— / — leads');
+  badge('rpt-l2p-sub', l2pRate >= 0.30 && d.leads > 0 ? 'up' : d.leads > 0 ? 'warn' : 'neutral');
 
-  // Efficiency
-  set('rpt-roas', d.spend ? roas.toFixed(2)+'x' : '—');
-  set('rpt-roas-flag', roas >= 2 && d.spend ? '✓ healthy' : d.spend ? 'target 2x' : '—');
-  badge('rpt-roas-flag', roas >= 2 && d.spend ? 'up' : d.spend ? 'warn' : 'neutral');
-  set('rpt-roas-con', d.spend ? roasCon.toFixed(1)+'x' : '—');
-  set('rpt-cac', d.rawDeals.length ? '$'+Math.round(cac) : '—');
-  set('rpt-cac-flag', cac > 0 && cac <= 3000 ? '✓ under $3k' : cac > 0 ? 'review' : '—');
-  badge('rpt-cac-flag', cac > 0 && cac <= 3000 ? 'up' : cac > 0 ? 'warn' : 'neutral');
-  set('rpt-cr', d.shows ? Math.round(cr*100)+'%' : '—');
-  set('rpt-cr-flag', cr >= 0.25 && d.shows ? '✓ healthy' : d.shows ? 'target 25%' : '—');
-  badge('rpt-cr-flag', cr >= 0.25 && d.shows ? 'up' : d.shows ? 'warn' : 'neutral');
+  set('rpt-p2b', ltCount > 0 ? Math.round(p2bRate*100)+'%' : '—');
+  set('rpt-p2b-sub', ltCount > 0 ? d.booked+' / '+ltCount+' purchasers booked' : '— / — purchases');
+  badge('rpt-p2b-sub', p2bRate >= 0.50 && ltCount > 0 ? 'up' : ltCount > 0 ? 'warn' : 'neutral');
 
-  // P&L
-  set('rpt-pl-spend', '$'+(d.spend||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
-  set('rpt-pl-cash', '$'+d.cash.toLocaleString());
-  const plEl = document.getElementById('rpt-pl-net');
-  if (plEl) {
-    plEl.textContent = (netPL >= 0 ? '+' : '') + '$' + Math.abs(netPL).toLocaleString();
-    plEl.style.color = netPL >= 0 ? 'var(--accent)' : 'var(--red)';
-  }
-  set('rpt-pl-con', (netCon >= 0 ? '+' : '') + '$' + Math.abs(netCon).toLocaleString());
+  // ─── What's working / Needs improvement ───
+  const wins = [];
+  const gaps = [];
 
-  // Verdict
-  const verdictEl = document.getElementById('rpt-verdict');
-  if (verdictEl) {
-    const flags = [];
-    if (roas >= 2) flags.push('✅ ROAS healthy at ' + roas.toFixed(2)+'x');
-    else if (d.spend) flags.push('⚠️ Cash ROAS at ' + roas.toFixed(2)+'x — below 2x target. Contract ROAS is ' + roasCon.toFixed(1)+'x.');
-    if (showR >= 0.70 && d.booked) flags.push('✅ Show-up rate strong at ' + Math.round(showR*100)+'%');
-    else if (d.booked) flags.push('⚠️ Show-up rate at ' + Math.round(showR*100)+'% — target 70%+');
-    if (cr >= 0.25 && d.shows) flags.push('✅ Close rate strong at ' + Math.round(cr*100)+'%');
-    else if (d.shows) flags.push('⚠️ Close rate at ' + Math.round(cr*100)+'% — target 25%+');
-    if (cpl <= 150 && cpl > 0) flags.push('✅ CPL at $' + Math.round(cpl) + ' — under $150 target');
-    else if (cpl > 0) flags.push('⚠️ CPL at $' + Math.round(cpl) + ' — above $150 target');
-    if (netPL >= 0) flags.push('✅ Cash positive — collecting more than spending');
-    else if (d.spend) flags.push('⚠️ Cash P&L is -$' + Math.abs(netPL).toLocaleString() + ' — but contracts are +$' + Math.max(0,netCon).toLocaleString());
-    verdictEl.innerHTML = flags.join('<br>');
+  // CPL
+  if (cpl > 0) {
+    if (cpl <= S.tgt_cpl) wins.push(`<b>CPL is under target</b> at $${Math.round(cpl)} (target $${S.tgt_cpl}) — ad creative + audience targeting are efficient`);
+    else gaps.push(`<b>CPL is above target</b> at $${Math.round(cpl)} (target $${S.tgt_cpl}) — review ad creative, audience, or hook quality`);
   }
 
-  // Closer breakdown
-  const closerTbody = document.getElementById('rpt-closer-tbody');
-  if (closerTbody) {
-    const closerData = [
-      { name: 'Frankie', color: 'var(--purple)' },
-      { name: 'Mehdi',   color: 'var(--amber)'  },
-    ].map(c => {
-      const cDeals = d.rawDeals.filter(dl => dl.closer === c.name);
-      const cCash = cDeals.reduce((s,dl) => s+(dl.usd||0), 0);
-      const cContracts = cDeals.reduce((s,dl) => s+(dl.contract||0), 0);
-      const cShows = log.filter(l => inPeriod(l.date) && l.closer === c.name).reduce((s,l) => s+(l.shows||0), 0);
-      const cCR = cShows ? Math.round(cDeals.length/cShows*100) : 0;
-      const cAdsDeals = cDeals.filter(dl => dl.source === 'Ads');
-      const cAdsCash = cAdsDeals.reduce((s,dl) => s+(dl.usd||0), 0);
-      return `<tr>
-        <td style="color:${c.color};font-weight:700">${c.name}</td>
-        <td>${cDeals.length}</td>
-        <td style="color:var(--accent);font-family:var(--font-mono);font-weight:700">$${cCash.toLocaleString()}</td>
-        <td style="font-family:var(--font-mono)">$${cContracts.toLocaleString()}</td>
-        <td><span class="kpi-badge ${cCR >= 25 ? 'up' : 'warn'}">${cShows ? cCR+'%' : '—'}</span></td>
-        <td style="font-family:var(--font-mono)">$${cAdsCash.toLocaleString()}</td>
-      </tr>`;
-    });
-    closerTbody.innerHTML = closerData.join('') ||
-      '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:16px">No deals this period</td></tr>';
+  // CPBC
+  if (cpbc > 0) {
+    if (cpbc <= S.tgt_cpbc) wins.push(`<b>Cost per booked call is healthy</b> at $${Math.round(cpbc)} (target $${S.tgt_cpbc})`);
+    else gaps.push(`<b>Cost per booked call is high</b> at $${Math.round(cpbc)} (target $${S.tgt_cpbc}) — booking page or qualification flow may be leaking`);
   }
 
-  // Written report
-  renderWrittenReport();
-
-  // Daily breakdown table
-  const dailyTbody = document.getElementById('rpt-daily-tbody');
-  if (dailyTbody) {
-    const pLog = log.filter(l => inPeriod(l.date)).sort((a,b) => new Date(b.date)-new Date(a.date));
-    if (!pLog.length) {
-      dailyTbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--t3);padding:16px">No data logged for this period</td></tr>';
-    } else {
-      dailyTbody.innerHTML = pLog.map(l => {
-        const lCPL  = l.leads  ? Math.round(l.spend/l.leads)  : 0;
-        const lShow = l.booked ? Math.round(l.shows/l.booked*100) : 0;
-        const lROAS = l.spend  ? (((l.cash||0)+(l.lt||0))/l.spend).toFixed(1) : '—';
-        const roasOk = l.spend && ((l.cash||0)+(l.lt||0))/l.spend >= 2;
-        return `<tr>
-          <td style="color:var(--accent);font-weight:700;font-family:var(--font-mono)">${l.date}</td>
-          <td style="font-family:var(--font-mono)">$${(l.spend||0).toLocaleString()}</td>
-          <td>${l.leads||0}</td>
-          <td style="color:${lCPL <= 150 && lCPL > 0 ? 'var(--accent)' : lCPL > 0 ? 'var(--amber)' : 'var(--t3)'}">
-            ${lCPL > 0 ? '$'+lCPL : '—'}
-          </td>
-          <td>${l.booked||0}</td>
-          <td>${l.shows||0}</td>
-          <td style="color:${lShow >= 70 ? 'var(--accent)' : lShow > 0 ? 'var(--amber)' : 'var(--t3)'}">
-            ${l.booked ? lShow+'%' : '—'}
-          </td>
-          <td>${l.closes||0}</td>
-          <td style="font-family:var(--font-mono);color:var(--accent)">$${(l.cash||0).toLocaleString()}</td>
-          <td style="font-family:var(--font-mono)">$${(l.lt||0).toLocaleString()}</td>
-          <td style="color:${roasOk ? 'var(--accent)' : typeof lROAS === 'string' && lROAS !== '—' ? 'var(--amber)' : 'var(--t3)'}">
-            ${lROAS !== '—' ? lROAS+'x' : '—'}
-          </td>
-        </tr>`;
-      }).join('');
-    }
+  // CAC
+  if (cac > 0) {
+    if (cac <= 3000) wins.push(`<b>CAC is under $3,000</b> at $${Math.round(cac).toLocaleString()} — sustainable acquisition economics`);
+    else gaps.push(`<b>CAC is above $3,000</b> at $${Math.round(cac).toLocaleString()} — close rate or pricing leverage needs attention`);
   }
+
+  // Show-up rate
+  if (d.booked > 0) {
+    if (showR >= 0.70) wins.push(`<b>Show-up rate is strong</b> at ${Math.round(showR*100)}% — pre-call nurture + reminders are working`);
+    else gaps.push(`<b>Show-up rate is low</b> at ${Math.round(showR*100)}% (target 70%) — improve reminder cadence and pre-call value`);
+  }
+
+  // Lead → Purchase
+  if (d.leads > 0) {
+    if (l2pRate >= 0.30) wins.push(`<b>Lead → Purchase rate is excellent</b> at ${Math.round(l2pRate*100)}% — $27 offer + landing page are converting well`);
+    else if (l2pRate >= 0.15) gaps.push(`<b>Lead → Purchase rate at ${Math.round(l2pRate*100)}%</b> — solid but room to grow toward 30%+. Test offer headline + price anchoring`);
+    else gaps.push(`<b>Lead → Purchase rate is weak</b> at ${Math.round(l2pRate*100)}% (target 30%) — front-end offer page needs attention`);
+  }
+
+  // Purchase → Booked Call
+  if (ltCount > 0) {
+    if (p2bRate >= 0.50) wins.push(`<b>Purchase → Booked Call rate is strong</b> at ${Math.round(p2bRate*100)}% — buyers are being effectively converted to high-ticket calls`);
+    else if (p2bRate >= 0.25) gaps.push(`<b>Purchase → Booked Call rate at ${Math.round(p2bRate*100)}%</b> — under target. Review post-purchase upsell sequence + setter outreach`);
+    else gaps.push(`<b>Purchase → Booked Call rate is low</b> at ${Math.round(p2bRate*100)}% (target 50%) — significant drop-off from buyer to booked call`);
+  }
+
+  // Render lists
+  const winsEl = document.getElementById('rpt-wins');
+  const gapsEl = document.getElementById('rpt-gaps');
+  if (winsEl) winsEl.innerHTML = wins.length ? wins.map(w => '<div style="margin-bottom:10px">• ' + w + '</div>').join('') : '<div style="color:var(--t3);font-style:italic">Not enough data yet for this period</div>';
+  if (gapsEl) gapsEl.innerHTML = gaps.length ? gaps.map(g => '<div style="margin-bottom:10px">• ' + g + '</div>').join('') : '<div style="color:var(--t3);font-style:italic">All metrics meeting targets — keep going</div>';
 }
 
 
@@ -3855,56 +3632,42 @@ function copyReport() {
 
 function downloadReport() {
   const d = computeMetrics(reportPeriod);
-  const text = generateWrittenReport();
   const today = new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'-');
-  const periodLabels = { today:'Today', '7d':'Last-7-Days', mtd:'MTD', all:'All-Time' };
-  const periodFull = { today:'Today', '7d':'Last 7 Days', mtd:'Month to Date', all:'All Time' };
-  const filename = `SWH-Ads-Report-${periodLabels[reportPeriod]}-${today}.pdf`;
+  const periodSlugs = { today:'Today', '7d':'Last-7-Days', mtd:'MTD', all:'All-Time' };
+  const periodFull = { today:'Latest Entry', '7d':'Last 7 Days', mtd:'Month to Date', all:'All Time' };
+  const filename = `SWH-Ads-Report-${periodSlugs[reportPeriod]}-${today}.pdf`;
 
-  const cpl    = d.leads  ? Math.round(d.spend/d.leads)   : 0;
-  const cpbc   = d.booked ? Math.round(d.spend/d.booked)  : 0;
-  const showR  = d.booked ? Math.round(d.shows/d.booked*100) : 0;
-  const cr     = d.shows  ? Math.round(d.rawDeals.length/d.shows*100) : 0;
-  const roas   = d.spend  ? (d.cash/d.spend).toFixed(2)   : '—';
-  const roasCon= d.spend  ? (d.contractTotal/d.spend).toFixed(1) : '—';
-  const cac    = d.rawDeals.length ? Math.round(d.spend/d.rawDeals.length) : 0;
-  const netPL  = d.cash - d.spend;
-  const netCon = d.contractTotal - d.spend;
-  const ltSales= Math.round((d.lt||0)/27);
+  // 7 key metrics + 2 funnel rates
+  const cpl     = d.leads  ? Math.round(d.spend/d.leads)   : 0;
+  const cpbc    = d.booked ? Math.round(d.spend/d.booked)  : 0;
+  const cac     = d.rawDeals.length ? Math.round(d.spend/d.rawDeals.length) : 0;
+  const showR   = d.booked ? Math.round(d.shows/d.booked*100) : 0;
+  const ltCount = d.lt > 0 ? Math.round(d.lt/27) : 0;
+  const l2pRate = d.leads > 0 ? Math.round((ltCount/d.leads)*100) : 0;
+  const p2bRate = ltCount > 0 ? Math.round((d.booked/ltCount)*100) : 0;
 
-  // Build log table rows for period
-  const log = DB_LOG;
-  const todayStr = new Date().toISOString().split('T')[0];
-  function inPeriod(ds) {
-    if (!ds) return false;
-    const dt = new Date(ds);
-    if (reportPeriod==='today') {
-      const mostRecent = DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr;
-      return ds === mostRecent;
-    }
-    if (reportPeriod==='7d') { const c=new Date(); c.setDate(c.getDate()-7); return dt>=c; }
-    if (reportPeriod==='mtd') { const n=new Date(); return dt.getFullYear()===n.getFullYear()&&dt.getMonth()===n.getMonth(); }
-    return true;
-  }
-  const pLog = log.filter(l=>inPeriod(l.date)).sort((a,b)=>new Date(b.date)-new Date(a.date));
-  const logRows = pLog.map(l => {
-    const lROAS = l.spend ? ((l.cash||0)+(l.lt||0))/l.spend : 0;
-    return `<tr>
-      <td>${l.date}</td>
-      <td>$${(l.spend||0).toLocaleString()}</td>
-      <td>${l.leads||0}</td>
-      <td>${l.leads&&l.spend?'$'+Math.round(l.spend/l.leads):'—'}</td>
-      <td>${l.booked||0}</td>
-      <td>${l.shows||0}</td>
-      <td>${l.booked?Math.round(l.shows/l.booked*100)+'%':'—'}</td>
-      <td>${l.closes||0}</td>
-      <td>$${(l.cash||0).toLocaleString()}</td>
-      <td>$${(l.lt||0).toLocaleString()}</td>
-      <td style="color:${lROAS>=2?'#00C882':lROAS>0?'#F5A623':'#888'}">${l.spend?lROAS.toFixed(1)+'x':'—'}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="11" style="text-align:center;color:#888;padding:12px">No data for this period</td></tr>';
+  // Targets
+  const TGT_CPL = 150, TGT_CPBC = 500, TGT_CAC = 3000, TGT_SHOWR = 70, TGT_L2P = 30, TGT_P2B = 50;
 
-  // Build PDF using browser print
+  // Status helpers (returns 'good' / 'warn' / 'neutral')
+  const sCPL  = cpl > 0  ? (cpl  <= TGT_CPL  ? 'good' : 'warn') : 'neutral';
+  const sCPBC = cpbc > 0 ? (cpbc <= TGT_CPBC ? 'good' : 'warn') : 'neutral';
+  const sCAC  = cac > 0  ? (cac  <= TGT_CAC  ? 'good' : 'warn') : 'neutral';
+  const sSHO  = d.booked > 0 ? (showR  >= TGT_SHOWR ? 'good' : 'warn') : 'neutral';
+  const sL2P  = d.leads > 0  ? (l2pRate >= TGT_L2P  ? 'good' : 'warn') : 'neutral';
+  const sP2B  = ltCount > 0  ? (p2bRate >= TGT_P2B  ? 'good' : 'warn') : 'neutral';
+
+  // Wins + gaps lists
+  const wins = [];
+  const gaps = [];
+  if (cpl > 0) (cpl <= TGT_CPL  ? wins : gaps).push(`CPL at $${cpl} ${cpl<=TGT_CPL?'— under':'— above'} $${TGT_CPL} target`);
+  if (cpbc > 0) (cpbc <= TGT_CPBC ? wins : gaps).push(`Cost per booked call at $${cpbc} ${cpbc<=TGT_CPBC?'— under':'— above'} $${TGT_CPBC} target`);
+  if (cac > 0) (cac <= TGT_CAC  ? wins : gaps).push(`CAC at $${cac.toLocaleString()} ${cac<=TGT_CAC?'— sustainable economics':'— above $3k target, review pricing or close rate'}`);
+  if (d.booked > 0) (showR >= TGT_SHOWR ? wins : gaps).push(`Show-up rate at ${showR}% ${showR>=TGT_SHOWR?'— above 70% target':'— below 70%, improve reminder cadence'}`);
+  if (d.leads > 0) (l2pRate >= TGT_L2P ? wins : gaps).push(`Lead → Purchase rate at ${l2pRate}% (${ltCount} of ${d.leads}) ${l2pRate>=TGT_L2P?'— offer is converting well':'— front-end offer needs attention'}`);
+  if (ltCount > 0) (p2bRate >= TGT_P2B ? wins : gaps).push(`Purchase → Booked Call rate at ${p2bRate}% (${d.booked} of ${ltCount}) ${p2bRate>=TGT_P2B?'— buyers converting to calls well':'— review post-purchase sequence'}`);
+
+  // Build PDF using browser print — black background, white text, accent green
   const printWindow = window.open('', '_blank');
   printWindow.document.write(`
     <!DOCTYPE html>
@@ -3912,31 +3675,38 @@ function downloadReport() {
     <head>
       <title>${filename}</title>
       <style>
+        @page { margin: 0; size: A4; }
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#1a1a2e;padding:40px;max-width:900px;margin:0 auto}
-        .header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #00C882;padding-bottom:18px;margin-bottom:24px}
-        .logo{font-size:24px;font-weight:800;color:#00C882}
-        .logo-sub{font-size:10px;color:#8895A7;letter-spacing:1px;margin-top:2px}
-        .header-right{text-align:right}
-        .title{font-size:16px;font-weight:700;color:#0d1117}
-        .subtitle{font-size:11px;color:#8895A7;margin-top:3px}
-        .section-title{font-size:9px;font-weight:700;color:#8895A7;text-transform:uppercase;letter-spacing:1.2px;margin:20px 0 8px;padding-bottom:5px;border-bottom:1px solid #eaeef2}
-        .metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px}
-        .metric{background:#f8fafb;border-radius:6px;padding:10px 12px;border-top:2px solid #00C882}
-        .metric-label{font-size:8px;font-weight:700;color:#8895A7;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px}
-        .metric-value{font-size:16px;font-weight:800;color:#0d1117}
-        .green{color:#00C882}.red{color:#FF5252}.amber{color:#F5A623}.blue{color:#4D9DE0}
-        .pl-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}
-        .pl-box{background:#f8fafb;border-radius:6px;padding:12px;text-align:center}
-        .pl-label{font-size:9px;font-weight:700;color:#8895A7;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px}
-        .pl-val{font-size:20px;font-weight:800}
-        table{width:100%;border-collapse:collapse;font-size:10px;margin-top:4px}
-        th{text-align:left;padding:6px 8px;background:#f1f3f5;color:#8895A7;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:1px solid #eaeef2}
-        td{padding:6px 8px;border-bottom:1px solid #f1f3f5;color:#4a5568}
-        tr:last-child td{border-bottom:none}
-        .report-text{font-size:12px;line-height:1.9;color:#2d3748;white-space:pre-line;background:#f8fafb;padding:16px;border-radius:6px;border-left:3px solid #00C882}
-        .footer{margin-top:28px;padding-top:12px;border-top:1px solid #eaeef2;font-size:9px;color:#8895A7;display:flex;justify-content:space-between}
-        @media print{body{padding:28px}@page{margin:1cm}}
+        html,body{background:#0d1117 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        body{font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;color:#ffffff;background:#0d1117;padding:40px;min-height:100vh}
+        .header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #00C882;padding-bottom:20px;margin-bottom:28px}
+        .logo{font-size:28px;font-weight:900;color:#00C882;letter-spacing:1px}
+        .logo-sub{font-size:10px;color:#8895A7;letter-spacing:2px;margin-top:4px;font-weight:600}
+        .title{font-size:16px;font-weight:700;color:#ffffff;text-align:right}
+        .subtitle{font-size:11px;color:#8895A7;margin-top:4px;text-align:right}
+        .section-title{font-size:10px;font-weight:700;color:#8895A7;text-transform:uppercase;letter-spacing:1.5px;margin:24px 0 12px;padding-bottom:6px;border-bottom:1px solid #1f242c}
+        .metrics-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:6px}
+        .metrics-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}
+        .metric{background:#161b22;border-radius:8px;padding:14px 16px;border-left:3px solid #00C882}
+        .metric.warn{border-left-color:#F5A623}
+        .metric.neutral{border-left-color:#3a4250}
+        .metric-label{font-size:9px;font-weight:700;color:#8895A7;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+        .metric-value{font-size:22px;font-weight:800;color:#ffffff;font-family:ui-monospace,monospace}
+        .metric-value.good{color:#00C882}
+        .metric-value.warn{color:#F5A623}
+        .metric-sub{font-size:10px;color:#8895A7;margin-top:4px}
+        .highlight-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+        .highlight-box{background:#161b22;border-radius:8px;padding:16px}
+        .highlight-box.wins{border-left:3px solid #00C882}
+        .highlight-box.gaps{border-left:3px solid #F5A623}
+        .highlight-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+        .highlight-title.wins{color:#00C882}
+        .highlight-title.gaps{color:#F5A623}
+        .highlight-list{font-size:11px;line-height:1.7;color:#d0d7de}
+        .highlight-list div{margin-bottom:8px}
+        .highlight-list div:before{content:'• ';color:inherit}
+        .empty{font-style:italic;color:#5a6370}
+        .footer{margin-top:36px;padding-top:14px;border-top:1px solid #1f242c;font-size:9px;color:#5a6370;display:flex;justify-content:space-between}
       </style>
     </head>
     <body>
@@ -3945,86 +3715,45 @@ function downloadReport() {
           <div class="logo">SWH</div>
           <div class="logo-sub">ADS COMMAND CENTER</div>
         </div>
-        <div class="header-right">
-          <div class="title">Ads Performance Report</div>
-          <div class="subtitle">Period: ${periodFull[reportPeriod]} &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
+        <div>
+          <div class="title">Performance Report</div>
+          <div class="subtitle">${periodFull[reportPeriod]} &nbsp;·&nbsp; ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>
         </div>
       </div>
 
-      <div class="section-title">Ad Spend + Acquisition</div>
+      <div class="section-title">Key Performance Metrics</div>
       <div class="metrics-grid">
-        <div class="metric"><div class="metric-label">Total Spend</div><div class="metric-value">$${(d.spend||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>
-        <div class="metric"><div class="metric-label">Leads</div><div class="metric-value">${d.leads}</div></div>
-        <div class="metric"><div class="metric-label">Cost Per Lead</div><div class="metric-value ${cpl<=150&&cpl>0?'green':cpl>0?'amber':''}">${cpl>0?'$'+cpl:'—'}</div></div>
-        <div class="metric"><div class="metric-label">Cost Per Booked Call</div><div class="metric-value ${cpbc<=500&&cpbc>0?'green':cpbc>0?'amber':''}">${cpbc>0?'$'+cpbc:'—'}</div></div>
+        <div class="metric"><div class="metric-label">Ad Spend</div><div class="metric-value">$${(d.spend||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div class="metric-sub">${periodFull[reportPeriod]}</div></div>
+        <div class="metric ${sCPL}"><div class="metric-label">Cost Per Lead</div><div class="metric-value ${sCPL}">${cpl>0?'$'+cpl:'—'}</div><div class="metric-sub">${cpl>0?(sCPL==='good'?'✓ under $'+TGT_CPL+' target':'target $'+TGT_CPL):'no leads yet'}</div></div>
+        <div class="metric ${sCPBC}"><div class="metric-label">Cost Per Booked Call</div><div class="metric-value ${sCPBC}">${cpbc>0?'$'+cpbc:'—'}</div><div class="metric-sub">${cpbc>0?(sCPBC==='good'?'✓ under $'+TGT_CPBC+' target':'target $'+TGT_CPBC):'no calls yet'}</div></div>
+        <div class="metric ${sCAC}"><div class="metric-label">Cost to Acquire Client</div><div class="metric-value ${sCAC}">${cac>0?'$'+cac.toLocaleString():'—'}</div><div class="metric-sub">${cac>0?(sCAC==='good'?'✓ under $3,000 target':'target $3,000'):'no closes yet'}</div></div>
       </div>
 
-      <div class="section-title">Call Performance</div>
-      <div class="metrics-grid">
-        <div class="metric"><div class="metric-label">Booked Calls</div><div class="metric-value">${d.booked}</div></div>
-        <div class="metric"><div class="metric-label">Show-Ups</div><div class="metric-value">${d.shows}</div></div>
-        <div class="metric"><div class="metric-label">No-Shows</div><div class="metric-value red">${d.noshows}</div></div>
-        <div class="metric"><div class="metric-label">Show-Up Rate</div><div class="metric-value ${showR>=70?'green':showR>0?'amber':''}">${showR>0?showR+'%':'—'}</div></div>
+      <div class="section-title">Funnel Conversion Rates</div>
+      <div class="metrics-grid-3">
+        <div class="metric ${sSHO}"><div class="metric-label">Show-Up Rate</div><div class="metric-value ${sSHO}">${d.booked>0?showR+'%':'—'}</div><div class="metric-sub">${d.booked>0?d.shows+' of '+d.booked+' showed':'no calls yet'}</div></div>
+        <div class="metric ${sL2P}"><div class="metric-label">Lead → Purchase</div><div class="metric-value ${sL2P}">${d.leads>0?l2pRate+'%':'—'}</div><div class="metric-sub">${d.leads>0?ltCount+' of '+d.leads+' bought':'no leads yet'}</div></div>
+        <div class="metric ${sP2B}"><div class="metric-label">Purchase → Booked Call</div><div class="metric-value ${sP2B}">${ltCount>0?p2bRate+'%':'—'}</div><div class="metric-sub">${ltCount>0?d.booked+' of '+ltCount+' booked':'no purchases yet'}</div></div>
       </div>
 
-      <div class="section-title">Revenue + Returns</div>
-      <div class="metrics-grid">
-        <div class="metric"><div class="metric-label">HT Cash Collected</div><div class="metric-value green">$${(d.htCash||0).toLocaleString()}</div></div>
-        <div class="metric"><div class="metric-label">HT from Ads</div><div class="metric-value">$${(d.htAds||0).toLocaleString()}</div></div>
-        <div class="metric"><div class="metric-label">Low-Ticket Rev</div><div class="metric-value">$${(d.lt||0).toLocaleString()}</div></div>
-        <div class="metric"><div class="metric-label">Total Cash</div><div class="metric-value green">$${d.cash.toLocaleString()}</div></div>
+      <div class="section-title">What's Working &amp; What Needs Improvement</div>
+      <div class="highlight-grid">
+        <div class="highlight-box wins">
+          <div class="highlight-title wins">✓ Doing Well</div>
+          <div class="highlight-list">
+            ${wins.length ? wins.map(w => '<div>'+w+'</div>').join('') : '<div class="empty">Not enough data yet for this period</div>'}
+          </div>
+        </div>
+        <div class="highlight-box gaps">
+          <div class="highlight-title gaps">⚠ Needs Improvement</div>
+          <div class="highlight-list">
+            ${gaps.length ? gaps.map(g => '<div>'+g+'</div>').join('') : '<div class="empty">All metrics meeting targets — keep going</div>'}
+          </div>
+        </div>
       </div>
-
-      <div class="section-title">Efficiency Metrics</div>
-      <div class="metrics-grid">
-        <div class="metric"><div class="metric-label">ROAS (Cash)</div><div class="metric-value ${parseFloat(roas)>=2?'green':parseFloat(roas)>0?'amber':''}">${roas}${roas!=='—'?'x':''}</div></div>
-        <div class="metric"><div class="metric-label">ROAS (Contracts)</div><div class="metric-value blue">${roasCon}${roasCon!=='—'?'x':''}</div></div>
-        <div class="metric"><div class="metric-label">CAC</div><div class="metric-value ${cac>0&&cac<=3000?'green':cac>0?'amber':''}">${cac>0?'$'+cac.toLocaleString():'—'}</div></div>
-        <div class="metric"><div class="metric-label">Close Rate</div><div class="metric-value ${cr>=25?'green':cr>0?'amber':''}">${cr>0?cr+'%':'—'}</div></div>
-      </div>
-
-      <div class="section-title">P&L Summary</div>
-      <div class="pl-grid">
-        <div class="pl-box"><div class="pl-label">Gross Spend</div><div class="pl-val red">-$${(d.spend||0).toLocaleString()}</div></div>
-        <div class="pl-box"><div class="pl-label">Cash Collected</div><div class="pl-val green">+$${d.cash.toLocaleString()}</div></div>
-        <div class="pl-box"><div class="pl-label">Net P&L (Cash)</div><div class="pl-val ${netPL>=0?'green':'red'}">${netPL>=0?'+':''}$${netPL.toLocaleString()}</div></div>
-        <div class="pl-box"><div class="pl-label">Net P&L (Contracts)</div><div class="pl-val blue">${netCon>=0?'+':''}$${netCon.toLocaleString()}</div></div>
-      </div>
-
-      <div class="section-title">Closer Breakdown</div>
-      <table>
-        <thead><tr><th>Closer</th><th>Deals</th><th>Cash Collected</th><th>Contracts</th><th>Close Rate</th><th>HT from Ads</th></tr></thead>
-        <tbody>
-          <tr>
-            <td style="font-weight:700;color:#B794F4">Frankie</td>
-            <td>${d.frankieDeals}</td>
-            <td style="font-weight:700">$${d.frankieCash.toLocaleString()}</td>
-            <td>$${DB_DEALS.filter(dl=>dl.closer==='Frankie').reduce((s,dl)=>s+(dl.contract||0),0).toLocaleString()}</td>
-            <td>${d.frankieShows?Math.round(d.frankieDeals/d.frankieShows*100)+'%':'—'}</td>
-            <td>$${DB_DEALS.filter(dl=>dl.closer==='Frankie'&&dl.source==='Ads').reduce((s,dl)=>s+(dl.usd||0),0).toLocaleString()}</td>
-          </tr>
-          <tr>
-            <td style="font-weight:700;color:#FFB742">Mehdi</td>
-            <td>${d.mehdiDeals}</td>
-            <td style="font-weight:700">$${d.mehdiCash.toLocaleString()}</td>
-            <td>$${DB_DEALS.filter(dl=>dl.closer==='Mehdi').reduce((s,dl)=>s+(dl.contract||0),0).toLocaleString()}</td>
-            <td>${d.mehdiShows?Math.round(d.mehdiDeals/d.mehdiShows*100)+'%':'—'}</td>
-            <td>$${DB_DEALS.filter(dl=>dl.closer==='Mehdi'&&dl.source==='Ads').reduce((s,dl)=>s+(dl.usd||0),0).toLocaleString()}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="section-title">Daily Breakdown</div>
-      <table>
-        <thead><tr><th>Date</th><th>Spend</th><th>Leads</th><th>CPL</th><th>Booked</th><th>Shows</th><th>Show%</th><th>Closes</th><th>Cash</th><th>LT</th><th>ROAS</th></tr></thead>
-        <tbody>${logRows}</tbody>
-      </table>
-
-      <div class="section-title" style="margin-top:20px">Performance Summary</div>
-      <div class="report-text">${text.split('\n').slice(3).join('\n')}</div>
 
       <div class="footer">
-        <span>SWH Ads Command Center &nbsp;·&nbsp; swh-dashboard.vercel.app</span>
+        <span>SWH Ads Command Center · swh-dashboard.vercel.app</span>
         <span>Generated ${new Date().toLocaleString('en-GB')}</span>
       </div>
     </body>
