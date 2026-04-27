@@ -235,6 +235,7 @@ body {
   margin-bottom: 10px;
 }
 .kpi-tier-5 { grid-template-columns: repeat(5, 1fr); }
+.kpi-tier-6 { grid-template-columns: repeat(6, 1fr); }
 .kpi-tier-4 { grid-template-columns: repeat(4, 1fr); }
 
 .kpi-card {
@@ -761,6 +762,7 @@ select.input-field option { background: var(--bg2); }
 /* ─── RESPONSIVE ─── */
 @media (max-width: 1100px) {
   .kpi-tier-5 { grid-template-columns: repeat(3, 1fr); }
+  .kpi-tier-6 { grid-template-columns: repeat(3, 1fr); }
   .chart-row-3 { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 820px) {
@@ -917,7 +919,7 @@ select.input-field option { background: var(--bg2); }
 <div id="tab-exec" class="tab-view active">
 
   <div class="section-label">Ad spend + acquisition</div>
-  <div class="kpi-tier kpi-tier-5">
+  <div class="kpi-tier kpi-tier-6">
     <div class="kpi-card accent">
       <div class="kpi-label">Ad Spend (USD)</div>
       <div class="kpi-value mono" id="k-spend">$0</div>
@@ -931,6 +933,13 @@ select.input-field option { background: var(--bg2); }
       <div class="kpi-value" id="k-leads">0</div>
       <div class="kpi-meta">
         <span class="kpi-badge neutral" id="k-cpl-badge">— CPL</span>
+      </div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">LT Purchases</div>
+      <div class="kpi-value" id="k-lt-count">0</div>
+      <div class="kpi-meta">
+        <span class="kpi-badge neutral" id="k-lt-conv">— of leads</span>
       </div>
     </div>
     <div class="kpi-card amber">
@@ -2594,7 +2603,26 @@ async function syncSheetsToFollowUpTracker(opts={}) {
       if (p) existingByKey.set('p:'+p, r);
     }
 
-    let insertedLeads = 0, insertedPurchasers = 0, upgradedToPurchaser = 0;
+    let insertedLeads = 0, insertedPurchasers = 0, upgradedToPurchaser = 0, skippedDupes = 0;
+
+    // Helper: insert with graceful unique-constraint handling.
+    // If insert fails due to DB unique index (race condition), find the existing row and treat as match.
+    async function safeInsert(newRow) {
+      try {
+        const inserted = await sbFetch('followup_leads', {
+          method: 'POST',
+          body: JSON.stringify(newRow),
+        });
+        return { ok: true, row: Array.isArray(inserted) ? inserted[0] : inserted };
+      } catch(e) {
+        const msg = (e.message || '').toLowerCase();
+        // Unique constraint violation = row already exists (DB caught what client missed)
+        if (msg.includes('duplicate') || msg.includes('unique') || msg.includes('23505')) {
+          return { ok: false, dupe: true };
+        }
+        throw e;
+      }
+    }
 
     // 3. Process Leads tab — insert if new
     for (const row of leadRows) {
@@ -2616,16 +2644,13 @@ async function syncSheetsToFollowUpTracker(opts={}) {
         notes: ''
       };
       try {
-        const inserted = await sbFetch('followup_leads', {
-          method: 'POST',
-          body: JSON.stringify(newRow),
-        });
-        insertedLeads++;
-        // Track in map so a later purchase row matches against this just-inserted row
-        const insertedRow = Array.isArray(inserted) ? inserted[0] : inserted;
-        if (insertedRow) {
-          if (normEmail(email)) existingByKey.set('e:'+normEmail(email), insertedRow);
-          if (normPhone(phone)) existingByKey.set('p:'+normPhone(phone), insertedRow);
+        const result = await safeInsert(newRow);
+        if (result.ok && result.row) {
+          insertedLeads++;
+          if (normEmail(email)) existingByKey.set('e:'+normEmail(email), result.row);
+          if (normPhone(phone)) existingByKey.set('p:'+normPhone(phone), result.row);
+        } else if (result.dupe) {
+          skippedDupes++;
         }
       } catch(e) { console.warn('Lead insert failed', e.message, newRow); }
     }
@@ -2634,7 +2659,6 @@ async function syncSheetsToFollowUpTracker(opts={}) {
     for (const row of purchRows) {
       const name  = row.name || '';
       const email = row.email || '';
-      // Purchases tab has no phone column, but normalise just in case
       const phone = row.phone || '';
       const date  = parseSheetDate(row.date);
       if (!name && !email) continue;
@@ -2666,15 +2690,14 @@ async function syncSheetsToFollowUpTracker(opts={}) {
           notes: ''
         };
         try {
-          const inserted = await sbFetch('followup_leads', {
-            method: 'POST',
-            body: JSON.stringify(newRow),
-          });
-          insertedPurchasers++;
-          const insertedRow = Array.isArray(inserted) ? inserted[0] : inserted;
-          if (insertedRow) {
-            if (normEmail(email)) existingByKey.set('e:'+normEmail(email), insertedRow);
-            if (normPhone(phone)) existingByKey.set('p:'+normPhone(phone), insertedRow);
+          const result = await safeInsert(newRow);
+          if (result.ok && result.row) {
+            insertedPurchasers++;
+            if (normEmail(email)) existingByKey.set('e:'+normEmail(email), result.row);
+            if (normPhone(phone)) existingByKey.set('p:'+normPhone(phone), result.row);
+          } else if (result.dupe) {
+            // DB has it but our client map didn't — fetch and upgrade if needed
+            skippedDupes++;
           }
         } catch(e) { console.warn('Purchaser insert failed', e.message, newRow); }
       }
@@ -2696,8 +2719,8 @@ async function syncSheetsToFollowUpTracker(opts={}) {
         showToast('✓ Synced ' + parts.join(', '));
       }
     }
-    console.log('Sheets→FU sync:', { insertedLeads, insertedPurchasers, upgradedToPurchaser, leadRows: leadRows.length, purchRows: purchRows.length });
-    return { insertedLeads, insertedPurchasers, upgradedToPurchaser };
+    console.log('Sheets→FU sync:', { insertedLeads, insertedPurchasers, upgradedToPurchaser, skippedDupes, leadRows: leadRows.length, purchRows: purchRows.length });
+    return { insertedLeads, insertedPurchasers, upgradedToPurchaser, skippedDupes };
 
   } catch(e) {
     console.error('Sheets→FU sync error:', e);
@@ -2778,6 +2801,13 @@ function renderExec(d) {
   set('k-leads', d.leads);
   set('k-cpl-badge', d.leads?(fmtFull(cpl)+' CPL'):'—');
   badge('k-cpl-badge', cpl>0&&cpl<=S.tgt_cpl?'up':cpl>0?'warn':'neutral');
+
+  // LT Purchases — count of $27 buyers + conversion % from leads
+  const ltCount = d.lt > 0 ? Math.round(d.lt / 27) : 0;
+  const ltConv = d.leads > 0 ? Math.round((ltCount / d.leads) * 100) : 0;
+  set('k-lt-count', ltCount);
+  set('k-lt-conv', d.leads > 0 ? (ltConv + '% of leads') : '— of leads');
+  badge('k-lt-conv', ltCount > 0 && ltConv >= 30 ? 'up' : ltCount > 0 ? 'warn' : 'neutral');
 
   set('k-cpl', d.leads?fmtFull(cpl):'—');
   set('k-cpl-flag', cpl>0?(cpl<=S.tgt_cpl?'✓ under $'+S.tgt_cpl:'target $'+S.tgt_cpl):'—');
