@@ -2176,7 +2176,12 @@ function computeMetrics(period) {
     if (!dateStr) return false;
     const d = new Date(dateStr);
     if (period==='today') {
-      const mostRecent = DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr;
+      // Most recent date with AD SPEND logged — gives a complete daily picture
+      // (spend lags by ~1 day, so anchoring to spend ensures CPL/CPBC/CAC/ROAS are valid)
+      const spendLog = DB_LOG.filter(l => (l.spend||0) > 0);
+      const mostRecent = spendLog.length
+        ? spendLog.sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date
+        : (DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr);
       return dateStr === mostRecent;
     }
     if (period==='7d') { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
@@ -2295,14 +2300,15 @@ function getLeadsForPeriod(period) {
   if (!LEADS_DATA.length) return 0;
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
-  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate()-1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
   function inP(dateStr) {
     if (!dateStr) return false;
     const d = new Date(dateStr);
     if (period==='today') {
-      const mostRecent = DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr;
-      return dateStr===todayStr||dateStr===yesterdayStr||dateStr===mostRecent;
+      const spendLog = DB_LOG.filter(l => (l.spend||0) > 0);
+      const mostRecent = spendLog.length
+        ? spendLog.sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date
+        : (DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr);
+      return dateStr === mostRecent;
     }
     if (period==='7d') { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
     if (period==='mtd') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
@@ -2356,18 +2362,16 @@ function getLTForPeriod(period) {
   if (!LT_PURCHASES.length) return 0;
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
-  // Get yesterday too since updates often happen day after
-  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate()-1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
 
   function inP(dateStr) {
     if (!dateStr) return false;
     const d = new Date(dateStr);
     if (period === 'today') {
-      // For latest entry — show today OR yesterday's purchases
-      // Also match against most recent log entry date
-      const mostRecent = DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr;
-      return dateStr === todayStr || dateStr === yesterdayStr || dateStr === mostRecent;
+      const spendLog = DB_LOG.filter(l => (l.spend||0) > 0);
+      const mostRecent = spendLog.length
+        ? spendLog.sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date
+        : (DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr);
+      return dateStr === mostRecent;
     }
     if (period === '7d') { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
     if (period === 'mtd') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
@@ -3474,7 +3478,20 @@ function renderDailyReport() {
   // Purchase → Booked Call: of LT purchasers, what % booked a call
   const p2bRate = ltCount > 0 ? (d.booked / ltCount) : 0;
 
-  const periodLabels = { today:'Latest entry', '7d':'Last 7 days', mtd:'Month to date', all:'All time' };
+  // For "Latest Entry", show the actual date being reported on
+  let latestLabel = 'Latest entry';
+  if (reportPeriod === 'today') {
+    const spendLog = DB_LOG.filter(l => (l.spend||0) > 0);
+    const anchorDate = spendLog.length
+      ? spendLog.sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date
+      : (DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : null);
+    if (anchorDate) {
+      const dt = new Date(anchorDate);
+      const fmt = dt.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+      latestLabel = fmt;
+    }
+  }
+  const periodLabels = { today: latestLabel, '7d':'Last 7 days', mtd:'Month to date', all:'All time' };
 
   // ─── Metric values ───
   set('rpt-spend', '$' + (d.spend||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
@@ -3798,7 +3815,8 @@ let CALL_OUTCOMES = [];
 
 async function getCallOutcomes() {
   try {
-    return await sbFetch('call_outcomes?order=date.desc&limit=50');
+    // Fetch ALL call outcomes — needed for accurate Show-Up Rate, Close Rate, and CAC across all periods
+    return await sbFetch('call_outcomes?order=date.desc');
   } catch(e) {
     // Table might not exist yet - return empty
     console.log('Call outcomes table not ready:', e.message);
