@@ -2297,7 +2297,6 @@ async function syncLeadsFromSheets() {
 }
 
 function getLeadsForPeriod(period) {
-  if (!LEADS_DATA.length) return 0;
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
   function inP(dateStr) {
@@ -2315,7 +2314,13 @@ function getLeadsForPeriod(period) {
     if (period==='lm') { const l=new Date(today); l.setMonth(l.getMonth()-1); return d.getFullYear()===l.getFullYear()&&d.getMonth()===l.getMonth(); }
     return true;
   }
-  return LEADS_DATA.filter(l => inP(l.date)).length;
+  // Source 1: Google Sheets leads sync (LEADS_DATA)
+  const fromSheet = (typeof LEADS_DATA !== 'undefined' && LEADS_DATA) ? LEADS_DATA.filter(l => inP(l.date)).length : 0;
+  // Source 2: Supabase followup_leads (FU_LEADS) — more reliable, doesn't depend on Sheets pipeline
+  const fromFu = (typeof FU_LEADS !== 'undefined' && FU_LEADS)
+    ? FU_LEADS.filter(l => inP(l.date)).length
+    : 0;
+  return Math.max(fromSheet, fromFu);
 }
 
 async function syncLTFromSheets() {
@@ -2359,7 +2364,6 @@ async function syncLTFromSheets() {
 
 // Get LT revenue for a specific period
 function getLTForPeriod(period) {
-  if (!LT_PURCHASES.length) return 0;
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
 
@@ -2378,8 +2382,14 @@ function getLTForPeriod(period) {
     if (period === 'lm') { const l=new Date(today); l.setMonth(l.getMonth()-1); return d.getFullYear()===l.getFullYear()&&d.getMonth()===l.getMonth(); }
     return true; // all
   }
-  const count = LT_PURCHASES.filter(p => inP(p.date)).length;
-  console.log('LT for period', period, ':', count, 'purchases');
+  // Source 1: Google Sheets purchases sync
+  const fromSheet = (typeof LT_PURCHASES !== 'undefined' && LT_PURCHASES) ? LT_PURCHASES.filter(p => inP(p.date)).length : 0;
+  // Source 2: Supabase followup_leads where stage = 'TCC Purchased'
+  const fromFu = (typeof FU_LEADS !== 'undefined' && FU_LEADS)
+    ? FU_LEADS.filter(l => l.stage === 'TCC Purchased' && inP(l.date)).length
+    : 0;
+  const count = Math.max(fromSheet, fromFu);
+  console.log('LT for period', period, ':', count, 'purchases (sheet:', fromSheet, 'fu:', fromFu, ')');
   return count * 27;
 }
 
