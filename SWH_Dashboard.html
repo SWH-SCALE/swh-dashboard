@@ -2294,7 +2294,8 @@ function computeMetrics(period) {
     const bcCount = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
       ? BOOKED_CALLS.filter(b => (b.status||'') !== 'cancelled').length
       : 0;
-    const bookedAuthoritative = bcCount > 0 ? bcCount : Math.max(dbBooked, ALL_TIME.booked);
+    // FIX: take MAX across all sources so we never lose the ALL_TIME floor when Calendly only has a few recent rows
+    const bookedAuthoritative = Math.max(bcCount, dbBooked, ALL_TIME.booked);
     const dbShows  = DB_LOG.reduce((s,l)=>s+(l.shows||0),0);
     const dbNoshows= DB_LOG.reduce((s,l)=>s+(l.noshows||0),0);
     // Closer-logged shows/noshows from call_outcomes table
@@ -2308,13 +2309,18 @@ function computeMetrics(period) {
     // Use live sheet count for LT if available
     const sheetLtRevenue = LT_FROM_SHEET > 0 ? LT_FROM_SHEET * 27 : 0;
     console.log('All Time LT: sheet=', sheetLtRevenue, 'db=', dbLt, 'hardcoded=', ALL_TIME.lt);
+    // FIX: clamp shows + noshows so they can NEVER exceed booked calls (prevents 2250% show-up rate)
+    const showsRawAT   = Math.max(dbShows,  coShows,   bcShows,   ALL_TIME.shows);
+    const noshowsRawAT = Math.max(dbNoshows,coNoshows, bcNoshows, ALL_TIME.noshows);
+    const showsClampedAT   = Math.min(showsRawAT, bookedAuthoritative);
+    const noshowsClampedAT = Math.min(noshowsRawAT, Math.max(0, bookedAuthoritative - showsClampedAT));
     // Use DB values if they exist and are bigger, otherwise use ALL_TIME verified totals
     return buildMetrics(
       Math.max(dbSpend,  ALL_TIME.spend),
       Math.max(dbLeads, sheetLeads, fuTotal, ALL_TIME.leads),
       bookedAuthoritative,
-      Math.max(dbShows,  coShows,   bcShows,   ALL_TIME.shows),
-      Math.max(dbNoshows,coNoshows, bcNoshows, ALL_TIME.noshows),
+      showsClampedAT,
+      noshowsClampedAT,
       Math.max(dbCloses, ALL_TIME.closes),
       Math.max(dbLt, sheetLtRevenue, ALL_TIME.lt),
       htCash, htAds, htOrg,
@@ -2372,8 +2378,11 @@ function computeMetrics(period) {
     : [];
   const showsBC    = pBookedCalls.filter(b=>b.status==='showed').length;
   const noshowsBC  = pBookedCalls.filter(b=>b.status==='no_show').length;
-  const shows  = Math.max(showsLog, showsCO, showsBC);
-  const noshows= Math.max(noshowsLog, noshowsCO, noshowsBC);
+  // FIX: clamp shows + noshows so they can never exceed booked calls in this period
+  const showsRaw   = Math.max(showsLog, showsCO, showsBC);
+  const noshowsRaw = Math.max(noshowsLog, noshowsCO, noshowsBC);
+  const shows   = Math.min(showsRaw, booked);
+  const noshows = Math.min(noshowsRaw, Math.max(0, booked - shows));
   const closes = pLog.reduce((s,l)=>s+(l.closes||0),0);
   const ltFromLog = pLog.reduce((s,l)=>s+(l.lt||0),0);
   const ltFromSheetPeriod = getLTForPeriod(period);
