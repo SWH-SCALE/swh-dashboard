@@ -1,5 +1,5 @@
 // /api/hyros-sync.js
-// Minimal probe — hits Hyros endpoints to verify auth + base URL
+// Auth header probe — tries multiple header formats on /leads
 const HYROS_BASE = 'https://api.hyros.com/v1/api/v1.0';
 const HYROS_API_KEY = process.env.HYROS_API_KEY;
 
@@ -8,28 +8,33 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'HYROS_API_KEY not set' });
   }
 
-  const tests = [
-    { name: 'leads',         url: `${HYROS_BASE}/leads?pageSize=1` },
-    { name: 'subscriptions', url: `${HYROS_BASE}/subscriptions?pageSize=1` },
-    { name: 'sales',         url: `${HYROS_BASE}/sales?pageSize=1` },
-    { name: 'calls',         url: `${HYROS_BASE}/calls?pageSize=1` },
+  const url = `${HYROS_BASE}/leads?pageSize=1`;
+
+  const authVariants = [
+    { name: 'API-Key',              headers: { 'API-Key': HYROS_API_KEY } },
+    { name: 'Api-Key',              headers: { 'Api-Key': HYROS_API_KEY } },
+    { name: 'X-API-Key',            headers: { 'X-API-Key': HYROS_API_KEY } },
+    { name: 'Authorization-Bearer', headers: { 'Authorization': `Bearer ${HYROS_API_KEY}` } },
+    { name: 'Authorization-raw',    headers: { 'Authorization': HYROS_API_KEY } },
+    { name: 'api_key-query',        headers: {}, qs: `&api_key=${encodeURIComponent(HYROS_API_KEY)}` },
   ];
 
   const results = {};
-  for (const t of tests) {
+  for (const v of authVariants) {
     try {
-      const r = await fetch(t.url, {
-        headers: { 'API-Key': HYROS_API_KEY }
-      });
+      const fullUrl = v.qs ? url + v.qs : url;
+      const r = await fetch(fullUrl, { headers: v.headers });
       const text = await r.text();
-      results[t.name] = {
-        status: r.status,
-        body: text.slice(0, 400)
-      };
+      results[v.name] = { status: r.status, body: text.slice(0, 300) };
     } catch (e) {
-      results[t.name] = { error: e.message };
+      results[v.name] = { error: e.message };
     }
   }
 
-  return res.status(200).json({ base: HYROS_BASE, results });
+  return res.status(200).json({
+    base: HYROS_BASE,
+    key_length: HYROS_API_KEY.length,
+    key_prefix: HYROS_API_KEY.slice(0, 8),
+    results
+  });
 }
