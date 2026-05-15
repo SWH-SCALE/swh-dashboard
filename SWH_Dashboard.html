@@ -1189,6 +1189,7 @@ select.input-field option { background: var(--bg2); }
             <th>Closer</th>
             <th>Source</th>
             <th>Booked</th>
+            <th style="width:50px"></th>
           </tr>
         </thead>
         <tbody id="bc-upcoming-tbody"></tbody>
@@ -1207,8 +1208,9 @@ select.input-field option { background: var(--bg2); }
             <th>Name</th>
             <th>Email</th>
             <th>Closer</th>
-            <th>Status</th>
+            <th>Stage</th>
             <th>Booked</th>
+            <th style="width:50px"></th>
           </tr>
         </thead>
         <tbody id="bc-past-tbody"></tbody>
@@ -2250,6 +2252,9 @@ function computeMetrics(period) {
     // Closer-logged shows/noshows from call_outcomes table
     const coShows   = (typeof CALL_OUTCOMES !== 'undefined' && CALL_OUTCOMES) ? CALL_OUTCOMES.filter(c=>c.showed==='showed').length : 0;
     const coNoshows = (typeof CALL_OUTCOMES !== 'undefined' && CALL_OUTCOMES) ? CALL_OUTCOMES.filter(c=>c.showed==='noshow').length : 0;
+    // Calendly/GHL-driven shows/noshows from booked_calls.status (now source of truth via GHL sync)
+    const bcShows   = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS) ? BOOKED_CALLS.filter(b=>b.status==='showed').length : 0;
+    const bcNoshows = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS) ? BOOKED_CALLS.filter(b=>b.status==='no_show').length : 0;
     const dbCloses = DB_LOG.reduce((s,l)=>s+(l.closes||0),0);
     const dbLt     = DB_LOG.reduce((s,l)=>s+(l.lt||0),0);
     // Use live sheet count for LT if available
@@ -2260,8 +2265,8 @@ function computeMetrics(period) {
       Math.max(dbSpend,  ALL_TIME.spend),
       Math.max(dbLeads, sheetLeads, fuTotal, ALL_TIME.leads),
       bookedAuthoritative,
-      Math.max(dbShows,  coShows,   ALL_TIME.shows),
-      Math.max(dbNoshows,coNoshows, ALL_TIME.noshows),
+      Math.max(dbShows,  coShows,   bcShows,   ALL_TIME.shows),
+      Math.max(dbNoshows,coNoshows, bcNoshows, ALL_TIME.noshows),
       Math.max(dbCloses, ALL_TIME.closes),
       Math.max(dbLt, sheetLtRevenue, ALL_TIME.lt),
       htCash, htAds, htOrg,
@@ -2304,14 +2309,23 @@ function computeMetrics(period) {
     : 0;
   const hasAnyCalendly = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS && BOOKED_CALLS.length > 0);
   const booked = hasAnyCalendly ? bookedFromCalendly : bookedFromLog;
-  // Shows/noshows: prefer larger of daily_log entries OR call_outcomes (closer-logged) entries
+  // Shows/noshows: prefer the largest of daily_log, call_outcomes (legacy), or booked_calls.status (GHL-driven, new source of truth)
   const showsLog   = pLog.reduce((s,l)=>s+(l.shows||0),0);
   const noshowsLog = pLog.reduce((s,l)=>s+(l.noshows||0),0);
   const pCallOut   = (typeof CALL_OUTCOMES !== 'undefined' && CALL_OUTCOMES) ? CALL_OUTCOMES.filter(c=>inPeriod(c.date)) : [];
   const showsCO    = pCallOut.filter(c=>c.showed==='showed').length;
   const noshowsCO  = pCallOut.filter(c=>c.showed==='noshow').length;
-  const shows  = Math.max(showsLog, showsCO);
-  const noshows= Math.max(noshowsLog, noshowsCO);
+  // Booked calls in this period whose status reflects show/no-show outcomes
+  const pBookedCalls = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
+    ? BOOKED_CALLS.filter(b => {
+        const when = b.scheduled_at ? b.scheduled_at.split('T')[0] : null;
+        return when && inPeriod(when);
+      })
+    : [];
+  const showsBC    = pBookedCalls.filter(b=>b.status==='showed').length;
+  const noshowsBC  = pBookedCalls.filter(b=>b.status==='no_show').length;
+  const shows  = Math.max(showsLog, showsCO, showsBC);
+  const noshows= Math.max(noshowsLog, noshowsCO, noshowsBC);
   const closes = pLog.reduce((s,l)=>s+(l.closes||0),0);
   const ltFromLog = pLog.reduce((s,l)=>s+(l.lt||0),0);
   const ltFromSheetPeriod = getLTForPeriod(period);
@@ -4418,9 +4432,10 @@ function renderBookedCalls() {
             <td>${closerPill}</td>
             <td><span class="pill" style="background:var(--blued);color:var(--blue)">${c.source || 'Calendly'}</span></td>
             <td style="color:var(--t3);font-size:11px">${fmtBookedAt(c.booked_at)}</td>
+            <td><button onclick="deleteBookedCall('${c.id}','${(c.name||'this call').replace(/'/g,"\\'")}')" title="Delete this call" style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer">×</button></td>
           </tr>`;
         }).join('')
-      : '<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:24px">No upcoming calls — bookings will appear here automatically</td></tr>';
+      : '<tr><td colspan="8" style="text-align:center;color:var(--t3);padding:24px">No upcoming calls — bookings will appear here automatically</td></tr>';
   }
 
   // Past table
@@ -4432,27 +4447,70 @@ function renderBookedCalls() {
           const closerPill = c.closer
             ? `<span class="pill ${(c.closer||'').toLowerCase()}">${c.closer}</span>`
             : `<span class="pill" style="background:var(--bg4);color:var(--t3)">—</span>`;
+          // GHL pipeline stage pill — color-coded by outcome
+          // Falls back to status if no GHL stage yet (e.g. closer hasn't updated GHL)
+          const stage = (c.ghl_pipeline_stage || '').trim();
           const status = (c.status || 'scheduled');
-          const statusColor = status === 'cancelled' ? 'var(--red)'
-            : status === 'no_show' ? 'var(--amber)'
-            : status === 'showed' ? 'var(--accent)'
-            : 'var(--t2)';
-          const statusLabel = status === 'cancelled' ? '❌ Cancelled'
-            : status === 'no_show' ? '⛔ No Show'
-            : status === 'showed' ? '✅ Showed'
-            : status === 'rescheduled' ? '🔄 Rescheduled'
-            : '⏱ Scheduled';
+          let stageLabel, stageBg, stageColor;
+          if (stage) {
+            // Color by stage semantics
+            const s = stage.toLowerCase();
+            if (s.includes('closed - won') || s === 'deposit') {
+              stageBg = 'var(--accentd)'; stageColor = 'var(--accent)';
+            } else if (s === 'call completed' || s.includes('offered')) {
+              stageBg = 'var(--blued)'; stageColor = 'var(--blue)';
+            } else if (s === 'no show') {
+              stageBg = 'rgba(255,159,67,0.15)'; stageColor = 'var(--amber)';
+            } else if (s === 'cancelled' || s.includes('deal lost')) {
+              stageBg = 'rgba(255,107,107,0.15)'; stageColor = 'var(--red)';
+            } else {
+              stageBg = 'var(--bg4)'; stageColor = 'var(--t2)';
+            }
+            stageLabel = stage;
+          } else {
+            // Fallback: legacy status if GHL hasn't updated yet
+            stageLabel = status === 'cancelled' ? 'Cancelled'
+              : status === 'no_show' ? 'No Show'
+              : status === 'showed' ? 'Showed'
+              : status === 'rescheduled' ? 'Rescheduled'
+              : 'Awaiting update';
+            stageBg = 'var(--bg4)'; stageColor = 'var(--t3)';
+          }
           return `<tr>
             <td style="font-family:var(--font-mono);color:var(--t2)">${fmtBookedWhen(c.scheduled_at)}</td>
             <td style="font-weight:700">${c.name || '—'}</td>
             <td style="color:var(--t2);font-size:11px">${c.email || '—'}</td>
             <td>${closerPill}</td>
-            <td style="color:${statusColor};font-weight:600;font-size:11px">${statusLabel}</td>
+            <td><span class="pill" style="background:${stageBg};color:${stageColor};font-size:10px">${stageLabel}</span></td>
             <td style="color:var(--t3);font-size:11px">${fmtBookedAt(c.booked_at)}</td>
+            <td><button onclick="deleteBookedCall('${c.id}','${(c.name||'this call').replace(/'/g,"\\'")}')" title="Delete this call" style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer">×</button></td>
           </tr>`;
         }).join('')
-        + (past.length > 50 ? `<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:14px;font-size:11px">+ ${past.length - 50} older bookings not shown</td></tr>` : '')
-      : '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:24px">No past calls yet</td></tr>';
+        + (past.length > 50 ? `<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:14px;font-size:11px">+ ${past.length - 50} older bookings not shown</td></tr>` : '')
+      : '<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:24px">No past calls yet</td></tr>';
+  }
+}
+
+// Delete a booked call row from Supabase + refresh views
+async function deleteBookedCall(id, name) {
+  if (!id) return;
+  if (!confirm(`Delete the booked call for ${name}?\n\nThis removes the row from Supabase and cannot be undone.`)) return;
+  try {
+    await deleteRow('booked_calls', id);
+    BOOKED_CALLS = await getBookedCalls();
+    renderBookedCalls();
+    renderAll(); // updates Executive dashboard counts too
+    if (typeof toast !== 'undefined') {
+      toast.textContent = 'Call deleted';
+      toast.style.background = 'var(--redd)';
+      toast.style.color = 'var(--red)';
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateY(0)';
+      setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(10px)'; }, 2000);
+    }
+  } catch (e) {
+    alert('Delete failed: ' + e.message);
+    console.error('deleteBookedCall failed:', e);
   }
 }
 
