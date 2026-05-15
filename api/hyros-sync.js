@@ -1,5 +1,5 @@
 // /api/hyros-sync.js
-// Auth header probe — tries multiple header formats on /leads
+// Inspect 401 response headers — Hyros should tell us the auth scheme via WWW-Authenticate
 const HYROS_BASE = 'https://api.hyros.com/v1/api/v1.0';
 const HYROS_API_KEY = process.env.HYROS_API_KEY;
 
@@ -10,31 +10,28 @@ export default async function handler(req, res) {
 
   const url = `${HYROS_BASE}/leads?pageSize=1`;
 
-  const authVariants = [
-    { name: 'API-Key',              headers: { 'API-Key': HYROS_API_KEY } },
-    { name: 'Api-Key',              headers: { 'Api-Key': HYROS_API_KEY } },
-    { name: 'X-API-Key',            headers: { 'X-API-Key': HYROS_API_KEY } },
-    { name: 'Authorization-Bearer', headers: { 'Authorization': `Bearer ${HYROS_API_KEY}` } },
-    { name: 'Authorization-raw',    headers: { 'Authorization': HYROS_API_KEY } },
-    { name: 'api_key-query',        headers: {}, qs: `&api_key=${encodeURIComponent(HYROS_API_KEY)}` },
-  ];
+  // Hit with no auth at all — server should tell us what it wants
+  const noAuth = await fetch(url);
+  const noAuthHeaders = {};
+  noAuth.headers.forEach((v, k) => { noAuthHeaders[k] = v; });
 
-  const results = {};
-  for (const v of authVariants) {
-    try {
-      const fullUrl = v.qs ? url + v.qs : url;
-      const r = await fetch(fullUrl, { headers: v.headers });
-      const text = await r.text();
-      results[v.name] = { status: r.status, body: text.slice(0, 300) };
-    } catch (e) {
-      results[v.name] = { error: e.message };
-    }
-  }
+  // Hit with API-Key — capture response headers + body
+  const withAuth = await fetch(url, { headers: { 'API-Key': HYROS_API_KEY } });
+  const withAuthHeaders = {};
+  withAuth.headers.forEach((v, k) => { withAuthHeaders[k] = v; });
+  const withAuthBody = await withAuth.text();
 
   return res.status(200).json({
     base: HYROS_BASE,
-    key_length: HYROS_API_KEY.length,
     key_prefix: HYROS_API_KEY.slice(0, 8),
-    results
+    no_auth: {
+      status: noAuth.status,
+      headers: noAuthHeaders,
+    },
+    with_api_key_header: {
+      status: withAuth.status,
+      headers: withAuthHeaders,
+      body: withAuthBody.slice(0, 500),
+    },
   });
 }
