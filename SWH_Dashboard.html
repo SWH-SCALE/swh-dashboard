@@ -812,6 +812,14 @@ select.input-field option { background: var(--bg2); }
     </svg>
     Call Tracking
   </div>
+  <div class="nav-item" onclick="switchTab('booked-calls', this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <rect x="2" y="3" width="12" height="11" rx="1.5"/>
+      <path d="M2 6h12M5 1.5v3M11 1.5v3"/>
+      <circle cx="8" cy="10" r="1" fill="currentColor" stroke="none"/>
+    </svg>
+    Booked Calls
+  </div>
   <div class="nav-item" onclick="switchTab('sales', this)">
     <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
       <path d="M2 11l3-3 2.5 2.5L11 6l3 3"/><path d="M1 14h14"/>
@@ -1123,6 +1131,88 @@ select.input-field option { background: var(--bg2); }
   <div class="chart-card">
     <div class="chart-wrap" style="height:200px">
       <canvas id="chart-calls-trend" role="img" aria-label="7-day booked calls by source"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TAB: BOOKED CALLS (from Calendly)
+══════════════════════════════════════ -->
+<div id="tab-booked-calls" class="tab-view">
+  <div class="section-label">Calendly bookings · live</div>
+  <div class="kpi-tier kpi-tier-4">
+    <div class="kpi-card accent">
+      <div class="kpi-label">Upcoming Calls</div>
+      <div class="kpi-value" id="bc-upcoming">0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">scheduled, not cancelled</span></div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Past Calls</div>
+      <div class="kpi-value" id="bc-past">0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">all-time, ex-cancelled</span></div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Frankie</div>
+      <div class="kpi-value" id="bc-frankie">0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="bc-frankie-sub">upcoming</span></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Mehdi</div>
+      <div class="kpi-value" id="bc-mehdi">0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="bc-mehdi-sub">upcoming</span></div>
+    </div>
+  </div>
+
+  <!-- ─── Closer filter ─── -->
+  <div style="display:flex;gap:8px;margin:16px 0 10px;align-items:center">
+    <div class="section-label" style="margin:0;flex:0 0 auto">View</div>
+    <div class="period-switcher" id="bc-filter-switcher" style="margin-left:8px">
+      <button class="period-btn active" onclick="setBookedFilter('all',this)">Both Closers</button>
+      <button class="period-btn" onclick="setBookedFilter('Frankie',this)">Frankie</button>
+      <button class="period-btn" onclick="setBookedFilter('Mehdi',this)">Mehdi</button>
+      <button class="period-btn" onclick="setBookedFilter('unassigned',this)">Unassigned</button>
+    </div>
+    <button onclick="refreshBookedCalls()" style="margin-left:auto;background:var(--accentd);color:var(--accent);border:1px solid rgba(0,245,168,0.2);border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;font-family:var(--font-mono);cursor:pointer">↻ Refresh</button>
+  </div>
+
+  <!-- ─── Upcoming section ─── -->
+  <div class="section-label">Upcoming · scheduled for today or later</div>
+  <div class="chart-card" style="margin-bottom:18px">
+    <div class="deals-table-wrap">
+      <table class="deals-table" id="bc-upcoming-table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Closer</th>
+            <th>Source</th>
+            <th>Booked</th>
+          </tr>
+        </thead>
+        <tbody id="bc-upcoming-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ─── Past section ─── -->
+  <div class="section-label">Past · already happened or cancelled</div>
+  <div class="chart-card">
+    <div class="deals-table-wrap">
+      <table class="deals-table" id="bc-past-table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Closer</th>
+            <th>Status</th>
+            <th>Booked</th>
+          </tr>
+        </thead>
+        <tbody id="bc-past-tbody"></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -2083,6 +2173,7 @@ const PAGE_TITLES = {
   'followup':     ['Follow-Up Tracker',  'Track all leads · pipeline stages · conversion rates'],
   deals:     ['Add New Deal',          'Log a closed deal · updates all metrics live'],
   slack:     ['Daily Report',          'Full breakdown · spend · revenue · funnel · closers'],
+  'booked-calls': ['Booked Calls',     'Live Calendly bookings · upcoming + past · by closer'],
   settings:  ['Settings',              'Targets · rates · thresholds'],
 };
 
@@ -2104,6 +2195,7 @@ function switchTab(id,el) {
   if(id==='edit-log')      renderEditLog();
   if(id==='call-outcomes') renderCallOutcomes();
   if(id==='followup')      renderFollowUpTracker();
+  if(id==='booked-calls')  renderBookedCalls();
   if(id==='slack')      { renderSlack(computeMetrics(currentPeriod)); renderDailyReport(); }
 }
 
@@ -2148,6 +2240,11 @@ function computeMetrics(period) {
     // Authoritative all-time lead count: unique people in followup_leads (deduped at DB level)
     const fuTotal = (typeof FU_LEADS !== 'undefined' && FU_LEADS) ? FU_LEADS.length : 0;
     const dbBooked = DB_LOG.reduce((s,l)=>s+(l.booked||0),0);
+    // Calendly is now source of truth for Booked Calls (excludes cancelled)
+    const bcCount = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
+      ? BOOKED_CALLS.filter(b => (b.status||'') !== 'cancelled').length
+      : 0;
+    const bookedAuthoritative = bcCount > 0 ? bcCount : Math.max(dbBooked, ALL_TIME.booked);
     const dbShows  = DB_LOG.reduce((s,l)=>s+(l.shows||0),0);
     const dbNoshows= DB_LOG.reduce((s,l)=>s+(l.noshows||0),0);
     // Closer-logged shows/noshows from call_outcomes table
@@ -2162,7 +2259,7 @@ function computeMetrics(period) {
     return buildMetrics(
       Math.max(dbSpend,  ALL_TIME.spend),
       Math.max(dbLeads, sheetLeads, fuTotal, ALL_TIME.leads),
-      Math.max(dbBooked, ALL_TIME.booked),
+      bookedAuthoritative,
       Math.max(dbShows,  coShows,   ALL_TIME.shows),
       Math.max(dbNoshows,coNoshows, ALL_TIME.noshows),
       Math.max(dbCloses, ALL_TIME.closes),
@@ -2195,7 +2292,18 @@ function computeMetrics(period) {
 
   const spend  = pLog.reduce((s,l)=>s+(l.spend||0),0);
   const leadsRaw = pLog.reduce((s,l)=>s+(l.leads||0),0);
-  const booked = pLog.reduce((s,l)=>s+(l.booked||0),0);
+  // Booked Calls — Calendly is source of truth; count rows where scheduled_at falls in period
+  // and status is NOT cancelled. Fallback to daily_log only if BOOKED_CALLS has no rows at all.
+  const bookedFromLog = pLog.reduce((s,l)=>s+(l.booked||0),0);
+  const bookedFromCalendly = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
+    ? BOOKED_CALLS.filter(b => {
+        if ((b.status||'') === 'cancelled') return false;
+        const when = b.scheduled_at ? b.scheduled_at.split('T')[0] : null;
+        return when && inPeriod(when);
+      }).length
+    : 0;
+  const hasAnyCalendly = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS && BOOKED_CALLS.length > 0);
+  const booked = hasAnyCalendly ? bookedFromCalendly : bookedFromLog;
   // Shows/noshows: prefer larger of daily_log entries OR call_outcomes (closer-logged) entries
   const showsLog   = pLog.reduce((s,l)=>s+(l.shows||0),0);
   const noshowsLog = pLog.reduce((s,l)=>s+(l.noshows||0),0);
@@ -2659,6 +2767,8 @@ async function loadAndRender() {
   showLoading(true);
   try {
     [DB_DEALS, DB_LOG, CALL_OUTCOMES, FU_LEADS] = await Promise.all([getDeals(), getLog(), syncLTFromSheets().then(()=>Promise.resolve([])), getCallOutcomes(), syncLeadsFromSheets().then(()=>Promise.resolve([])), getFollowUpLeads()]);
+    // Fetch Calendly booked calls (separate await so a failure here doesn't break the dashboard)
+    try { BOOKED_CALLS = await getBookedCalls(); } catch(e) { console.warn('booked_calls load failed:', e.message); BOOKED_CALLS = []; }
     // Background: pull any new leads from Sheets into followup_leads
     // Don't block initial render — kick off after, then refresh tracker silently
     syncSheetsToFollowUpTracker({ silent: true }).catch(()=>{});
@@ -4210,6 +4320,143 @@ async function deleteFuLead(id) {
 }
 
 // ═══════════════════════════════════════════
+// BOOKED CALLS (Calendly) — source of truth for Booked Calls KPI
+// ═══════════════════════════════════════════
+let BOOKED_CALLS = [];
+let bookedFilter = 'all'; // 'all' | 'Frankie' | 'Mehdi' | 'unassigned'
+
+async function getBookedCalls() {
+  try {
+    // Fetch all; sorted soonest-upcoming-last on server, but we re-sort client-side anyway
+    return await sbFetch('booked_calls?order=scheduled_at.asc');
+  } catch(e) {
+    console.log('booked_calls table not ready:', e.message);
+    return [];
+  }
+}
+
+async function refreshBookedCalls() {
+  try {
+    BOOKED_CALLS = await getBookedCalls();
+    renderBookedCalls();
+    renderAll();
+    showToast('✓ Booked calls refreshed');
+  } catch(e) {
+    showToast('Refresh failed: ' + e.message, 'error');
+  }
+}
+
+function setBookedFilter(f, btn) {
+  bookedFilter = f;
+  document.querySelectorAll('#bc-filter-switcher .period-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderBookedCalls();
+}
+
+function fmtBookedWhen(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+    + ' · ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtBookedAt(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function renderBookedCalls() {
+  // Filter by closer
+  let calls = [...(BOOKED_CALLS||[])];
+  if (bookedFilter === 'Frankie' || bookedFilter === 'Mehdi') {
+    calls = calls.filter(c => (c.closer||'') === bookedFilter);
+  } else if (bookedFilter === 'unassigned') {
+    calls = calls.filter(c => !c.closer || c.closer === '');
+  }
+
+  // Split upcoming vs past based on scheduled_at
+  const now = new Date();
+  const upcoming = calls.filter(c => {
+    if ((c.status||'') === 'cancelled') return false;
+    if (!c.scheduled_at) return false;
+    return new Date(c.scheduled_at) >= now;
+  }).sort((a,b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+
+  const past = calls.filter(c => {
+    if (!c.scheduled_at) return true; // no time = treat as past
+    return new Date(c.scheduled_at) < now || (c.status||'') === 'cancelled';
+  }).sort((a,b) => new Date(b.scheduled_at) - new Date(a.scheduled_at));
+
+  // Top KPIs — always reflect ALL calls (ignoring filter) so the headline numbers are stable
+  const allUpcoming = (BOOKED_CALLS||[]).filter(c => (c.status||'') !== 'cancelled' && c.scheduled_at && new Date(c.scheduled_at) >= now);
+  const allPast = (BOOKED_CALLS||[]).filter(c => (c.status||'') !== 'cancelled' && c.scheduled_at && new Date(c.scheduled_at) < now);
+  set('bc-upcoming', allUpcoming.length);
+  set('bc-past', allPast.length);
+  const frankieUpcoming = allUpcoming.filter(c => c.closer === 'Frankie').length;
+  const mehdiUpcoming   = allUpcoming.filter(c => c.closer === 'Mehdi').length;
+  set('bc-frankie', frankieUpcoming);
+  set('bc-mehdi', mehdiUpcoming);
+  set('bc-frankie-sub', frankieUpcoming === 1 ? 'upcoming call' : 'upcoming calls');
+  set('bc-mehdi-sub',   mehdiUpcoming === 1 ? 'upcoming call' : 'upcoming calls');
+
+  // Upcoming table
+  const upBody = document.getElementById('bc-upcoming-tbody');
+  if (upBody) {
+    upBody.innerHTML = upcoming.length
+      ? upcoming.map(c => {
+          const closerPill = c.closer
+            ? `<span class="pill ${(c.closer||'').toLowerCase()}">${c.closer}</span>`
+            : `<span class="pill" style="background:var(--bg4);color:var(--t3)">—</span>`;
+          return `<tr>
+            <td style="font-family:var(--font-mono);color:var(--accent);font-weight:700">${fmtBookedWhen(c.scheduled_at)}</td>
+            <td style="font-weight:700">${c.name || '—'}</td>
+            <td style="color:var(--t2);font-size:11px">${c.email || '—'}</td>
+            <td style="font-family:var(--font-mono);font-size:11px">${c.phone || '—'}</td>
+            <td>${closerPill}</td>
+            <td><span class="pill" style="background:var(--blued);color:var(--blue)">${c.source || 'Calendly'}</span></td>
+            <td style="color:var(--t3);font-size:11px">${fmtBookedAt(c.booked_at)}</td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:24px">No upcoming calls — bookings will appear here automatically</td></tr>';
+  }
+
+  // Past table
+  const pastBody = document.getElementById('bc-past-tbody');
+  if (pastBody) {
+    const visiblePast = past.slice(0, 50); // cap to 50 most recent so the page stays fast
+    pastBody.innerHTML = visiblePast.length
+      ? visiblePast.map(c => {
+          const closerPill = c.closer
+            ? `<span class="pill ${(c.closer||'').toLowerCase()}">${c.closer}</span>`
+            : `<span class="pill" style="background:var(--bg4);color:var(--t3)">—</span>`;
+          const status = (c.status || 'scheduled');
+          const statusColor = status === 'cancelled' ? 'var(--red)'
+            : status === 'no_show' ? 'var(--amber)'
+            : status === 'showed' ? 'var(--accent)'
+            : 'var(--t2)';
+          const statusLabel = status === 'cancelled' ? '❌ Cancelled'
+            : status === 'no_show' ? '⛔ No Show'
+            : status === 'showed' ? '✅ Showed'
+            : status === 'rescheduled' ? '🔄 Rescheduled'
+            : '⏱ Scheduled';
+          return `<tr>
+            <td style="font-family:var(--font-mono);color:var(--t2)">${fmtBookedWhen(c.scheduled_at)}</td>
+            <td style="font-weight:700">${c.name || '—'}</td>
+            <td style="color:var(--t2);font-size:11px">${c.email || '—'}</td>
+            <td>${closerPill}</td>
+            <td style="color:${statusColor};font-weight:600;font-size:11px">${statusLabel}</td>
+            <td style="color:var(--t3);font-size:11px">${fmtBookedAt(c.booked_at)}</td>
+          </tr>`;
+        }).join('')
+        + (past.length > 50 ? `<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:14px;font-size:11px">+ ${past.length - 50} older bookings not shown</td></tr>` : '')
+      : '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:24px">No past calls yet</td></tr>';
+  }
+}
+
+// ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
 document.getElementById('inp-date').valueAsDate=new Date();
@@ -4247,9 +4494,11 @@ async function autoSync() {
       (async () => { DB_LOG = await getLog(); })(),
       (async () => { CALL_OUTCOMES = await getCallOutcomes(); })(),
       (async () => { FU_LEADS = await getFollowUpLeads(); })(),
+      (async () => { try { BOOKED_CALLS = await getBookedCalls(); } catch(e) { /* ignore */ } })(),
     ]);
     renderAll();
     if (typeof renderFollowUpTracker === 'function') renderFollowUpTracker();
+    if (typeof renderBookedCalls === 'function') renderBookedCalls();
     showLoading(false); // updates the "Updated: HH:MM" stamp
     console.log('Auto-sync complete at', new Date().toLocaleTimeString());
   } catch(e) {
