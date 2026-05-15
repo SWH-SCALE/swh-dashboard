@@ -1,6 +1,6 @@
 // /api/hyros-sync.js
-// Minimal probe — hits the known-good /subscriptions endpoint to verify auth
-const HYROS_BASE = 'https://api.hyros.com/api/v1.0';
+// Minimal probe — hits Hyros endpoints to verify auth + base URL
+const HYROS_BASE = 'https://api.hyros.com/v1/api/v1.0';
 const HYROS_API_KEY = process.env.HYROS_API_KEY;
 
 export default async function handler(req, res) {
@@ -9,8 +9,8 @@ export default async function handler(req, res) {
   }
 
   const tests = [
-    { name: 'subscriptions', url: `${HYROS_BASE}/subscriptions?pageSize=1` },
     { name: 'leads',         url: `${HYROS_BASE}/leads?pageSize=1` },
+    { name: 'subscriptions', url: `${HYROS_BASE}/subscriptions?pageSize=1` },
     { name: 'sales',         url: `${HYROS_BASE}/sales?pageSize=1` },
     { name: 'calls',         url: `${HYROS_BASE}/calls?pageSize=1` },
   ];
