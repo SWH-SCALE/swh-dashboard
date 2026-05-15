@@ -2012,6 +2012,54 @@ select.input-field option { background: var(--bg2); }
     </div>
   </div>
 
+  <!-- ─── Booked Call edit modal ─── -->
+  <div id="bc-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:24px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-size:14px;font-weight:700;color:var(--t1)">Edit Booked Call</div>
+        <button onclick="closeBcModal()" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px">×</button>
+      </div>
+      <div class="input-grid">
+        <div class="input-group"><div class="input-label">Name</div><input class="input-field" type="text" id="bc-edit-name"></div>
+        <div class="input-group"><div class="input-label">Email</div><input class="input-field" type="text" id="bc-edit-email"></div>
+        <div class="input-group"><div class="input-label">Phone</div><input class="input-field" type="text" id="bc-edit-phone"></div>
+        <div class="input-group"><div class="input-label">Scheduled At</div><input class="input-field" type="datetime-local" id="bc-edit-scheduled"></div>
+        <div class="input-group"><div class="input-label">Closer</div>
+          <select class="input-field" id="bc-edit-closer">
+            <option value="">Unassigned</option><option>Frankie</option><option>Mehdi</option>
+          </select>
+        </div>
+        <div class="input-group"><div class="input-label">Status</div>
+          <select class="input-field" id="bc-edit-status">
+            <option value="scheduled">Scheduled</option>
+            <option value="showed">Showed</option>
+            <option value="no_show">No Show</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="rescheduled">Rescheduled</option>
+          </select>
+        </div>
+        <div class="input-group"><div class="input-label">Outcome</div>
+          <select class="input-field" id="bc-edit-outcome">
+            <option value="">—</option>
+            <option value="closed">Closed</option>
+            <option value="followup">Follow-up</option>
+            <option value="lost">Lost</option>
+            <option value="noshow">No-show</option>
+            <option value="notqualified">Not Qualified</option>
+          </select>
+        </div>
+        <div class="input-group"><div class="input-label">Source</div><input class="input-field" type="text" id="bc-edit-source" placeholder="Calendly"></div>
+      </div>
+      <div class="input-group" style="margin-top:8px"><div class="input-label">GHL Pipeline Stage (read-only — auto-synced from GHL)</div>
+        <input class="input-field" type="text" id="bc-edit-ghl-stage" readonly style="opacity:0.7">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button id="bc-edit-save-btn" onclick="saveBcEdit()" class="submit-btn" style="margin-top:0">Save Changes →</button>
+        <button onclick="closeBcModal()" style="background:var(--bg4);color:var(--t2);border:1px solid var(--border2);border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:var(--font-display);cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
   </div><!-- /content -->
@@ -4432,7 +4480,10 @@ function renderBookedCalls() {
             <td>${closerPill}</td>
             <td><span class="pill" style="background:var(--blued);color:var(--blue)">${c.source || 'Calendly'}</span></td>
             <td style="color:var(--t3);font-size:11px">${fmtBookedAt(c.booked_at)}</td>
-            <td><button onclick="deleteBookedCall('${c.id}','${(c.name||'this call').replace(/'/g,"\\'")}')" title="Delete this call" style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer">×</button></td>
+            <td style="white-space:nowrap">
+              <button onclick="openBcEdit('${c.id}')" title="Edit this call" style="background:var(--blued);color:var(--blue);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;margin-right:4px">✎</button>
+              <button onclick="deleteBookedCall('${c.id}','${(c.name||'this call').replace(/'/g,"\\'")}')" title="Delete this call" style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer">×</button>
+            </td>
           </tr>`;
         }).join('')
       : '<tr><td colspan="8" style="text-align:center;color:var(--t3);padding:24px">No upcoming calls — bookings will appear here automatically</td></tr>';
@@ -4483,7 +4534,10 @@ function renderBookedCalls() {
             <td>${closerPill}</td>
             <td><span class="pill" style="background:${stageBg};color:${stageColor};font-size:10px">${stageLabel}</span></td>
             <td style="color:var(--t3);font-size:11px">${fmtBookedAt(c.booked_at)}</td>
-            <td><button onclick="deleteBookedCall('${c.id}','${(c.name||'this call').replace(/'/g,"\\'")}')" title="Delete this call" style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer">×</button></td>
+            <td style="white-space:nowrap">
+              <button onclick="openBcEdit('${c.id}')" title="Edit this call" style="background:var(--blued);color:var(--blue);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;margin-right:4px">✎</button>
+              <button onclick="deleteBookedCall('${c.id}','${(c.name||'this call').replace(/'/g,"\\'")}')" title="Delete this call" style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer">×</button>
+            </td>
           </tr>`;
         }).join('')
         + (past.length > 50 ? `<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:14px;font-size:11px">+ ${past.length - 50} older bookings not shown</td></tr>` : '')
@@ -4512,6 +4566,78 @@ async function deleteBookedCall(id, name) {
     alert('Delete failed: ' + e.message);
     console.error('deleteBookedCall failed:', e);
   }
+}
+
+// Edit a booked call — opens modal pre-filled with the row's data
+let bcEditingId = null;
+function openBcEdit(id) {
+  const c = (BOOKED_CALLS || []).find(b => b.id === id);
+  if (!c) { alert('Call not found'); return; }
+  bcEditingId = id;
+  document.getElementById('bc-edit-name').value      = c.name      || '';
+  document.getElementById('bc-edit-email').value     = c.email     || '';
+  document.getElementById('bc-edit-phone').value     = c.phone     || '';
+  // datetime-local needs YYYY-MM-DDTHH:MM format
+  if (c.scheduled_at) {
+    const d = new Date(c.scheduled_at);
+    const pad = n => String(n).padStart(2, '0');
+    document.getElementById('bc-edit-scheduled').value =
+      `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } else {
+    document.getElementById('bc-edit-scheduled').value = '';
+  }
+  document.getElementById('bc-edit-closer').value    = c.closer    || '';
+  document.getElementById('bc-edit-status').value    = c.status    || 'scheduled';
+  document.getElementById('bc-edit-outcome').value   = c.outcome   || '';
+  document.getElementById('bc-edit-source').value    = c.source    || 'Calendly';
+  document.getElementById('bc-edit-ghl-stage').value = c.ghl_pipeline_stage || '— not synced yet —';
+  document.getElementById('bc-edit-modal').style.display = 'flex';
+}
+
+function closeBcModal() {
+  bcEditingId = null;
+  document.getElementById('bc-edit-modal').style.display = 'none';
+}
+
+async function saveBcEdit() {
+  if (!bcEditingId) return;
+  const scheduledRaw = document.getElementById('bc-edit-scheduled').value;
+  const updated = {
+    name:     document.getElementById('bc-edit-name').value.trim()  || null,
+    email:    document.getElementById('bc-edit-email').value.trim() || null,
+    phone:    document.getElementById('bc-edit-phone').value.trim() || null,
+    scheduled_at: scheduledRaw ? new Date(scheduledRaw).toISOString() : null,
+    closer:   document.getElementById('bc-edit-closer').value       || null,
+    status:   document.getElementById('bc-edit-status').value       || null,
+    outcome:  document.getElementById('bc-edit-outcome').value      || null,
+    source:   document.getElementById('bc-edit-source').value.trim()|| null,
+    updated_at: new Date().toISOString(),
+  };
+  const btn = document.getElementById('bc-edit-save-btn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+  try {
+    await sbFetch('booked_calls?id=eq.' + bcEditingId, {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify(updated),
+    });
+    BOOKED_CALLS = await getBookedCalls();
+    renderBookedCalls();
+    renderAll(); // updates Executive dashboard counts
+    closeBcModal();
+    if (typeof toast !== 'undefined') {
+      toast.textContent = '✓ Call updated';
+      toast.style.background = 'var(--accentd)';
+      toast.style.color = 'var(--accent)';
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateY(0)';
+      setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(10px)'; }, 2000);
+    }
+  } catch (e) {
+    alert('Save failed: ' + e.message);
+    console.error('saveBcEdit failed:', e);
+  }
+  btn.textContent = 'Save Changes →'; btn.disabled = false;
 }
 
 // ═══════════════════════════════════════════
