@@ -1,5 +1,5 @@
 // /api/hyros-sync.js
-// Probe endpoints for sales, spend, and other data
+// Probe /attribution with date params + full sales field dump
 const HYROS_BASE = 'https://api.hyros.com/v1/api/v1.0';
 const HYROS_API_KEY = process.env.HYROS_API_KEY;
 
@@ -8,55 +8,52 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'HYROS_API_KEY not set' });
   }
 
-  // Probe a wide set of likely endpoints
-  const endpoints = [
-    'sales',
-    'orders',
-    'spend',
-    'ad-spend',
-    'adspend',
-    'attribution',
-    'attribution/sales',
-    'reports',
-    'reports/sales',
-    'reports/spend',
-    'reports/profit',
-    'analytics',
-    'campaigns',
-    'sources',
-    'traffic-sources',
-    'leads/info',
-    'calls',
-  ];
-
+  const H = { 'API-Key': HYROS_API_KEY };
   const results = {};
-  for (const ep of endpoints) {
-    const url = `${HYROS_BASE}/${ep}?pageSize=1`;
+
+  // Date range: last 30 days
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 30);
+  const fmt = d => d.toISOString().split('T')[0];
+  const sd = fmt(start), ed = fmt(end);
+
+  // Try /attribution with various date param name conventions
+  const attrVariants = [
+    `attribution?startDate=${sd}&endDate=${ed}`,
+    `attribution?startDate=${sd}T00:00:00Z&endDate=${ed}T23:59:59Z`,
+    `attribution?start_date=${sd}&end_date=${ed}`,
+    `attribution?fromDate=${sd}&toDate=${ed}`,
+    `attribution?from=${sd}&to=${ed}`,
+  ];
+  for (let i = 0; i < attrVariants.length; i++) {
     try {
-      const r = await fetch(url, { headers: { 'API-Key': HYROS_API_KEY } });
-      const text = await r.text();
-      results[ep] = {
+      const r = await fetch(`${HYROS_BASE}/${attrVariants[i]}`, { headers: H });
+      results['attribution_v' + (i+1)] = {
+        query: attrVariants[i],
         status: r.status,
-        // First 600 chars so we can see field names if it returned JSON
-        body: text.slice(0, 600),
+        body: (await r.text()).slice(0, 800),
       };
     } catch (e) {
-      results[ep] = { error: e.message };
+      results['attribution_v' + (i+1)] = { error: e.message };
     }
   }
 
-  // Also get a full leads sample so we can see field names there
+  // Full sales record — every field, so we can see if revenue/amount is in there
   try {
-    const r = await fetch(`${HYROS_BASE}/leads?pageSize=3`, {
-      headers: { 'API-Key': HYROS_API_KEY }
-    });
-    results['leads_sample'] = {
-      status: r.status,
-      body: (await r.text()).slice(0, 1500),
-    };
+    const r = await fetch(`${HYROS_BASE}/sales?pageSize=2`, { headers: H });
+    results['sales_full'] = { status: r.status, body: (await r.text()).slice(0, 2000) };
   } catch (e) {
-    results['leads_sample'] = { error: e.message };
+    results['sales_full'] = { error: e.message };
   }
 
-  return res.status(200).json({ base: HYROS_BASE, results });
+  // Single sale by detail — sometimes detail endpoint has more fields
+  try {
+    const r = await fetch(`${HYROS_BASE}/sales?pageSize=1&fields=price,amount,revenue,total`, { headers: H });
+    results['sales_fields'] = { status: r.status, body: (await r.text()).slice(0, 1000) };
+  } catch (e) {
+    results['sales_fields'] = { error: e.message };
+  }
+
+  return res.status(200).json({ dateRange: { sd, ed }, results });
 }
