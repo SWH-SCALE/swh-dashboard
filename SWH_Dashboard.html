@@ -920,6 +920,13 @@ select.input-field option { background: var(--bg2); }
 
     <div class="topbar-right">
       <div class="last-sync" id="last-sync">Last sync: just now</div>
+      <div class="sync-badge" id="meta-sync-badge" onclick="syncMeta()" title="Pull latest ad spend from Meta">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M1 5a4 4 0 0 1 7-2.6M9 5a4 4 0 0 1-7 2.6"/>
+          <path d="M7.5 2L8.5 2.4l-.4 1M2.5 8L1.5 7.6l.4-1"/>
+        </svg>
+        Sync Meta
+      </div>
       <div class="sync-badge" onclick="simulateSync()">
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M1 5a4 4 0 0 1 7-2.6M9 5a4 4 0 0 1-7 2.6"/>
@@ -2104,6 +2111,36 @@ async function getDeals() {
 async function getLog() {
   return await sbFetch('daily_log?order=date.desc');
 }
+// ── Meta ad spend (automated, from meta_spend table written by /api/meta-sync) ──
+async function getMetaSpend() {
+  try {
+    return await sbFetch('meta_spend?order=spend_date.desc');
+  } catch(e) {
+    console.log('meta_spend table not ready:', e.message);
+    return [];
+  }
+}
+// Sum Meta spend (USD) for a given dashboard period: 'all' | 'today' | '7d' | 'mtd' | 'lm'
+function getMetaSpendForPeriod(period) {
+  if (!META_SPEND || !META_SPEND.length) return 0;
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  function inP(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (period === 'today') {
+      // anchor to most recent date that has Meta spend
+      const sorted = META_SPEND.slice().sort((a,b)=>new Date(b.spend_date)-new Date(a.spend_date));
+      const mostRecent = sorted.length ? sorted[0].spend_date : todayStr;
+      return dateStr === mostRecent;
+    }
+    if (period === '7d')  { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
+    if (period === 'mtd') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
+    if (period === 'lm')  { const l=new Date(today); l.setMonth(l.getMonth()-1); return d.getFullYear()===l.getFullYear()&&d.getMonth()===l.getMonth(); }
+    return true; // all
+  }
+  return META_SPEND.filter(r => inP(r.spend_date)).reduce((s,r)=>s+(parseFloat(r.spend)||0),0);
+}
 async function insertDeal(deal) {
   return await sbFetch('deals', {
     method: 'POST',
@@ -2184,6 +2221,7 @@ let currentPeriod = 'all';
 let chartTrend=null, chartSource=null, chartCloser=null, chartCallsTrend=null;
 let DB_DEALS = [];
 let DB_LOG   = [];
+let META_SPEND = [];   // rows from meta_spend table: {spend_date, spend, ...} — automated Meta ad spend
 let loading  = false;
 
 // ═══════════════════════════════════════════
@@ -2314,9 +2352,12 @@ function computeMetrics(period) {
     const noshowsRawAT = Math.max(dbNoshows,coNoshows, bcNoshows, ALL_TIME.noshows);
     const showsClampedAT   = Math.min(showsRawAT, bookedAuthoritative);
     const noshowsClampedAT = Math.min(noshowsRawAT, Math.max(0, bookedAuthoritative - showsClampedAT));
+    // META SPEND: automated Meta ad spend is the source of truth when available; fall back to manual log/ALL_TIME
+    const metaSpendAll = getMetaSpendForPeriod('all');
+    const spendAuthoritative = metaSpendAll > 0 ? metaSpendAll : Math.max(dbSpend, ALL_TIME.spend);
     // Use DB values if they exist and are bigger, otherwise use ALL_TIME verified totals
     return buildMetrics(
-      Math.max(dbSpend,  ALL_TIME.spend),
+      spendAuthoritative,
       Math.max(dbLeads, sheetLeads, fuTotal, ALL_TIME.leads),
       bookedAuthoritative,
       showsClampedAT,
@@ -2349,7 +2390,10 @@ function computeMetrics(period) {
   const pLog   = log.filter(l=>inPeriod(l.date));
   const pDeals = deals.filter(d=>inPeriod(d.date)&&d.usd>0);
 
-  const spend  = pLog.reduce((s,l)=>s+(l.spend||0),0);
+  // META SPEND: use automated Meta spend for this period when available; fall back to manual daily_log
+  const spendFromLog = pLog.reduce((s,l)=>s+(l.spend||0),0);
+  const spendFromMeta = getMetaSpendForPeriod(period);
+  const spend  = spendFromMeta > 0 ? spendFromMeta : spendFromLog;
   const leadsRaw = pLog.reduce((s,l)=>s+(l.leads||0),0);
   // Booked Calls — Calendly is source of truth; count rows where scheduled_at falls in period
   // and status is NOT cancelled. Fallback to daily_log only if BOOKED_CALLS has no rows at all.
@@ -2840,6 +2884,8 @@ async function loadAndRender() {
     [DB_DEALS, DB_LOG, CALL_OUTCOMES, FU_LEADS] = await Promise.all([getDeals(), getLog(), syncLTFromSheets().then(()=>Promise.resolve([])), getCallOutcomes(), syncLeadsFromSheets().then(()=>Promise.resolve([])), getFollowUpLeads()]);
     // Fetch Calendly booked calls (separate await so a failure here doesn't break the dashboard)
     try { BOOKED_CALLS = await getBookedCalls(); } catch(e) { console.warn('booked_calls load failed:', e.message); BOOKED_CALLS = []; }
+    // Fetch automated Meta ad spend (separate await — a failure here must not break the dashboard)
+    try { META_SPEND = await getMetaSpend(); } catch(e) { console.warn('meta_spend load failed:', e.message); META_SPEND = []; }
     // Background: pull any new leads from Sheets into followup_leads
     // Don't block initial render — kick off after, then refresh tracker silently
     syncSheetsToFollowUpTracker({ silent: true }).catch(()=>{});
@@ -3412,6 +3458,31 @@ async function simulateSync() {
   document.getElementById('last-sync').textContent='Syncing...';
   await syncLTFromSheets();
   await loadAndRender();
+}
+
+// Manual Meta ad spend sync — calls the /api/meta-sync endpoint, then reloads the dashboard.
+// The cron also runs this daily; this button is for an on-demand refresh.
+async function syncMeta() {
+  const badge = document.getElementById('meta-sync-badge');
+  const original = badge ? badge.innerHTML : '';
+  if (badge) { badge.style.pointerEvents = 'none'; badge.textContent = 'Syncing Meta...'; }
+  try {
+    const res = await fetch('/api/meta-sync');
+    const data = await res.json();
+    if (data && data.ok) {
+      META_SPEND = await getMetaSpend();
+      renderAll();
+      showToast('✓ Meta spend synced — ' + (data.daysWritten||0) + ' days, $' + Math.round(data.totalSpendUsd||0).toLocaleString());
+    } else {
+      const msg = (data && data.error)
+        ? (typeof data.error === 'string' ? data.error : (data.error.message || 'unknown error'))
+        : 'sync failed';
+      showToast('Meta sync error: ' + msg, 'error');
+    }
+  } catch(e) {
+    showToast('Meta sync error: ' + e.message, 'error');
+  }
+  if (badge) { badge.style.pointerEvents = ''; badge.innerHTML = original; }
 }
 
 
@@ -4688,6 +4759,7 @@ async function autoSync() {
       (async () => { CALL_OUTCOMES = await getCallOutcomes(); })(),
       (async () => { FU_LEADS = await getFollowUpLeads(); })(),
       (async () => { try { BOOKED_CALLS = await getBookedCalls(); } catch(e) { /* ignore */ } })(),
+      (async () => { try { META_SPEND = await getMetaSpend(); } catch(e) { /* ignore */ } })(),
     ]);
     renderAll();
     if (typeof renderFollowUpTracker === 'function') renderFollowUpTracker();
