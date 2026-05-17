@@ -1,5 +1,8 @@
 {
   "rewrites": [
     { "source": "/(.*)", "destination": "/SWH_Dashboard.html" }
+  ],
+  "crons": [
+    { "path": "/api/meta-sync", "schedule": "0 6 * * *" }
   ]
 }
