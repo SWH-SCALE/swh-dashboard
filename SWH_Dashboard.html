@@ -841,6 +841,12 @@ select.input-field option { background: var(--bg2); }
     </svg>
     Low-Ticket
   </div>
+  <div class="nav-item" onclick="switchTab('ht-ads', this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M8 1l2 4.5 5 .5-3.7 3.3 1.1 4.9L8 11.8 3.6 14.2l1.1-4.9L1 6l5-.5z"/>
+    </svg>
+    Scaling With High Ticket
+  </div>
 
   <div class="sidebar-section">Config</div>
   <div class="nav-item" onclick="switchTab('deals', this)">
@@ -1100,6 +1106,35 @@ select.input-field option { background: var(--bg2); }
     <div class="scale-checks" id="scale-checks"></div>
   </div>
 
+  <div class="section-label">Profit &amp; loss — ads</div>
+  <div class="kpi-tier kpi-tier-4">
+    <div class="kpi-card red">
+      <div class="kpi-label">Ad Spend</div>
+      <div class="kpi-value mono" id="pl-spend">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">total invested</span></div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">HT Sales (Ads)</div>
+      <div class="kpi-value mono" id="pl-ht">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="pl-ht-src">cash collected</span></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Low-Ticket Sales</div>
+      <div class="kpi-value mono" id="pl-lt">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">$27 front-end</span></div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">Net Profit / Loss</div>
+      <div class="kpi-value mono" id="pl-net">$0</div>
+      <div class="kpi-meta"><span class="kpi-badge neutral" id="pl-net-badge">—</span></div>
+    </div>
+  </div>
+  <div class="chart-card" style="padding:14px 18px">
+    <div style="font-size:11px;color:var(--t2);line-height:1.7">
+      <span id="pl-summary">Ad spend vs HT ads sales + low-ticket sales.</span>
+    </div>
+  </div>
+
 </div><!-- /exec -->
 
 <!-- ══════════════════════════════════════
@@ -1339,6 +1374,58 @@ select.input-field option { background: var(--bg2); }
       <div>Webhook endpoint: <span style="color:var(--accent);font-family:var(--font-mono);font-size:11px">https://your-vercel-app.vercel.app/api/ghl-webhook</span></div>
       <div style="margin-top:8px">Trigger: <span style="color:var(--t1);font-weight:600">Contact purchases low-ticket product → fires webhook → auto-logs revenue</span></div>
       <div style="margin-top:8px">Status: <span style="color:var(--amber);font-family:var(--font-mono)">⚠ Pending connection — see Settings to configure</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TAB: SCALING WITH HIGH TICKET (Whop ads sales)
+══════════════════════════════════════ -->
+<div id="tab-ht-ads" class="tab-view">
+  <div class="section-label">High-ticket ads sales · from Whop</div>
+  <div class="kpi-tier kpi-tier-4">
+    <div class="kpi-card accent">
+      <div class="kpi-label">Total Ads Sales</div>
+      <div class="kpi-value" id="ht-ads-count">0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">high-ticket closes via ads</span></div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">Cash Collected (Gross)</div>
+      <div class="kpi-value mono" id="ht-ads-gross">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">total paid by clients</span></div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Cash After Fees (Net)</div>
+      <div class="kpi-value mono" id="ht-ads-net">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">after Whop fees</span></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Average Sale</div>
+      <div class="kpi-value mono" id="ht-ads-avg">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">gross per sale</span></div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;margin:16px 0 10px;align-items:center">
+    <div class="section-label" style="margin:0;flex:1">All ads high-ticket sales</div>
+    <button onclick="syncWhop()" id="whop-sync-btn" style="background:var(--accentd);color:var(--accent);border:1px solid rgba(0,245,168,0.2);border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;font-family:var(--font-mono);cursor:pointer">↻ Sync Whop</button>
+  </div>
+
+  <div class="chart-card">
+    <div class="deals-table-wrap">
+      <table class="deals-table" id="ht-ads-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Customer</th>
+            <th>Email</th>
+            <th>Gross (USD)</th>
+            <th>Net (USD)</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody id="ht-ads-tbody"></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -2120,6 +2207,15 @@ async function getMetaSpend() {
     return [];
   }
 }
+// ── Whop high-ticket ads sales (automated, from ht_sales table written by /api/whop-sync) ──
+async function getHtSales() {
+  try {
+    return await sbFetch('ht_sales?order=paid_at.desc');
+  } catch(e) {
+    console.log('ht_sales table not ready:', e.message);
+    return [];
+  }
+}
 // Sum Meta spend (USD) for a given dashboard period: 'all' | 'today' | '7d' | 'mtd' | 'lm'
 function getMetaSpendForPeriod(period) {
   if (!META_SPEND || !META_SPEND.length) return 0;
@@ -2222,6 +2318,7 @@ let chartTrend=null, chartSource=null, chartCloser=null, chartCallsTrend=null;
 let DB_DEALS = [];
 let DB_LOG   = [];
 let META_SPEND = [];   // rows from meta_spend table: {spend_date, spend, ...} — automated Meta ad spend
+let HT_ADS = [];       // rows from ht_sales table: {customer_name, amount_gross, ...} — automated Whop high-ticket ads sales
 let loading  = false;
 
 // ═══════════════════════════════════════════
@@ -2254,6 +2351,7 @@ const PAGE_TITLES = {
   sales:     ['Sales & Revenue',       'HT sales · LT revenue · pipeline'],
   closers:   ['Closer Performance',    'Frankie vs Mehdi · live attribution'],
   lowticket: ['Low-Ticket',            '$27 course · GHL purchases'],
+  'ht-ads':  ['Scaling With High Ticket', 'High-ticket ads sales · live from Whop'],
   daily:     ['Daily Input',           'Log today\'s numbers · saves instantly for everyone'],
   'calls-log': ['Setters Daily Tracker',    'Log appointments · outreach · follow-ups'],
   'edit-log':     ['Edit Log Entries',    'Fix any previously logged numbers'],
@@ -2284,6 +2382,7 @@ function switchTab(id,el) {
   if(id==='call-outcomes') renderCallOutcomes();
   if(id==='followup')      renderFollowUpTracker();
   if(id==='booked-calls')  renderBookedCalls();
+  if(id==='ht-ads')        renderHtAds();
   if(id==='slack')      { renderSlack(computeMetrics(currentPeriod)); renderDailyReport(); }
 }
 
@@ -2886,6 +2985,8 @@ async function loadAndRender() {
     try { BOOKED_CALLS = await getBookedCalls(); } catch(e) { console.warn('booked_calls load failed:', e.message); BOOKED_CALLS = []; }
     // Fetch automated Meta ad spend (separate await — a failure here must not break the dashboard)
     try { META_SPEND = await getMetaSpend(); } catch(e) { console.warn('meta_spend load failed:', e.message); META_SPEND = []; }
+    // Fetch automated Whop high-ticket ads sales (separate await — a failure here must not break the dashboard)
+    try { HT_ADS = await getHtSales(); } catch(e) { console.warn('ht_sales load failed:', e.message); HT_ADS = []; }
     // Background: pull any new leads from Sheets into followup_leads
     // Don't block initial render — kick off after, then refresh tracker silently
     syncSheetsToFollowUpTracker({ silent: true }).catch(()=>{});
@@ -3006,6 +3107,7 @@ function renderExec(d) {
   renderSourceChart(d);
   renderFlags(d,{cpl,cpbc,showupRate:showR,cr,roas,cac,roasCon});
   renderScale(d,{cpl,cpbc,showupRate:showR,cr,roas,roasCon});
+  renderPL(d);
 }
 
 function renderFunnel(d) {
@@ -3119,6 +3221,64 @@ function renderScale(d,m) {
       <div class="scale-check-text">${c.label}</div>
       <div class="scale-check-val" style="color:${c.ok?'#00F5A8':'#FF5252'}">${c.val}</div>
     </div>`).join('');
+}
+
+// ═══════════════════════════════════════════
+// PROFIT & LOSS (ADS) — exec dashboard
+// ═══════════════════════════════════════════
+// Ad spend vs (HT ads cash + LT sales). HT ads cash is the LARGER of:
+//   - the manual deal-log ads HT cash for this period (d.htAds), and
+//   - the Whop ht_sales gross for this period (HT_ADS rows in period).
+// Taking the max avoids undercounting while never double-counting a sale.
+function htAdsWhopForPeriod(period) {
+  const rows = (typeof HT_ADS !== 'undefined' && HT_ADS) ? HT_ADS : [];
+  if (!rows.length) return 0;
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  function inP(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (period === 'today') {
+      const sorted = rows.slice().sort((a,b)=>new Date(b.paid_at)-new Date(a.paid_at));
+      const mostRecent = sorted.length && sorted[0].paid_at
+        ? sorted[0].paid_at.split('T')[0] : todayStr;
+      return dateStr === mostRecent;
+    }
+    if (period === '7d')  { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
+    if (period === 'mtd') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
+    if (period === 'lm')  { const l=new Date(today); l.setMonth(l.getMonth()-1); return d.getFullYear()===l.getFullYear()&&d.getMonth()===l.getMonth(); }
+    return true; // all
+  }
+  return rows
+    .filter(r => r.paid_at && inP(r.paid_at.split('T')[0]))
+    .reduce((s,r) => s + (parseFloat(r.amount_gross) || 0), 0);
+}
+
+function renderPL(d) {
+  const spend = d.spend || 0;
+  // HT ads cash: larger of manual deal-log ads HT vs Whop ht_sales gross (same period)
+  const htManual = d.htAds || 0;
+  const htWhop   = htAdsWhopForPeriod(currentPeriod);
+  const htAds    = Math.max(htManual, htWhop);
+  const lt       = d.lt || 0;
+  const revenue  = htAds + lt;
+  const net      = revenue - spend;
+
+  set('pl-spend', fmtFull(spend));
+  set('pl-ht',    fmtFull(htAds));
+  set('pl-ht-src', htWhop > htManual ? 'from Whop · ads' : 'from deal log · ads');
+  set('pl-lt',    fmtFull(lt));
+  set('pl-net',   (net < 0 ? '-$' : '$') + Math.abs(Math.round(net)).toLocaleString());
+
+  const netEl = document.getElementById('pl-net');
+  if (netEl) netEl.style.color = net >= 0 ? 'var(--accent)' : 'var(--red)';
+  set('pl-net-badge', net >= 0 ? 'profit' : 'loss');
+  badge('pl-net-badge', net >= 0 ? 'up' : 'down');
+
+  set('pl-summary',
+    'Ad spend ' + fmtFull(spend) + ' vs revenue ' + fmtFull(revenue) +
+    ' (HT ads ' + fmtFull(htAds) + ' + low-ticket ' + fmtFull(lt) + ') — ' +
+    (net >= 0 ? 'net profit of ' + fmtFull(net) + '.' : 'net loss of ' + fmtFull(Math.abs(net)) + '.'));
 }
 
 // ═══════════════════════════════════════════
@@ -3483,6 +3643,76 @@ async function syncMeta() {
     showToast('Meta sync error: ' + e.message, 'error');
   }
   if (badge) { badge.style.pointerEvents = ''; badge.innerHTML = original; }
+}
+
+
+// ═══════════════════════════════════════════
+// SCALING WITH HIGH TICKET (Whop ads sales)
+// ═══════════════════════════════════════════
+// Renders the ht_sales table (high-ticket ads sales pulled from Whop by /api/whop-sync).
+function renderHtAds() {
+  const rows = (typeof HT_ADS !== 'undefined' && HT_ADS) ? HT_ADS : [];
+
+  // Top KPI cards
+  const count = rows.length;
+  const gross = rows.reduce((s,r) => s + (parseFloat(r.amount_gross) || 0), 0);
+  const net   = rows.reduce((s,r) => s + (parseFloat(r.amount_net) || 0), 0);
+  const avg   = count ? gross / count : 0;
+
+  set('ht-ads-count', count);
+  set('ht-ads-gross', fmtFull(gross));
+  set('ht-ads-net',   fmtFull(net));
+  set('ht-ads-avg',   count ? fmtFull(avg) : '$0');
+
+  // Sales table — newest first (already ordered by paid_at desc from Supabase)
+  const tbody = document.getElementById('ht-ads-tbody');
+  if (!tbody) return;
+
+  if (!count) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:24px">No high-ticket ads sales yet — they appear here automatically once a client pays via the ads product</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const when = r.paid_at
+      ? new Date(r.paid_at).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })
+      : '—';
+    const grossVal = parseFloat(r.amount_gross) || 0;
+    const netVal   = r.amount_net != null ? parseFloat(r.amount_net) : null;
+    return `<tr>
+      <td style="font-family:var(--font-mono);color:var(--accent);font-weight:700">${when}</td>
+      <td style="font-weight:700">${r.customer_name || '—'}</td>
+      <td style="color:var(--t2);font-size:11px">${r.customer_email || '—'}</td>
+      <td style="font-family:var(--font-mono);color:var(--accent);font-weight:700">$${grossVal.toLocaleString()}</td>
+      <td style="font-family:var(--font-mono);color:var(--blue)">${netVal != null ? '$'+netVal.toLocaleString() : '—'}</td>
+      <td><span class="pill ads">Ads</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// Manual Whop sync — calls the /api/whop-sync endpoint, then refreshes the tab.
+// The cron also runs this daily; this button is for an on-demand refresh.
+async function syncWhop() {
+  const btn = document.getElementById('whop-sync-btn');
+  const original = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing...'; }
+  try {
+    const res = await fetch('/api/whop-sync');
+    const data = await res.json();
+    if (data && data.ok) {
+      HT_ADS = await getHtSales();
+      renderHtAds();
+      showToast('✓ Whop synced — ' + (data.salesWritten||0) + ' sale' + ((data.salesWritten===1)?'':'s'));
+    } else {
+      const msg = (data && data.error)
+        ? (typeof data.error === 'string' ? data.error : (data.error.message || 'unknown error'))
+        : 'sync failed';
+      showToast('Whop sync error: ' + msg, 'error');
+    }
+  } catch(e) {
+    showToast('Whop sync error: ' + e.message, 'error');
+  }
+  if (btn) { btn.disabled = false; btn.textContent = original; }
 }
 
 
@@ -4760,10 +4990,12 @@ async function autoSync() {
       (async () => { FU_LEADS = await getFollowUpLeads(); })(),
       (async () => { try { BOOKED_CALLS = await getBookedCalls(); } catch(e) { /* ignore */ } })(),
       (async () => { try { META_SPEND = await getMetaSpend(); } catch(e) { /* ignore */ } })(),
+      (async () => { try { HT_ADS = await getHtSales(); } catch(e) { /* ignore */ } })(),
     ]);
     renderAll();
     if (typeof renderFollowUpTracker === 'function') renderFollowUpTracker();
     if (typeof renderBookedCalls === 'function') renderBookedCalls();
+    if (typeof renderHtAds === 'function') renderHtAds();
     showLoading(false); // updates the "Updated: HH:MM" stamp
     console.log('Auto-sync complete at', new Date().toLocaleTimeString());
   } catch(e) {
