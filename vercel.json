@@ -4,6 +4,7 @@
   ],
   "crons": [
     { "path": "/api/meta-sync", "schedule": "0 6 * * *" },
-    { "path": "/api/whop-sync", "schedule": "0 6 * * *" }
+    { "path": "/api/whop-sync", "schedule": "0 6 * * *" },
+    { "path": "/api/whop-retainer-sync", "schedule": "0 6 * * *" }
   ]
 }
