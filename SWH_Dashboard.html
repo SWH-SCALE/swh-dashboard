@@ -826,6 +826,12 @@ select.input-field option { background: var(--bg2); }
     </svg>
     Sales & Revenue
   </div>
+  <div class="nav-item" onclick="switchTab('retainers', this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M2 5h12v8H2z"/><path d="M2 8h12"/><circle cx="5" cy="10.5" r="1"/>
+    </svg>
+    Retainers
+  </div>
 
   <div class="sidebar-section">Team</div>
   <div class="nav-item" onclick="switchTab('closers', this)">
@@ -1427,6 +1433,88 @@ select.input-field option { background: var(--bg2); }
         <tbody id="ht-ads-tbody"></tbody>
       </table>
     </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TAB: RETAINERS
+══════════════════════════════════════ -->
+<div id="tab-retainers" class="tab-view">
+  <div class="section-label">Forecasted recurring cash · retainer payments</div>
+  <div class="kpi-tier kpi-tier-4">
+    <div class="kpi-card accent">
+      <div class="kpi-label">Forecast — Next 30 Days</div>
+      <div class="kpi-value mono" id="ret-30">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">retainer payments due ≤30d</span></div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">Forecast — Next 60 Days</div>
+      <div class="kpi-value mono" id="ret-60">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">cumulative due ≤60d</span></div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">From Ads Leads</div>
+      <div class="kpi-value mono" id="ret-ads">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">forecast 60d · ads-sourced</span></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">From Organic Leads</div>
+      <div class="kpi-value mono" id="ret-org">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">forecast 60d · organic-sourced</span></div>
+    </div>
+  </div>
+
+  <div class="kpi-tier kpi-tier-4" style="margin-top:10px">
+    <div class="kpi-card">
+      <div class="kpi-label">Active Retainers</div>
+      <div class="kpi-value" id="ret-active">0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="ret-payments-sub">0 payments synced</span></div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">Collected To Date</div>
+      <div class="kpi-value mono" id="ret-collected">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">retainer payments received</span></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Scheduled — Not Yet Paid</div>
+      <div class="kpi-value mono" id="ret-scheduled">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">future payments 2 + 3</span></div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Needs Salima's Input</div>
+      <div class="kpi-value" id="ret-needs">0</div>
+      <div class="kpi-meta"><span class="kpi-badge neutral" id="ret-needs-badge">payments awaiting amounts</span></div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;margin:16px 0 10px;align-items:center">
+    <div class="section-label" style="margin:0;flex:1">All payments · tap “Mark retainer” then enter the next 2 amounts</div>
+    <button onclick="syncRetainers()" id="ret-sync-btn" style="background:var(--accentd);color:var(--accent);border:1px solid rgba(0,245,168,0.2);border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;font-family:var(--font-mono);cursor:pointer">↻ Sync Whop</button>
+  </div>
+
+  <div class="chart-card">
+    <div class="deals-table-wrap">
+      <table class="deals-table" id="ret-table">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Source</th>
+            <th>1st Payment</th>
+            <th>Paid On</th>
+            <th>2nd Due</th>
+            <th>2nd Amount</th>
+            <th>3rd Due</th>
+            <th>3rd Amount</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="ret-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="margin-top:10px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">
+    Payments sync automatically from Whop (Ads + Organic products). Tap <b style="color:var(--accent)">Mark retainer</b> on a real retainer payment, enter the 2nd &amp; 3rd payment amounts, and the 30/60-day forecast updates instantly. Due dates are auto-scheduled one month apart from the paid date.
   </div>
 </div>
 
@@ -2216,6 +2304,22 @@ async function getHtSales() {
     return [];
   }
 }
+// ── Retainer payments (Whop Ads+Organic, from retainer_payments table written by /api/whop-retainer-sync) ──
+async function getRetainerPayments() {
+  try {
+    return await sbFetch('retainer_payments?order=paid_at.desc');
+  } catch(e) {
+    console.log('retainer_payments table not ready:', e.message);
+    return [];
+  }
+}
+// ── Patch a retainer payment row (e.g. mark as retainer, save 2nd/3rd amounts) ──
+async function patchRetainerPayment(id, fields) {
+  return await sbFetch('retainer_payments?id=eq.' + id, {
+    method: 'PATCH',
+    body: JSON.stringify(fields),
+  });
+}
 // Sum Meta spend (USD) for a given dashboard period: 'all' | 'today' | '7d' | 'mtd' | 'lm'
 function getMetaSpendForPeriod(period) {
   if (!META_SPEND || !META_SPEND.length) return 0;
@@ -2319,6 +2423,7 @@ let DB_DEALS = [];
 let DB_LOG   = [];
 let META_SPEND = [];   // rows from meta_spend table: {spend_date, spend, ...} — automated Meta ad spend
 let HT_ADS = [];       // rows from ht_sales table: {customer_name, amount_gross, ...} — automated Whop high-ticket ads sales
+let RETAINER_PAYMENTS = []; // rows from retainer_payments table — Whop payments (Ads+Organic), enriched with retainer schedule
 let loading  = false;
 
 // ═══════════════════════════════════════════
@@ -2349,6 +2454,7 @@ const PAGE_TITLES = {
   exec:      ['Executive Dashboard',   'TCC · Dec 2025 – present · USD · live data'],
   calls:     ['Call Tracking',         'Booked calls · show-ups · no-shows'],
   sales:     ['Sales & Revenue',       'HT sales · LT revenue · pipeline'],
+  retainers: ['Retainers',             'Forecasted recurring cash · ads vs organic'],
   closers:   ['Closer Performance',    'Frankie vs Mehdi · live attribution'],
   lowticket: ['Low-Ticket',            '$27 course · GHL purchases'],
   'ht-ads':  ['Scaling With High Ticket', 'High-ticket ads sales · live from Whop'],
@@ -2383,6 +2489,7 @@ function switchTab(id,el) {
   if(id==='followup')      renderFollowUpTracker();
   if(id==='booked-calls')  renderBookedCalls();
   if(id==='ht-ads')        renderHtAds();
+  if(id==='retainers')     renderRetainers();
   if(id==='slack')      { renderSlack(computeMetrics(currentPeriod)); renderDailyReport(); }
 }
 
@@ -2987,6 +3094,8 @@ async function loadAndRender() {
     try { META_SPEND = await getMetaSpend(); } catch(e) { console.warn('meta_spend load failed:', e.message); META_SPEND = []; }
     // Fetch automated Whop high-ticket ads sales (separate await — a failure here must not break the dashboard)
     try { HT_ADS = await getHtSales(); } catch(e) { console.warn('ht_sales load failed:', e.message); HT_ADS = []; }
+    // Fetch retainer payments (separate await — a failure here must not break the dashboard)
+    try { RETAINER_PAYMENTS = await getRetainerPayments(); } catch(e) { console.warn('retainer_payments load failed:', e.message); RETAINER_PAYMENTS = []; }
     // Background: pull any new leads from Sheets into followup_leads
     // Don't block initial render — kick off after, then refresh tracker silently
     syncSheetsToFollowUpTracker({ silent: true }).catch(()=>{});
@@ -3711,6 +3820,186 @@ async function syncWhop() {
     }
   } catch(e) {
     showToast('Whop sync error: ' + e.message, 'error');
+  }
+  if (btn) { btn.disabled = false; btn.textContent = original; }
+}
+
+
+// ═══════════════════════════════════════════
+// RETAINERS TAB
+// ═══════════════════════════════════════════
+// Data model — retainer_payments table, one row per Whop payment (Ads or Organic product):
+//   id, customer_name, customer_email, amount_gross, paid_at, source ('ads'|'organic'),
+//   is_retainer (bool, default false), amount_2 (numeric|null), amount_3 (numeric|null)
+// Whop sync writes the first 6 columns. Salima sets is_retainer + amount_2 + amount_3 in the dashboard.
+// Due dates are DERIVED, never stored: 2nd due = paid_at + 1 month, 3rd due = paid_at + 2 months.
+
+function retAddMonths(dateStr, n) {
+  const d = new Date(dateStr);
+  if (isNaN(d)) return null;
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + n);
+  // guard month-overflow (e.g. 31 Jan + 1mo) — clamp to last day of target month
+  if (d.getDate() < day) d.setDate(0);
+  return d;
+}
+function retFmtDate(d) {
+  if (!d) return '—';
+  return d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+}
+function retDaysFromNow(d) {
+  if (!d) return Infinity;
+  const now = new Date(); now.setHours(0,0,0,0);
+  return Math.round((d - now) / 86400000);
+}
+
+function renderRetainers() {
+  const rows = (typeof RETAINER_PAYMENTS !== 'undefined' && RETAINER_PAYMENTS) ? RETAINER_PAYMENTS : [];
+  const retainers = rows.filter(r => r.is_retainer);
+
+  let forecast30 = 0, forecast60 = 0;
+  let ads60 = 0, org60 = 0;
+  let collected = 0, scheduled = 0, needsInput = 0;
+
+  retainers.forEach(r => {
+    collected += parseFloat(r.amount_gross) || 0;
+    const a2 = r.amount_2 != null ? parseFloat(r.amount_2) : null;
+    const a3 = r.amount_3 != null ? parseFloat(r.amount_3) : null;
+    if (a2 == null || a3 == null) needsInput++;
+
+    const due2 = retAddMonths(r.paid_at, 1);
+    const due3 = retAddMonths(r.paid_at, 2);
+    const src  = (r.source === 'organic') ? 'organic' : 'ads';
+
+    [[a2, due2], [a3, due3]].forEach(([amt, due]) => {
+      if (amt == null || amt <= 0 || !due) return;
+      scheduled += amt;
+      const days = retDaysFromNow(due);
+      if (days >= 0 && days <= 30) forecast30 += amt;
+      if (days >= 0 && days <= 60) {
+        forecast60 += amt;
+        if (src === 'ads') ads60 += amt; else org60 += amt;
+      }
+    });
+  });
+
+  set('ret-30',        fmtFull(forecast30));
+  set('ret-60',        fmtFull(forecast60));
+  set('ret-ads',       fmtFull(ads60));
+  set('ret-org',       fmtFull(org60));
+  set('ret-active',    retainers.length);
+  set('ret-payments-sub', rows.length + ' payment' + (rows.length===1?'':'s') + ' synced');
+  set('ret-collected', fmtFull(collected));
+  set('ret-scheduled', fmtFull(scheduled));
+  set('ret-needs',     needsInput);
+  badge('ret-needs-badge', needsInput > 0 ? 'warn' : 'up');
+
+  const tbody = document.getElementById('ret-tbody');
+  if (!tbody) return;
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:24px">No payments synced yet — payments appear here automatically once Whop sync runs (or tap “↻ Sync Whop”)</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const when   = r.paid_at ? retFmtDate(new Date(r.paid_at)) : '—';
+    const gross  = parseFloat(r.amount_gross) || 0;
+    const srcPill = (r.source === 'organic')
+      ? '<span class="pill" style="background:var(--amberd);color:var(--amber)">Organic</span>'
+      : '<span class="pill ads">Ads</span>';
+
+    if (!r.is_retainer) {
+      // Not flagged a retainer — show muted, with a one-tap "Mark retainer" action
+      return `<tr style="opacity:0.55">
+        <td style="font-weight:700">${r.customer_name || '—'}</td>
+        <td>${srcPill}</td>
+        <td style="font-family:var(--font-mono)">$${gross.toLocaleString()}</td>
+        <td style="font-family:var(--font-mono);color:var(--t2)">${when}</td>
+        <td colspan="4" style="color:var(--t3)">— not marked as a retainer —</td>
+        <td><button onclick="markRetainer(${r.id}, true)" style="background:var(--accentd);color:var(--accent);border:1px solid rgba(0,245,168,0.25);border-radius:6px;padding:5px 10px;font-size:10px;font-weight:700;font-family:var(--font-mono);cursor:pointer">Mark retainer</button></td>
+      </tr>`;
+    }
+
+    // Flagged retainer — show derived due dates + editable amount fields
+    const due2 = retFmtDate(retAddMonths(r.paid_at, 1));
+    const due3 = retFmtDate(retAddMonths(r.paid_at, 2));
+    const a2   = r.amount_2 != null ? r.amount_2 : '';
+    const a3   = r.amount_3 != null ? r.amount_3 : '';
+    const complete = (r.amount_2 != null && r.amount_3 != null);
+    const statusCell = complete
+      ? '<span class="pill" style="background:var(--accentd);color:var(--accent)">Scheduled</span>'
+      : '<span class="pill" style="background:var(--amberd);color:var(--amber)">Needs amounts</span>';
+
+    return `<tr>
+      <td style="font-weight:700">${r.customer_name || '—'}</td>
+      <td>${srcPill}</td>
+      <td style="font-family:var(--font-mono)">$${gross.toLocaleString()}</td>
+      <td style="font-family:var(--font-mono);color:var(--t2)">${when}</td>
+      <td style="font-family:var(--font-mono);color:var(--blue)">${due2}</td>
+      <td><input type="number" id="ret-a2-${r.id}" value="${a2}" placeholder="amount" style="width:90px;background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:5px 7px;color:var(--t1);font-family:var(--font-mono);font-size:11px"></td>
+      <td style="font-family:var(--font-mono);color:var(--blue)">${due3}</td>
+      <td><input type="number" id="ret-a3-${r.id}" value="${a3}" placeholder="amount" style="width:90px;background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:5px 7px;color:var(--t1);font-family:var(--font-mono);font-size:11px"></td>
+      <td style="white-space:nowrap">
+        ${statusCell}
+        <button onclick="saveRetainerAmounts(${r.id})" style="background:var(--accentd);color:var(--accent);border:1px solid rgba(0,245,168,0.25);border-radius:6px;padding:5px 9px;font-size:10px;font-weight:700;font-family:var(--font-mono);cursor:pointer;margin-left:5px">Save</button>
+        <button onclick="markRetainer(${r.id}, false)" title="Not a retainer" style="background:var(--redd);color:var(--red);border:1px solid rgba(255,82,82,0.25);border-radius:6px;padding:5px 8px;font-size:10px;font-weight:700;font-family:var(--font-mono);cursor:pointer;margin-left:4px">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// Toggle a payment's is_retainer flag. When un-marking, also clear the 2nd/3rd amounts.
+async function markRetainer(id, isRet) {
+  try {
+    const fields = isRet ? { is_retainer: true } : { is_retainer: false, amount_2: null, amount_3: null };
+    await patchRetainerPayment(id, fields);
+    RETAINER_PAYMENTS = await getRetainerPayments();
+    renderRetainers();
+    showToast(isRet ? '✓ Marked as retainer — enter the next 2 amounts' : '✓ Unmarked');
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// Save the 2nd + 3rd payment amounts Salima entered for a retainer.
+async function saveRetainerAmounts(id) {
+  const el2 = document.getElementById('ret-a2-' + id);
+  const el3 = document.getElementById('ret-a3-' + id);
+  const v2 = el2 && el2.value !== '' ? parseFloat(el2.value) : null;
+  const v3 = el3 && el3.value !== '' ? parseFloat(el3.value) : null;
+  if (v2 != null && (isNaN(v2) || v2 < 0)) { showToast('2nd amount looks invalid', 'error'); return; }
+  if (v3 != null && (isNaN(v3) || v3 < 0)) { showToast('3rd amount looks invalid', 'error'); return; }
+  try {
+    await patchRetainerPayment(id, { amount_2: v2, amount_3: v3 });
+    RETAINER_PAYMENTS = await getRetainerPayments();
+    renderRetainers();
+    showToast('✓ Saved — 30/60-day forecast updated');
+  } catch(e) {
+    showToast('Error saving amounts: ' + e.message, 'error');
+  }
+}
+
+// Manual Whop retainer sync — calls /api/whop-retainer-sync, then refreshes the tab.
+async function syncRetainers() {
+  const btn = document.getElementById('ret-sync-btn');
+  const original = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing...'; }
+  try {
+    const res = await fetch('/api/whop-retainer-sync');
+    const data = await res.json();
+    if (data && data.ok) {
+      RETAINER_PAYMENTS = await getRetainerPayments();
+      renderRetainers();
+      showToast('✓ Whop synced — ' + (data.paymentsWritten||0) + ' payment' + ((data.paymentsWritten===1)?'':'s'));
+    } else {
+      const msg = (data && data.error)
+        ? (typeof data.error === 'string' ? data.error : (data.error.message || 'unknown error'))
+        : 'sync failed';
+      showToast('Retainer sync error: ' + msg, 'error');
+    }
+  } catch(e) {
+    showToast('Retainer sync error: ' + e.message, 'error');
   }
   if (btn) { btn.disabled = false; btn.textContent = original; }
 }
@@ -4991,11 +5280,13 @@ async function autoSync() {
       (async () => { try { BOOKED_CALLS = await getBookedCalls(); } catch(e) { /* ignore */ } })(),
       (async () => { try { META_SPEND = await getMetaSpend(); } catch(e) { /* ignore */ } })(),
       (async () => { try { HT_ADS = await getHtSales(); } catch(e) { /* ignore */ } })(),
+      (async () => { try { RETAINER_PAYMENTS = await getRetainerPayments(); } catch(e) { /* ignore */ } })(),
     ]);
     renderAll();
     if (typeof renderFollowUpTracker === 'function') renderFollowUpTracker();
     if (typeof renderBookedCalls === 'function') renderBookedCalls();
     if (typeof renderHtAds === 'function') renderHtAds();
+    if (typeof renderRetainers === 'function') renderRetainers();
     showLoading(false); // updates the "Updated: HH:MM" stamp
     console.log('Auto-sync complete at', new Date().toLocaleTimeString());
   } catch(e) {
