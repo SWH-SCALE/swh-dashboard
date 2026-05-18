@@ -1148,16 +1148,11 @@ select.input-field option { background: var(--bg2); }
 ══════════════════════════════════════ -->
 <div id="tab-calls" class="tab-view">
   <div class="section-label">Call performance</div>
-  <div class="kpi-tier kpi-tier-5">
+  <div class="kpi-tier kpi-tier-4">
     <div class="kpi-card blue">
       <div class="kpi-label">Booked Calls</div>
       <div class="kpi-value" id="c-booked">0</div>
       <div class="kpi-meta"><span class="kpi-badge neutral">from ads + organic</span></div>
-    </div>
-    <div class="kpi-card blue">
-      <div class="kpi-label">From Ads</div>
-      <div class="kpi-value" id="c-booked-ads">0</div>
-      <div class="kpi-meta"><span class="kpi-badge neutral" id="c-ads-pct">0% of total</span></div>
     </div>
     <div class="kpi-card accent">
       <div class="kpi-label">Show-Ups</div>
@@ -3398,8 +3393,7 @@ function renderCallsTab(d) {
   const showR=d.booked?d.shows/d.booked:0;
   const noshowR=d.booked?d.noshows/d.booked:0;
   const cpbc=d.booked?d.spend/d.booked:0;
-  set('c-booked',d.booked); set('c-booked-ads',d.adsBookedCalls);
-  set('c-ads-pct',pct(d.adsBookedCalls,d.booked)+' of total');
+  set('c-booked',d.booked);
   set('c-shows',d.shows);
   set('c-showup-pct',Math.round(showR*100)+'% show rate');
   document.getElementById('c-showup-pct').className='kpi-badge '+(showR>=(S.tgt_showup/100)?'up':'warn');
