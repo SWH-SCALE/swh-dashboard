@@ -1153,12 +1153,13 @@ select.input-field option { background: var(--bg2); }
     <div class="kpi-card blue">
       <div class="kpi-label">Booked Calls</div>
       <div class="kpi-value" id="c-booked">0</div>
-      <div class="kpi-meta"><span class="kpi-badge neutral">from ads + organic</span></div>
+      <div class="kpi-meta"><span class="kpi-badge neutral" id="c-booked-sub">from ads + organic</span></div>
     </div>
     <div class="kpi-card accent">
       <div class="kpi-label">Show-Ups</div>
       <div class="kpi-value" id="c-shows">0</div>
       <div class="kpi-meta"><span class="kpi-badge warn" id="c-showup-pct">0% show rate</span></div>
+      <div class="kpi-sublabel" id="c-scope-note" style="margin-top:4px;font-size:10px;color:var(--t3)"></div>
     </div>
     <div class="kpi-card red">
       <div class="kpi-label">No-Shows</div>
@@ -3430,8 +3431,9 @@ function renderPL(d) {
 // ═══════════════════════════════════════════
 function renderCallsTab(d) {
   const S=getSettings();
-  const showR=(d.showBase||d.booked)?d.shows/(d.showBase||d.booked):0;
-  const noshowR=d.booked?d.noshows/d.booked:0;
+  const base=(d.showBase||d.booked);          // show-rate scope denominator (e.g. 83)
+  const showR=base?d.shows/base:0;
+  const noshowR=base?d.noshows/base:0;          // no-show rate on the SAME denominator as show rate
   const cpbc=d.booked?d.spend/d.booked:0;
   set('c-booked',d.booked);
   set('c-shows',d.shows);
@@ -3440,6 +3442,13 @@ function renderCallsTab(d) {
   set('c-noshows',d.noshows);
   set('c-noshow-pct',Math.round(noshowR*100)+'% no-show');
   set('c-cpbc',d.booked?fmtFull(cpbc):'—');
+  // Booked card sub-label: clarify the 131 is the all-time count
+  set('c-booked-sub', d.booked + ' all-time · ' + base + ' in show-rate scope');
+  // Scope note under Show-Ups: explains the 39/36/rate are measured against `base`, not the all-time 131
+  const pend = d.pendingCalls || 0;
+  set('c-scope-note',
+    'show & no-show rates based on ' + base + ' calls (verified Apr 1 baseline + new)' +
+    (pend > 0 ? ' · ' + pend + ' awaiting outcome' : ''));
 }
 
 function renderCallsTrend() {
