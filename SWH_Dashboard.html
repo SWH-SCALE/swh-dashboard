@@ -1011,6 +1011,7 @@ select.input-field option { background: var(--bg2); }
       <div class="kpi-meta">
         <span class="kpi-badge warn" id="k-showup-flag">target 75%</span>
       </div>
+      <div class="kpi-sublabel" id="k-showup-pending" style="margin-top:4px;font-size:10px;color:var(--t3)"></div>
     </div>
     <div class="kpi-card purple">
       <div class="kpi-label">Close Rate (Ads)</div>
@@ -2535,7 +2536,8 @@ function computeMetrics(period) {
     const bcCount = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
       ? BOOKED_CALLS.filter(b => (b.status||'') !== 'cancelled').length
       : 0;
-    // FIX: take MAX across all sources so we never lose the ALL_TIME floor when Calendly only has a few recent rows
+    // BOOKED CALLS (All Time): stays LIVE — updates on every new Calendly booking.
+    // max() across live booked_calls, legacy daily_log, and seed so the card only ever grows.
     const bookedAuthoritative = Math.max(bcCount, dbBooked, ALL_TIME.booked);
     const dbShows  = DB_LOG.reduce((s,l)=>s+(l.shows||0),0);
     const dbNoshows= DB_LOG.reduce((s,l)=>s+(l.noshows||0),0);
@@ -2550,16 +2552,37 @@ function computeMetrics(period) {
     // Use live sheet count for LT if available
     const sheetLtRevenue = LT_FROM_SHEET > 0 ? LT_FROM_SHEET * 27 : 0;
     console.log('All Time LT: sheet=', sheetLtRevenue, 'db=', dbLt, 'hardcoded=', ALL_TIME.lt);
-    // FIX: clamp shows + noshows so they can NEVER exceed booked calls (prevents 2250% show-up rate)
-    const showsRawAT   = Math.max(dbShows,  coShows,   bcShows,   ALL_TIME.shows);
-    const noshowsRawAT = Math.max(dbNoshows,coNoshows, bcNoshows, ALL_TIME.noshows);
-    const showsClampedAT   = Math.min(showsRawAT, bookedAuthoritative);
-    const noshowsClampedAT = Math.min(noshowsRawAT, Math.max(0, bookedAuthoritative - showsClampedAT));
+    // ── SHOW-UP RATE: verified baseline + live activity after cutoff ──
+    // Baseline = verified Apr 1 – May 18 2026 figures (ALL_TIME.booked 75 / shows 39 / noshows 36).
+    // On top of that we add LIVE booked_calls activity scheduled AFTER the cutoff date, so the
+    // show-up rate genuinely moves with every new booking + show — with no double-count of the
+    // verified window (the 12 existing rows are mid-May and fall inside the baseline).
+    const SHOW_RATE_CUTOFF = '2026-05-18';   // verified baseline covers up to & including this date
+    const afterCutoff = (b) => {
+      const when = b.scheduled_at ? String(b.scheduled_at).split('T')[0] : null;
+      return when && when > SHOW_RATE_CUTOFF;
+    };
+    const liveRows = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
+      ? BOOKED_CALLS.filter(b => afterCutoff(b) && (b.status||'') !== 'cancelled')
+      : [];
+    const newBooked  = liveRows.length;
+    const newShows   = liveRows.filter(b => b.status === 'showed').length;
+    const newNoshows = liveRows.filter(b => b.status === 'no_show').length;
+    // Pending = live rows after cutoff still awaiting an outcome (booked, not yet shown/no-shown).
+    // These DO count in the rate denominator, so the note explains any dip.
+    const pendingCallsAT = liveRows.filter(b => {
+      const st = b.status || '';
+      return st !== 'showed' && st !== 'no_show';
+    }).length;
+    // Totals = verified baseline + new live activity
+    const showRateBooked = ALL_TIME.booked  + newBooked;   // rate denominator (75 + new)
+    const showsClampedAT   = ALL_TIME.shows   + newShows;  // rate numerator   (39 + new)
+    const noshowsClampedAT = ALL_TIME.noshows + newNoshows;
     // META SPEND: automated Meta ad spend is the source of truth when available; fall back to manual log/ALL_TIME
     const metaSpendAll = getMetaSpendForPeriod('all');
     const spendAuthoritative = metaSpendAll > 0 ? metaSpendAll : Math.max(dbSpend, ALL_TIME.spend);
     // Use DB values if they exist and are bigger, otherwise use ALL_TIME verified totals
-    return buildMetrics(
+    const allTimeMetrics = buildMetrics(
       spendAuthoritative,
       Math.max(dbLeads, sheetLeads, fuTotal, ALL_TIME.leads),
       bookedAuthoritative,
@@ -2570,6 +2593,12 @@ function computeMetrics(period) {
       htCash, htAds, htOrg,
       deals.filter(d=>d.usd>0), contractTotal, pipeline, deals
     );
+    // Show-up rate denominator = verified baseline booked (75) + new live bookings after cutoff.
+    // The rate is (39 + new shows) / (75 + new booked) — it moves with every new booking + show.
+    // The Booked Calls CARD still shows bookedAuthoritative (the full live count incl. history).
+    allTimeMetrics.showBase = showRateBooked;
+    allTimeMetrics.pendingCalls = pendingCallsAT;
+    return allTimeMetrics;
   }
 
   function inPeriod(dateStr) {
@@ -2672,6 +2701,10 @@ function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,ht
   }
   return {
     spend,leads,booked,shows,noshows,closes,lt,
+    // showBase = denominator for show-up rate. Defaults to booked (live).
+    // The All Time branch overrides this to the verified booked figure (75)
+    // so the show-up rate stays 39/75=52% while the Booked Calls card shows live count.
+    showBase: booked,
     cash:totalCash,htCash,htAds,htOrg,contractTotal,pipeline:pipeline||0,
     frankieDeals:frankieDeals.length,mehdiDeals:mehdiDeals.length,
     frankieCash,mehdiCash,frankieShows,mehdiShows,
@@ -3146,7 +3179,7 @@ function renderExec(d) {
   const S=getSettings();
   const cpl    = d.leads  ? d.spend/d.leads   : 0;
   const cpbc   = d.booked ? d.spend/d.booked  : 0;
-  const showR  = d.booked ? d.shows/d.booked  : 0;
+  const showR  = (d.showBase||d.booked) ? d.shows/(d.showBase||d.booked)  : 0;
   const cr     = d.shows  ? d.rawDeals.length/d.shows : 0;
   const roas   = d.spend  ? d.cash/d.spend    : 0;
   const roasCon= d.spend  ? d.contractTotal/d.spend : 0;
@@ -3183,6 +3216,11 @@ function renderExec(d) {
   const showOk=showR>=(S.tgt_showup/100)&&d.booked>0;
   set('k-showup-flag', d.booked?(showOk?'✓ healthy':'target '+S.tgt_showup+'%'):'—');
   badge('k-showup-flag', showOk?'up':d.booked?'warn':'neutral');
+  // Pending-calls note: explains why the rate may dip — calls booked but not yet held
+  const pend = d.pendingCalls || 0;
+  set('k-showup-pending', pend > 0
+    ? '↳ ' + pend + ' call' + (pend===1?'':'s') + ' booked, awaiting outcome'
+    : '');
 
   // Close Rate (Ads) — deals from ads source / showed calls
   const adsDeals = d.rawDeals.filter(dl => dl.source === 'Ads').length;
@@ -3222,7 +3260,7 @@ function renderFunnel(d) {
     {label:'Leads generated',val:d.leads,  color:'#5B9CF6',pct:100},
     {label:'→ LT purchased',  val:ltCount, color:'#FFB742',pct:d.leads?Math.round(ltCount/d.leads*100):0},
     {label:'→ Booked calls',  val:d.booked,color:'#00F5A8',pct:d.leads?Math.round(d.booked/d.leads*100):0},
-    {label:'→ Show-ups',      val:d.shows, color:'#B794F4',pct:d.booked?Math.round(d.shows/d.booked*100):0},
+    {label:'→ Show-ups',      val:d.shows, color:'#B794F4',pct:(d.showBase||d.booked)?Math.round(d.shows/(d.showBase||d.booked)*100):0},
     {label:'→ HT closes',     val:d.rawDeals.length,color:'#FF9F43',pct:d.shows?Math.round(d.rawDeals.length/d.shows*100):0},
   ];
   document.getElementById('funnel-steps').innerHTML=steps.map((s,i)=>`
@@ -3392,7 +3430,7 @@ function renderPL(d) {
 // ═══════════════════════════════════════════
 function renderCallsTab(d) {
   const S=getSettings();
-  const showR=d.booked?d.shows/d.booked:0;
+  const showR=(d.showBase||d.booked)?d.shows/(d.showBase||d.booked):0;
   const noshowR=d.booked?d.noshows/d.booked:0;
   const cpbc=d.booked?d.spend/d.booked:0;
   set('c-booked',d.booked);
@@ -3656,7 +3694,7 @@ function renderSlack(d) {
   const S=getSettings();
   const roas=d.spend?d.cash/d.spend:0;
   const roasCon=d.spend?d.contractTotal/d.spend:0;
-  const showup=d.booked?d.shows/d.booked:0;
+  const showup=(d.showBase||d.booked)?d.shows/(d.showBase||d.booked):0;
   const cr=d.shows?d.rawDeals.length/d.shows:0;
   const cpl=d.leads?d.spend/d.leads:0;
   const cpbc=d.booked?d.spend/d.booked:0;
@@ -3676,7 +3714,7 @@ Leads:        <span class="sv">${d.leads}</span>  ·  CPL: <span class="sv">${d.
 Booked:       <span class="sv">${d.booked}</span>  ·  CPBC: <span class="sv">${d.booked?'$'+Math.round(cpbc):'—'}</span>
 LT Sales:     <span class="sv">${Math.round((d.lt||0)/27)} × $27 = $${(d.lt||0).toLocaleString()}</span>
 <span class="sh">📞 CALLS</span>
-${sF} Show-up: <span class="sv">${d.booked?Math.round(showup*100)+'%':'—'}</span>  (${d.shows} of ${d.booked})  ·  No-shows: <span class="sv">${d.noshows}</span>
+${sF} Show-up: <span class="sv">${d.booked?Math.round(showup*100)+'%':'—'}</span>  (${d.shows} of ${d.showBase||d.booked})  ·  No-shows: <span class="sv">${d.noshows}</span>
 <span class="sh">💰 SALES</span>
 ${cF} HT Closes: <span class="sv">${d.rawDeals.length}</span>  ·  Close rate: <span class="sv">${d.shows?Math.round(cr*100)+'%':'—'}</span>
 Cash: <span class="sv">$${d.cash.toLocaleString()}</span>  ·  Contracts: <span class="sv">$${d.contractTotal.toLocaleString()}</span>  ·  Pipeline: <span class="sv">$${(d.pipeline||0).toLocaleString()}</span>
@@ -4247,7 +4285,7 @@ function renderDailyReport() {
 
   const cpl    = d.leads  ? d.spend/d.leads   : 0;
   const cpbc   = d.booked ? d.spend/d.booked  : 0;
-  const showR  = d.booked ? d.shows/d.booked  : 0;
+  const showR  = (d.showBase||d.booked) ? d.shows/(d.showBase||d.booked)  : 0;
   const cac    = d.rawDeals.length ? d.spend/d.rawDeals.length : 0;
   const ltCount = d.lt > 0 ? Math.round(d.lt/27) : 0;
   // Lead → Purchase: of all leads, what % bought the $27 LT
@@ -4360,7 +4398,7 @@ function generateWrittenReport() {
 
   const cpl    = d.leads  ? d.spend/d.leads   : 0;
   const cpbc   = d.booked ? d.spend/d.booked  : 0;
-  const showR  = d.booked ? d.shows/d.booked  : 0;
+  const showR  = (d.showBase||d.booked) ? d.shows/(d.showBase||d.booked)  : 0;
   const cr     = d.shows  ? d.rawDeals.length/d.shows : 0;
   const roas   = d.spend  ? d.cash/d.spend    : 0;
   const roasCon= d.spend  ? d.contractTotal/d.spend : 0;
@@ -4383,7 +4421,7 @@ function generateWrittenReport() {
 
   // Calls
   if (d.booked > 0) {
-    lines.push(`Our ads generated ${d.booked} booked calls at a cost of $${Math.round(cpbc)} per booked call. Of those, ${d.shows} showed up — a ${Math.round(showR*100)}% show-up rate${showR >= 0.70 ? ', which is above our 70% benchmark' : ', which is below our 70% benchmark — we should review our pre-call nurture sequences'}. ${d.noshows} call${d.noshows !== 1 ? 's' : ''} resulted in no-shows.`);
+    lines.push(`Our ads generated ${d.booked} booked calls at a cost of $${Math.round(cpbc)} per booked call. Of the ${d.showBase||d.booked} calls in our verified tracking window, ${d.shows} showed up — a ${Math.round(showR*100)}% show-up rate${showR >= 0.70 ? ', which is above our 70% benchmark' : ', which is below our 70% benchmark — we should review our pre-call nurture sequences'}. ${d.noshows} call${d.noshows !== 1 ? 's' : ''} resulted in no-shows.`);
   }
 
   // Revenue
@@ -4460,7 +4498,7 @@ function downloadReport() {
   const cpl     = d.leads  ? Math.round(d.spend/d.leads)   : 0;
   const cpbc    = d.booked ? Math.round(d.spend/d.booked)  : 0;
   const cac     = d.rawDeals.length ? Math.round(d.spend/d.rawDeals.length) : 0;
-  const showR   = d.booked ? Math.round(d.shows/d.booked*100) : 0;
+  const showR   = (d.showBase||d.booked) ? Math.round(d.shows/(d.showBase||d.booked)*100) : 0;
   const ltCount = d.lt > 0 ? Math.round(d.lt/27) : 0;
   const l2pRate = d.leads > 0 ? Math.round((ltCount/d.leads)*100) : 0;
   const p2bRate = ltCount > 0 ? Math.round((d.booked/ltCount)*100) : 0;
@@ -4550,7 +4588,7 @@ function downloadReport() {
 
       <div class="section-title">Funnel Conversion Rates</div>
       <div class="metrics-grid-3">
-        <div class="metric ${sSHO}"><div class="metric-label">Show-Up Rate</div><div class="metric-value ${sSHO}">${d.booked>0?showR+'%':'—'}</div><div class="metric-sub">${d.booked>0?d.shows+' of '+d.booked+' showed':'no calls yet'}</div></div>
+        <div class="metric ${sSHO}"><div class="metric-label">Show-Up Rate</div><div class="metric-value ${sSHO}">${d.booked>0?showR+'%':'—'}</div><div class="metric-sub">${d.booked>0?d.shows+' of '+(d.showBase||d.booked)+' showed':'no calls yet'}</div></div>
         <div class="metric ${sL2P}"><div class="metric-label">Lead → Purchase</div><div class="metric-value ${sL2P}">${d.leads>0?l2pRate+'%':'—'}</div><div class="metric-sub">${d.leads>0?ltCount+' of '+d.leads+' bought':'no leads yet'}</div></div>
         <div class="metric ${sP2B}"><div class="metric-label">Purchase → Booked Call</div><div class="metric-value ${sP2B}">${ltCount>0?p2bRate+'%':'—'}</div><div class="metric-sub">${ltCount>0?d.booked+' of '+ltCount+' booked':'no purchases yet'}</div></div>
       </div>
