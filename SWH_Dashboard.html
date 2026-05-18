@@ -2405,8 +2405,10 @@ async function seedIfEmpty() {
 // Note: 'leads' acts as a safety floor — actual displayed value is max(this, FU_LEADS.length)
 // so the number grows automatically as new leads sync into followup_leads
 const ALL_TIME = {
-  spend:25677.90, leads:303, booked:54, shows:17,
-  noshows:5, closes:7, lt:3564, cash:21000,
+  // Verified figures Apr 1 – May 18 2026 (Calendly "SWH - Work With Us 2026" + GHL showed-stage opportunities).
+  // These act as a FLOOR: dashboard shows max(live data, this), so live Calendly/GHL data takes over once it exceeds these.
+  spend:25677.90, leads:303, booked:75, shows:39,
+  noshows:36, closes:7, lt:3564, cash:21000,
 };
 
 // ═══════════════════════════════════════════
