@@ -27,6 +27,24 @@ const WHOP_COMPANY_ID = 'biz_6YYccxU9EzDgfU';
 // "Turn Content In To Clients" ($27 LT course).
 const LT_PRODUCT_IDS = ['prod_Q0nZad1rnebtx'];
 
+// Low-ticket UPSELL amounts to EXCLUDE. These upsells have no dedicated Whop
+// product, so they can only be identified by their exact price. $97 is the
+// LT-course upsell. A genuine high-ticket payment is never exactly one of
+// these amounts (HT deposits start at ~$500 and never land on $97).
+// If a new fixed-price LT upsell is added, add its amount here.
+const LT_UPSELL_AMOUNTS = [97];
+
+// True when a payment is a low-ticket upsell, matched on exact USD amount.
+function isLtUpsellAmount(usd) {
+  return LT_UPSELL_AMOUNTS.includes(Math.round(Number(usd) || 0));
+}
+
+// Gross USD for a payment. Single source of truth so the LT-amount filter and
+// the row that gets inserted always agree on the figure.
+function grossOf(p) {
+  return +(((p && (p.usd_total != null ? p.usd_total : p.total)) || 0).toFixed(2));
+}
+
 // Pull the product id off a Whop payment, wherever Whop puts it.
 function productIdOf(p) {
   return (p && (
@@ -78,12 +96,16 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, message: 'No payments returned from Whop', dealsWritten: 0 });
     }
 
-    // --- 2. keep paid/succeeded, drop low-ticket product ---
+    // --- 2. keep paid/succeeded, drop low-ticket ---
     const paid = payments.filter(p =>
       p && (p.status === 'paid' || p.substatus === 'succeeded')
     );
-    const ltSkipped = paid.filter(p => LT_PRODUCT_IDS.includes(productIdOf(p))).length;
-    const htPayments = paid.filter(p => !LT_PRODUCT_IDS.includes(productIdOf(p)));
+    // A payment is low-ticket if it's the LT product OR a known LT upsell amount.
+    const isLowTicket = (p) =>
+      LT_PRODUCT_IDS.includes(productIdOf(p)) || isLtUpsellAmount(grossOf(p));
+
+    const ltSkipped   = paid.filter(p => isLowTicket(p)).length;
+    const htPayments  = paid.filter(p => !isLowTicket(p));
 
     if (htPayments.length === 0) {
       return res.status(200).json({
@@ -116,7 +138,7 @@ export default async function handler(req, res) {
       if (!p.id || existing.has(p.id) || seen.has(p.id)) continue;
       seen.add(p.id);
 
-      const gross = +(((p.usd_total != null ? p.usd_total : p.total) || 0).toFixed(2));
+      const gross = grossOf(p);
       const paidAt = p.paid_at || p.created_at || null;
       const dateOnly = paidAt ? String(paidAt).split('T')[0] : null;
 
