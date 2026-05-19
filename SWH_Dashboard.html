@@ -2655,9 +2655,13 @@ function computeMetrics(period) {
     : [];
   const showsBC    = pBookedCalls.filter(b=>b.status==='showed').length;
   const noshowsBC  = pBookedCalls.filter(b=>b.status==='no_show').length;
-  // FIX: clamp shows + noshows so they can never exceed booked calls in this period
-  const showsRaw   = Math.max(showsLog, showsCO, showsBC);
-  const noshowsRaw = Math.max(noshowsLog, noshowsCO, noshowsBC);
+  // SHOWS / NO-SHOWS for this period: use booked_calls.status ONLY — that is the GHL-driven
+  // source of truth. The legacy daily_log (showsLog) and call_outcomes (showsCO) are stale
+  // manual data; including them in a max() let an old daily_log number force e.g. 12/12 = 100%.
+  // showsLog/showsCO/noshowsLog/noshowsCO computed above are intentionally NOT used here.
+  const showsRaw   = showsBC;
+  const noshowsRaw = noshowsBC;
+  // Clamp as a safety net so shows + noshows can never exceed booked calls in this period.
   const shows   = Math.min(showsRaw, booked);
   const noshows = Math.min(noshowsRaw, Math.max(0, booked - shows));
   const closes = pLog.reduce((s,l)=>s+(l.closes||0),0);
