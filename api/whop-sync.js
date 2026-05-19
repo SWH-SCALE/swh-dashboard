@@ -1,39 +1,55 @@
 // /api/whop-sync.js
-// Pulls high-ticket ADS sales from the Whop API and upserts one row per
-// payment into the Supabase `ht_sales` table.
+// Pulls ALL payments from the Whop API and logs each one into the Supabase
+// `deals` table — the Sales & Revenue source of truth that powers the
+// Executive Dashboard's high-ticket revenue figures.
 //
-// Runs automatically every day via Vercel cron (see vercel.json),
-// and also on a manual GET to /api/whop-sync.
+// Rules (kept deliberately simple):
+//   1. Pull every Whop payment for the company.
+//   2. EXCLUDE the low-ticket product (LT_PRODUCT_IDS) — those are $27 LT
+//      purchases, not high-ticket sales, and must not hit `deals`.
+//   3. Every remaining payment is logged as a deal with source = 'ads'.
+//      (Source can be manually switched to 'organic' in the Sales & Revenue
+//      tab; this sync never overwrites an existing row.)
+//   4. Idempotent: each Whop payment carries a unique whop_payment_id. A
+//      payment already present in `deals` is skipped, so the daily cron
+//      never double-logs revenue. Every DISTINCT payment = one deal row,
+//      even if the same client pays multiple times (intentional).
 //
-// Each run pulls the FULL payment history for the ads product, so the data
-// self-heals: re-running never duplicates (the Whop payment id is the
-// primary key) and any late changes get corrected.
+// Runs daily via Vercel cron and on a manual GET to /api/whop-sync.
 
 const WHOP_KEY     = process.env.WHOP_API_KEY;
 const SUPABASE_URL = 'https://qstlyvauppjkdiwpgtql.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
 
-// ---- CONFIG ----------------------------------------------------------------
-// Whop company id (not secret).
 const WHOP_COMPANY_ID = 'biz_6YYccxU9EzDgfU';
 
-// The ADS high-ticket product. Every payment on this product is an ads sale.
-// (The organic HT product is intentionally NOT tracked here.)
-const ADS_PRODUCT_ID = 'prod_k8RgabvSAsdw7';
-// ----------------------------------------------------------------------------
+// Low-ticket product(s) to EXCLUDE — these are not high-ticket revenue.
+// "Turn Content In To Clients" ($27 LT course).
+const LT_PRODUCT_IDS = ['prod_Q0nZad1rnebtx'];
+
+// Pull the product id off a Whop payment, wherever Whop puts it.
+function productIdOf(p) {
+  return (p && (
+    p.product_id ||
+    (p.product && p.product.id) ||
+    (p.plan && p.plan.product && p.plan.product.id) ||
+    (p.plan && p.plan.product_id)
+  )) || null;
+}
 
 export default async function handler(req, res) {
-  // --- guard: required config ---
   if (!WHOP_KEY)     return res.status(500).json({ ok: false, error: 'WHOP_API_KEY not set' });
   if (!SUPABASE_KEY) return res.status(500).json({ ok: false, error: 'SUPABASE_ANON_KEY not set' });
 
   try {
-    // --- 1. pull payments for the ads product from Whop, following pagination ---
-    let url = `https://api.whop.com/api/v1/payments`
+    // --- 1. pull ALL payments from Whop (no product filter), following pagination ---
+    const buildUrl = (cursor) =>
+      `https://api.whop.com/api/v1/payments`
       + `?company_id=${WHOP_COMPANY_ID}`
-      + `&product_ids=${ADS_PRODUCT_ID}`
-      + `&first=100`;
+      + `&first=100`
+      + (cursor ? `&after=${encodeURIComponent(cursor)}` : '');
 
+    let url = buildUrl(null);
     const payments = [];
     let pages = 0;
 
@@ -49,92 +65,107 @@ export default async function handler(req, res) {
 
       (whopJson.data || []).forEach(p => payments.push(p));
 
-      // follow the next-page cursor if Whop split the result across pages
       const nextCursor =
         whopJson.pagination && (whopJson.pagination.next_cursor || whopJson.pagination.end_cursor);
       const hasNext =
         whopJson.pagination && whopJson.pagination.has_next_page;
 
-      if (hasNext && nextCursor) {
-        url = `https://api.whop.com/api/v1/payments`
-          + `?company_id=${WHOP_COMPANY_ID}`
-          + `&product_ids=${ADS_PRODUCT_ID}`
-          + `&first=100`
-          + `&after=${encodeURIComponent(nextCursor)}`;
-      } else {
-        url = null;
-      }
+      url = (hasNext && nextCursor) ? buildUrl(nextCursor) : null;
       pages++;
     }
 
     if (payments.length === 0) {
-      return res.status(200).json({
-        ok: true,
-        message: 'No payments returned from Whop for the ads product yet',
-        salesWritten: 0,
-      });
+      return res.status(200).json({ ok: true, message: 'No payments returned from Whop', dealsWritten: 0 });
     }
 
-    // --- 2. keep only successfully-paid payments, build upsert payload ---
-    // status 'paid' / substatus 'succeeded' = real collected money.
+    // --- 2. keep paid/succeeded, drop low-ticket product ---
     const paid = payments.filter(p =>
       p && (p.status === 'paid' || p.substatus === 'succeeded')
     );
+    const ltSkipped = paid.filter(p => LT_PRODUCT_IDS.includes(productIdOf(p))).length;
+    const htPayments = paid.filter(p => !LT_PRODUCT_IDS.includes(productIdOf(p)));
 
-    const payload = paid.map(p => ({
-      whop_payment_id: p.id,
-      // user.name is often null on Whop; billing_address.name is reliable.
-      customer_name:   (p.billing_address && p.billing_address.name)
-                         || (p.user && p.user.name)
-                         || null,
-      customer_email:  (p.user && p.user.email) || null,
-      amount_gross:    +(((p.usd_total != null ? p.usd_total : p.total) || 0).toFixed(2)),
-      amount_net:      p.amount_after_fees != null
-                         ? +(p.amount_after_fees.toFixed(2))
-                         : null,
-      currency:        (p.currency || 'usd').toUpperCase(),
-      source:          'ads',                       // this product = ads, always
-      product_id:      ADS_PRODUCT_ID,
-      paid_at:         p.paid_at || p.created_at || null,
-      synced_at:       new Date().toISOString(),
-    }));
-
-    // sort newest-first so the summary reads naturally
-    payload.sort((a, b) => String(b.paid_at).localeCompare(String(a.paid_at)));
-
-    // --- 3. upsert into Supabase ---
-    // on_conflict=whop_payment_id + merge-duplicates => re-running overwrites
-    // the same payment instead of inserting a duplicate. Safe to run any time.
-    const upsertRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/ht_sales?on_conflict=whop_payment_id`,
-      {
-        method: 'POST',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'resolution=merge-duplicates,return=minimal',
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-
-    if (!upsertRes.ok) {
-      const errText = await upsertRes.text();
-      return res.status(502).json({
-        ok: false,
-        stage: 'supabase',
-        status: upsertRes.status,
-        error: errText,
+    if (htPayments.length === 0) {
+      return res.status(200).json({
+        ok: true, message: 'No high-ticket payments to log (all were low-ticket or unpaid)',
+        dealsWritten: 0, ltSkipped,
       });
     }
 
-    // --- 4. summary ---
-    const totalGross = payload.reduce((s, p) => s + (p.amount_gross || 0), 0);
+    // --- 3. find which Whop payments are already in `deals` (idempotency) ---
+    const ids = htPayments.map(p => p.id).filter(Boolean);
+    const existing = new Set();
+    // query in chunks so the URL never gets too long
+    for (let i = 0; i < ids.length; i += 50) {
+      const chunk = ids.slice(i, i + 50);
+      const inList = chunk.map(id => `"${id}"`).join(',');
+      const checkRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/deals?select=whop_payment_id&whop_payment_id=in.(${inList})`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+      );
+      if (checkRes.ok) {
+        const rows = await checkRes.json();
+        rows.forEach(r => { if (r.whop_payment_id) existing.add(r.whop_payment_id); });
+      }
+    }
+
+    // --- 4. build deal rows for payments not already logged ---
+    const seen = new Set(); // guard against the same id appearing twice in one pull
+    const newRows = [];
+    for (const p of htPayments) {
+      if (!p.id || existing.has(p.id) || seen.has(p.id)) continue;
+      seen.add(p.id);
+
+      const gross = +(((p.usd_total != null ? p.usd_total : p.total) || 0).toFixed(2));
+      const paidAt = p.paid_at || p.created_at || null;
+      const dateOnly = paidAt ? String(paidAt).split('T')[0] : null;
+
+      newRows.push({
+        name:    (p.billing_address && p.billing_address.name)
+                   || (p.user && p.user.name) || null,
+        email:   (p.user && p.user.email) || null,
+        date:    dateOnly,
+        usd:     gross,
+        contract: 0,
+        source:  'ads',                       // default; manually switchable to 'organic'
+        closer:  null,
+        setter:  null,
+        notes:   'Auto-synced from Whop',
+        whop_payment_id: p.id,
+      });
+    }
+
+    if (newRows.length === 0) {
+      return res.status(200).json({
+        ok: true, message: 'All Whop payments already logged — nothing new',
+        dealsWritten: 0, ltSkipped, alreadyLogged: existing.size,
+      });
+    }
+
+    // --- 5. insert the new deals ---
+    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/deals`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(newRows),
+    });
+
+    if (!insertRes.ok) {
+      const errText = await insertRes.text();
+      return res.status(502).json({ ok: false, stage: 'supabase', status: insertRes.status, error: errText });
+    }
+
+    const totalGross = newRows.reduce((s, r) => s + (r.usd || 0), 0);
     return res.status(200).json({
       ok: true,
-      salesWritten: payload.length,
+      dealsWritten: newRows.length,
       totalGrossUsd: +totalGross.toFixed(2),
+      ltSkipped,
+      alreadyLogged: existing.size,
       whopPaymentsSeen: payments.length,
       whopPagesFetched: pages,
     });
