@@ -3947,9 +3947,12 @@ function renderRetainers() {
   tbody.innerHTML = rows.map(r => {
     const when   = r.paid_at ? retFmtDate(new Date(r.paid_at)) : '—';
     const gross  = parseFloat(r.amount_gross) || 0;
+    // Clickable source toggle — tap to flip ads <-> organic. The choice is
+    // saved to Supabase and survives every Whop sync (sync no longer writes
+    // the source column).
     const srcPill = (r.source === 'organic')
-      ? '<span class="pill" style="background:var(--amberd);color:var(--amber)">Organic</span>'
-      : '<span class="pill ads">Ads</span>';
+      ? `<span class="pill" onclick="toggleSource(${r.id})" title="Click to switch to Ads" style="background:var(--amberd);color:var(--amber);cursor:pointer">Organic</span>`
+      : `<span class="pill ads" onclick="toggleSource(${r.id})" title="Click to switch to Organic" style="cursor:pointer">Ads</span>`;
 
     if (!r.is_retainer) {
       // Not flagged a retainer — show muted, with a one-tap "Mark retainer" action
@@ -4001,6 +4004,23 @@ async function markRetainer(id, isRet) {
     showToast(isRet ? '✓ Marked as retainer — enter the next 2 amounts' : '✓ Unmarked');
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// Toggle a payment's source between 'ads' and 'organic'. Saved to Supabase;
+// because the Whop sync no longer writes the source column, this sticks.
+async function toggleSource(id) {
+  try {
+    const rows = (typeof RETAINER_PAYMENTS !== 'undefined' && RETAINER_PAYMENTS) ? RETAINER_PAYMENTS : [];
+    const row = rows.find(r => r.id === id);
+    const current = (row && row.source === 'organic') ? 'organic' : 'ads';
+    const next = current === 'ads' ? 'organic' : 'ads';
+    await patchRetainerPayment(id, { source: next });
+    RETAINER_PAYMENTS = await getRetainerPayments();
+    renderRetainers();
+    showToast('✓ Source set to ' + (next === 'ads' ? 'Ads' : 'Organic'));
+  } catch(e) {
+    showToast('Error updating source: ' + e.message, 'error');
   }
 }
 
