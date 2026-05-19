@@ -2537,9 +2537,13 @@ function computeMetrics(period) {
     const bcCount = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
       ? BOOKED_CALLS.filter(b => (b.status||'') !== 'cancelled').length
       : 0;
-    // BOOKED CALLS (All Time): stays LIVE — updates on every new Calendly booking.
-    // max() across live booked_calls, legacy daily_log, and seed so the card only ever grows.
-    const bookedAuthoritative = Math.max(bcCount, dbBooked, ALL_TIME.booked);
+    // BOOKED CALLS (All Time) = verified pre-April history + live booked_calls count.
+    // HISTORICAL_BOOKED_PRE_APRIL is a LOCKED constant: 110 verified booked calls from the
+    // Calendly "SWH - Work With Us 2026" export, Jan 1 - Mar 31 2026 (before the booked_calls
+    // table existed). It must never be recalculated. bcCount is the live booked_calls count
+    // (April onward, source of truth) and grows with every new booking. No overlap between them.
+    const HISTORICAL_BOOKED_PRE_APRIL = 110;
+    const bookedAuthoritative = HISTORICAL_BOOKED_PRE_APRIL + bcCount;
     const dbShows  = DB_LOG.reduce((s,l)=>s+(l.shows||0),0);
     const dbNoshows= DB_LOG.reduce((s,l)=>s+(l.noshows||0),0);
     // Closer-logged shows/noshows from call_outcomes table
