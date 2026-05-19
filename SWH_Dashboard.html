@@ -3524,17 +3524,26 @@ function renderSalesDeals() {
   const tbody=document.getElementById('deals-tbody');
   if(tbody){
     const sorted=[...DB_DEALS].sort((a,b)=>new Date(b.date)-new Date(a.date));
-    tbody.innerHTML=sorted.length?sorted.map((deal,i)=>`
+    tbody.innerHTML=sorted.length?sorted.map((deal,i)=>{
+      // editable source dropdown — value normalised to lowercase
+      const isOrg = String(deal.source||'').toLowerCase()==='organic';
+      const srcSel = `<select onchange="changeDealSource('${deal.id}', this.value)"
+          style="background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:3px 6px;color:${isOrg?'var(--amber)':'var(--blue)'};font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer">
+          <option value="ads"${isOrg?'':' selected'}>Ads</option>
+          <option value="organic"${isOrg?' selected':''}>Organic</option>
+        </select>`;
+      return `
       <tr>
         <td>${sorted.length-i}</td>
         <td>${deal.name}</td><td>${deal.date}</td>
         <td style="color:${deal.usd>0?'var(--accent)':'var(--t3)'};font-family:var(--font-mono);font-weight:700">${deal.usd>0?'$'+deal.usd.toLocaleString():'—'}</td>
         <td style="font-family:var(--font-mono);color:var(--blue)">$${(deal.contract||0).toLocaleString()}</td>
-        <td><span class="pill ${(deal.source||'').toLowerCase()}">${deal.source||'—'}</span></td>
+        <td>${srcSel}</td>
         <td><span class="pill ${(deal.closer||'').toLowerCase()}">${deal.closer||'—'}</span></td>
         <td>${deal.setter||'—'}</td>
         <td style="color:var(--t3)">${deal.notes||'—'}</td>
-      </tr>`).join('')
+      </tr>`;
+    }).join('')
     :'<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:24px">No deals yet — use Add New Deal</td></tr>';
   }
 }
