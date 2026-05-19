@@ -18,8 +18,10 @@
 //
 // Each run pulls the FULL payment history for both products, so the data
 // self-heals: re-running never duplicates (whop_payment_id is unique) and
-// the upsert is set to PRESERVE is_retainer / amount_2 / amount_3 — the
-// columns Salima edits — so a sync never wipes her input.
+// the upsert is set to PRESERVE is_retainer / amount_2 / amount_3 / source —
+// the columns Salima edits — so a sync never wipes her input. New payments
+// default to source = 'ads' (set on the table); Salima can correct any row
+// to 'organic' in the dashboard and that correction sticks across syncs.
 
 const WHOP_KEY     = process.env.WHOP_API_KEY;
 const SUPABASE_URL = 'https://qstlyvauppjkdiwpgtql.supabase.co';
@@ -141,14 +143,15 @@ export default async function handler(req, res) {
                          ? +(p.amount_after_fees.toFixed(2))
                          : null,
       currency:        (p.currency || 'usd').toUpperCase(),
-      source:          source,                      // 'ads' or 'organic'
       product_id:      source === 'ads' ? ADS_PRODUCT_ID : ORGANIC_PRODUCT_ID,
       paid_at:         p.paid_at || p.created_at || null,
       synced_at:       new Date().toISOString(),
-      // NOTE: is_retainer / amount_2 / amount_3 are deliberately NOT sent.
-      // They are owned by Salima in the dashboard. Omitting them from the
-      // upsert means merge-duplicates leaves any existing values untouched,
-      // and new rows fall back to the table default (is_retainer = false).
+      // NOTE: is_retainer / amount_2 / amount_3 / source are deliberately NOT
+      // sent. They are owned by Salima in the dashboard. Omitting them from
+      // the upsert means merge-duplicates leaves any existing values
+      // untouched, and new rows fall back to the table defaults
+      // (is_retainer = false, source = 'ads'). This is what lets a manual
+      // ads/organic correction in the dashboard survive every future sync.
     }));
 
     // sort newest-first so the summary reads naturally
