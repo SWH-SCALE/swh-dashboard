@@ -1021,17 +1021,17 @@ select.input-field option { background: var(--bg2); }
       </div>
     </div>
     <div class="kpi-card purple">
-      <div class="kpi-label">HT Sales from Ads</div>
+      <div class="kpi-label">Cash Collected — Ads</div>
       <div class="kpi-value mono" id="k-ht-ads">$0</div>
       <div class="kpi-meta">
         <span class="kpi-badge neutral" id="k-ht-count">0 deals</span>
       </div>
     </div>
     <div class="kpi-card accent">
-      <div class="kpi-label">Total Cash Collected</div>
+      <div class="kpi-label">Cash Collected — Organic</div>
       <div class="kpi-value mono" id="k-cash">$0</div>
       <div class="kpi-meta">
-        <span class="kpi-badge up" id="k-cash-split">ads + organic</span>
+        <span class="kpi-badge up" id="k-cash-split">0 deals</span>
       </div>
     </div>
     <div class="kpi-card amber">
@@ -2381,6 +2381,13 @@ async function insertDeal(deal) {
     body: JSON.stringify(deal),
   });
 }
+// Update a single deal's source ('ads' | 'organic') — used by the Deal Log dropdown.
+async function updateDealSource(id, source) {
+  return await sbFetch('deals?id=eq.' + id, {
+    method: 'PATCH',
+    body: JSON.stringify({ source: source }),
+  });
+}
 async function insertLog(entry) {
   return await sbFetch('daily_log', {
     method: 'POST',
@@ -2551,6 +2558,12 @@ function initPeriodBtns() {
 // ═══════════════════════════════════════════
 // COMPUTE METRICS
 // ═══════════════════════════════════════════
+// Deal source is stored inconsistently: Whop sync writes 'ads' (lowercase),
+// older Call-Outcome rows write 'Ads'. Always compare case-insensitively.
+// A deal counts as ads-sourced unless it is explicitly marked organic.
+function isAdsDeal(dl)     { return String(dl && dl.source || '').toLowerCase() !== 'organic'; }
+function isOrganicDeal(dl) { return String(dl && dl.source || '').toLowerCase() === 'organic'; }
+
 function computeMetrics(period) {
   const deals = DB_DEALS;
   const log   = DB_LOG;
@@ -2559,8 +2572,8 @@ function computeMetrics(period) {
 
   if (period === 'all') {
     const htCash = deals.filter(d=>d.usd>0).reduce((s,d)=>s+(d.usd||0),0);
-    const htAds  = deals.filter(d=>d.source==='Ads'&&d.usd>0).reduce((s,d)=>s+(d.usd||0),0);
-    const htOrg  = deals.filter(d=>d.source!=='Ads'&&d.usd>0).reduce((s,d)=>s+(d.usd||0),0);
+    const htAds  = deals.filter(d=>isAdsDeal(d)&&d.usd>0).reduce((s,d)=>s+(d.usd||0),0);
+    const htOrg  = deals.filter(d=>isOrganicDeal(d)&&d.usd>0).reduce((s,d)=>s+(d.usd||0),0);
     const contractTotal = deals.reduce((s,d)=>s+(d.contract||0),0);
     const pipeline = deals.filter(d=>!d.usd||d.usd===0).reduce((s,d)=>s+(d.contract||0),0);
     // Pull live totals from DB_LOG for calls, leads, spend, lt
@@ -2705,8 +2718,8 @@ function computeMetrics(period) {
   // Use sheet leads if available and bigger
   const leads = Math.max(leadsFromLog, leadsFromSheet);
   const htCash = pDeals.reduce((s,d)=>s+(d.usd||0),0);
-  const htAds  = pDeals.filter(d=>d.source==='Ads').reduce((s,d)=>s+(d.usd||0),0);
-  const htOrg  = pDeals.filter(d=>d.source!=='Ads').reduce((s,d)=>s+(d.usd||0),0);
+  const htAds  = pDeals.filter(d=>isAdsDeal(d)).reduce((s,d)=>s+(d.usd||0),0);
+  const htOrg  = pDeals.filter(d=>isOrganicDeal(d)).reduce((s,d)=>s+(d.usd||0),0);
   const contractTotal = pDeals.reduce((s,d)=>s+(d.contract||0),0);
   const pipeline = deals.filter(d=>(!d.usd||d.usd===0)&&inPeriod(d.date)).reduce((s,d)=>s+(d.contract||0),0);
 
@@ -3218,7 +3231,7 @@ function renderExec(d) {
   const cpbc   = d.booked ? d.spend/d.booked  : 0;
   const showR  = (d.showBase||d.booked) ? d.shows/(d.showBase||d.booked)  : 0;
   const cr     = d.shows  ? d.rawDeals.length/d.shows : 0;
-  const roas   = d.spend  ? d.cash/d.spend    : 0;
+  const roas   = d.spend  ? ((d.htAds||0)+(d.lt||0))/d.spend : 0; // ads revenue / ad spend
   const roasCon= d.spend  ? d.contractTotal/d.spend : 0;
   const cac    = d.rawDeals.length ? d.spend/d.rawDeals.length : 0;
 
@@ -3260,20 +3273,23 @@ function renderExec(d) {
     : '');
 
   // Close Rate (Ads) — deals from ads source / showed calls
-  const adsDeals = d.rawDeals.filter(dl => dl.source === 'Ads').length;
+  const adsDeals = d.rawDeals.filter(dl => isAdsDeal(dl)).length;
   const closeRateAds = d.shows > 0 ? adsDeals / d.shows : 0;
   set('k-close-rate', d.shows ? Math.round(closeRateAds*100)+'%' : '—');
   set('k-close-rate-meta', d.shows ? (adsDeals + ' of ' + d.shows + ' shows closed') : '— ads deals');
   badge('k-close-rate-meta', closeRateAds >= 0.25 && d.shows > 0 ? 'up' : d.shows > 0 ? 'warn' : 'neutral');
 
+  // Cash Collected — Ads (sum of usd on ads-sourced deals this period)
+  const adsDealCount = d.rawDeals.filter(dl => isAdsDeal(dl)).length;
+  const orgDealCount = d.rawDeals.filter(dl => isOrganicDeal(dl)).length;
   set('k-ht-ads', fmtFull(d.htAds));
-  set('k-ht-count', d.rawDeals.length+' deals · $'+d.contractTotal.toLocaleString()+' contracts');
+  set('k-ht-count', adsDealCount + ' deal' + (adsDealCount===1?'':'s'));
   badge('k-ht-count', d.htAds>0?'up':'neutral');
 
-  set('k-cash', fmtFull(d.cash));
-  const adsPct=d.cash?Math.round(d.htAds/d.cash*100):0;
-  set('k-cash-split', adsPct+'% from ads');
-  badge('k-cash-split', d.cash>0?'up':'neutral');
+  // Cash Collected — Organic (sum of usd on organic-sourced deals this period)
+  set('k-cash', fmtFull(d.htOrg));
+  set('k-cash-split', orgDealCount + ' deal' + (orgDealCount===1?'':'s'));
+  badge('k-cash-split', d.htOrg>0?'up':'neutral');
 
   set('k-cac', d.rawDeals.length?fmtFull(cac):'—');
   set('k-cac-flag', cac>0?(cac<=3000?'✓ under $3k':'review – over $3k'):'—');
@@ -3325,15 +3341,16 @@ function renderTrendChart(d) {
 function renderSourceChart(d) {
   if(chartSource)chartSource.destroy();
   const ctx=document.getElementById('chart-source');if(!ctx)return;
-  chartSource=new Chart(ctx,{type:'doughnut',data:{labels:['HT Ads','Low-Ticket'],datasets:[{
-    data:[d.htAds||0,d.lt||0],
-    backgroundColor:['rgba(91,156,246,0.7)','rgba(255,183,66,0.7)'],
-    borderColor:['#5B9CF6','#FFB742'],borderWidth:1.5,
+  chartSource=new Chart(ctx,{type:'doughnut',data:{labels:['HT Ads','HT Organic','Low-Ticket'],datasets:[{
+    data:[d.htAds||0,d.htOrg||0,d.lt||0],
+    backgroundColor:['rgba(91,156,246,0.7)','rgba(0,245,168,0.7)','rgba(255,183,66,0.7)'],
+    borderColor:['#5B9CF6','#00F5A8','#FFB742'],borderWidth:1.5,
   }]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',
     plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' $'+c.raw.toLocaleString()}}}}});
-  const total=(d.htAds||0)+(d.lt||0)||1;
+  const total=(d.htAds||0)+(d.htOrg||0)+(d.lt||0)||1;
   document.getElementById('source-legend').innerHTML=[
     {label:'HT Ads',val:d.htAds||0,color:'#5B9CF6'},
+    {label:'HT Organic',val:d.htOrg||0,color:'#00F5A8'},
     {label:'Low-Ticket',val:d.lt||0,color:'#FFB742'},
   ].map(l=>`<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#8895A7">
     <div style="width:8px;height:8px;border-radius:2px;background:${l.color}"></div>
@@ -3407,47 +3424,21 @@ function renderScale(d,m) {
 // ═══════════════════════════════════════════
 // PROFIT & LOSS (ADS) — exec dashboard
 // ═══════════════════════════════════════════
-// Ad spend vs (HT ads cash + LT sales). HT ads cash is the LARGER of:
-//   - the manual deal-log ads HT cash for this period (d.htAds), and
-//   - the Whop ht_sales gross for this period (HT_ADS rows in period).
-// Taking the max avoids undercounting while never double-counting a sale.
-function htAdsWhopForPeriod(period) {
-  const rows = (typeof HT_ADS !== 'undefined' && HT_ADS) ? HT_ADS : [];
-  if (!rows.length) return 0;
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  function inP(dateStr) {
-    if (!dateStr) return false;
-    const d = new Date(dateStr);
-    if (period === 'today') {
-      const sorted = rows.slice().sort((a,b)=>new Date(b.paid_at)-new Date(a.paid_at));
-      const mostRecent = sorted.length && sorted[0].paid_at
-        ? sorted[0].paid_at.split('T')[0] : todayStr;
-      return dateStr === mostRecent;
-    }
-    if (period === '7d')  { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
-    if (period === 'mtd') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
-    if (period === 'lm')  { const l=new Date(today); l.setMonth(l.getMonth()-1); return d.getFullYear()===l.getFullYear()&&d.getMonth()===l.getMonth(); }
-    return true; // all
-  }
-  return rows
-    .filter(r => r.paid_at && inP(r.paid_at.split('T')[0]))
-    .reduce((s,r) => s + (parseFloat(r.amount_gross) || 0), 0);
-}
-
+// The ads P&L compares ad spend against ads-sourced revenue ONLY:
+//   ad spend  vs  (ads HT cash collected + low-ticket sales)
+// Organic HT cash is real revenue but is NOT ad-driven, so it is excluded
+// here — it would distort the return-on-ad-spend picture. Organic is shown
+// separately on the "Cash Collected — Organic" card.
 function renderPL(d) {
   const spend = d.spend || 0;
-  // HT ads cash: larger of manual deal-log ads HT vs Whop ht_sales gross (same period)
-  const htManual = d.htAds || 0;
-  const htWhop   = htAdsWhopForPeriod(currentPeriod);
-  const htAds    = Math.max(htManual, htWhop);
-  const lt       = d.lt || 0;
-  const revenue  = htAds + lt;
-  const net      = revenue - spend;
+  const htAds = d.htAds || 0;   // ads-sourced HT cash collected, this period
+  const lt    = d.lt    || 0;   // low-ticket sales, this period (ads funnel front-end)
+  const revenue = htAds + lt;
+  const net     = revenue - spend;
 
   set('pl-spend', fmtFull(spend));
   set('pl-ht',    fmtFull(htAds));
-  set('pl-ht-src', htWhop > htManual ? 'from Whop · ads' : 'from deal log · ads');
+  set('pl-ht-src', 'ads deals · cash collected');
   set('pl-lt',    fmtFull(lt));
   set('pl-net',   (net < 0 ? '-$' : '$') + Math.abs(Math.round(net)).toLocaleString());
 
@@ -3457,7 +3448,7 @@ function renderPL(d) {
   badge('pl-net-badge', net >= 0 ? 'up' : 'down');
 
   set('pl-summary',
-    'Ad spend ' + fmtFull(spend) + ' vs revenue ' + fmtFull(revenue) +
+    'Ad spend ' + fmtFull(spend) + ' vs ads revenue ' + fmtFull(revenue) +
     ' (HT ads ' + fmtFull(htAds) + ' + low-ticket ' + fmtFull(lt) + ') — ' +
     (net >= 0 ? 'net profit of ' + fmtFull(net) + '.' : 'net loss of ' + fmtFull(Math.abs(net)) + '.'));
 }
@@ -3557,11 +3548,11 @@ function renderCloserCards() {
     {name:'Frankie',initials:'FR',color:'#B794F4',bg:'rgba(183,148,244,0.12)',
      deals:d.frankieDeals,cash:d.frankieCash,shows:d.frankieShows,
      contracts:DB_DEALS.filter(dl=>dl.closer==='Frankie').reduce((s,dl)=>s+(dl.contract||0),0),
-     adsCash:DB_DEALS.filter(dl=>dl.closer==='Frankie'&&dl.source==='Ads').reduce((s,dl)=>s+(dl.usd||0),0)},
+     adsCash:DB_DEALS.filter(dl=>dl.closer==='Frankie'&&isAdsDeal(dl)).reduce((s,dl)=>s+(dl.usd||0),0)},
     {name:'Mehdi',initials:'ME',color:'#FFB742',bg:'rgba(255,183,66,0.12)',
      deals:d.mehdiDeals,cash:d.mehdiCash,shows:d.mehdiShows,
      contracts:DB_DEALS.filter(dl=>dl.closer==='Mehdi').reduce((s,dl)=>s+(dl.contract||0),0),
-     adsCash:DB_DEALS.filter(dl=>dl.closer==='Mehdi'&&dl.source==='Ads').reduce((s,dl)=>s+(dl.usd||0),0)},
+     adsCash:DB_DEALS.filter(dl=>dl.closer==='Mehdi'&&isAdsDeal(dl)).reduce((s,dl)=>s+(dl.usd||0),0)},
   ];
   document.getElementById('closer-grid').innerHTML=closers.map(c=>{
     const cr=c.shows?Math.round(c.deals/c.shows*100):0;
@@ -3628,18 +3619,43 @@ function renderDealLog() {
   const tbody=document.getElementById('deal-log-tbody');
   if(!tbody)return;
   const sorted=[...DB_DEALS].sort((a,b)=>new Date(b.date)-new Date(a.date));
-  tbody.innerHTML=sorted.length?sorted.map(d=>`
+  tbody.innerHTML=sorted.length?sorted.map(d=>{
+    // source dropdown — value normalised to lowercase; 'organic' only if explicitly set
+    const isOrg = String(d.source||'').toLowerCase()==='organic';
+    const srcSel = `<select onchange="changeDealSource('${d.id}', this.value)"
+        style="background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:3px 6px;color:${isOrg?'var(--amber)':'var(--blue)'};font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer">
+        <option value="ads"${isOrg?'':' selected'}>Ads</option>
+        <option value="organic"${isOrg?' selected':''}>Organic</option>
+      </select>`;
+    return `
     <tr>
       <td>${d.name}</td><td>${d.date}</td>
       <td style="color:${d.usd>0?'var(--accent)':'var(--t3)'};font-weight:700;font-family:var(--font-mono)">${d.usd>0?'$'+d.usd.toLocaleString():'—'}</td>
       <td style="color:var(--blue);font-family:var(--font-mono)">$${(d.contract||0).toLocaleString()}</td>
-      <td><span class="pill ${(d.source||'').toLowerCase()}">${d.source||'—'}</span></td>
+      <td>${srcSel}</td>
       <td><span class="pill ${(d.closer||'').toLowerCase()}">${d.closer||'—'}</span></td>
       <td>${d.setter||'—'}</td>
       <td style="color:var(--t3)">${d.notes||'—'}</td>
       <td><button onclick="deleteDeal('${d.id}')" style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer">×</button></td>
-    </tr>`)
+    </tr>`;
+  })
   .join(''):'<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:24px">No deals yet</td></tr>';
+}
+
+// Change a deal's source from the Deal Log dropdown. Persists to Supabase and
+// refreshes every dashboard metric (Ads/Organic cash, P&L, ROAS, source split).
+async function changeDealSource(id, source) {
+  try {
+    await updateDealSource(id, source);
+    DB_DEALS = await getDeals();
+    renderDealLog();
+    renderAll();
+    showToast('✓ Source set to ' + (source==='organic'?'Organic':'Ads'));
+  } catch(e) {
+    showToast('Error updating source: ' + e.message, 'error');
+    DB_DEALS = await getDeals();
+    renderDealLog();
+  }
 }
 
 async function submitDeal() {
@@ -3737,7 +3753,7 @@ async function submitDaily() {
 // ═══════════════════════════════════════════
 function renderSlack(d) {
   const S=getSettings();
-  const roas=d.spend?d.cash/d.spend:0;
+  const roas=d.spend?((d.htAds||0)+(d.lt||0))/d.spend:0; // ads revenue / ad spend
   const roasCon=d.spend?d.contractTotal/d.spend:0;
   const showup=(d.showBase||d.booked)?d.shows/(d.showBase||d.booked):0;
   const cr=d.shows?d.rawDeals.length/d.shows:0;
@@ -3762,16 +3778,16 @@ LT Sales:     <span class="sv">${Math.round((d.lt||0)/27)} × $27 = $${(d.lt||0)
 ${sF} Show-up: <span class="sv">${d.booked?Math.round(showup*100)+'%':'—'}</span>  (${d.shows} of ${d.showBase||d.booked})  ·  No-shows: <span class="sv">${d.noshows}</span>
 <span class="sh">💰 SALES</span>
 ${cF} HT Closes: <span class="sv">${d.rawDeals.length}</span>  ·  Close rate: <span class="sv">${d.shows?Math.round(cr*100)+'%':'—'}</span>
-Cash: <span class="sv">$${d.cash.toLocaleString()}</span>  ·  Contracts: <span class="sv">$${d.contractTotal.toLocaleString()}</span>  ·  Pipeline: <span class="sv">$${(d.pipeline||0).toLocaleString()}</span>
+Cash (ads): <span class="sv">$${((d.htAds||0)+(d.lt||0)).toLocaleString()}</span>  ·  Cash (organic): <span class="sv">$${(d.htOrg||0).toLocaleString()}</span>  ·  Contracts: <span class="sv">$${d.contractTotal.toLocaleString()}</span>
 <span class="sh">📈 ECONOMICS</span>
-${rF} ROAS (cash): <span class="sv">${d.spend?roas.toFixed(2)+'x':'—'}</span>  ·  Contract ROAS: <span class="sv">${d.spend?roasCon.toFixed(1)+'x':'—'}</span>
-P&L (cash): <span class="${d.cash>=d.spend?'sv':'sr'}">$${(d.cash-d.spend).toLocaleString()}</span>
+${rF} ROAS (ads): <span class="sv">${d.spend?roas.toFixed(2)+'x':'—'}</span>  ·  Contract ROAS: <span class="sv">${d.spend?roasCon.toFixed(1)+'x':'—'}</span>
+P&L (ads): <span class="${((d.htAds||0)+(d.lt||0))>=d.spend?'sv':'sr'}">$${(((d.htAds||0)+(d.lt||0))-d.spend).toLocaleString()}</span>
 <span class="divider">━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
 ${roas>=1&&showup>=0.70&&cr>=0.25?'<span style="color:#00F5A8">🟢 Core funnel healthy. Show-up 77% + Close rate 41% strong.</span>':'<span class="sw">🟡 Cash ROAS still below 1x. Focus on payment collection from signed deals.</span>'}`;
   const wb=document.getElementById('slack-weekly-body');
   if(wb) wb.innerHTML=`<span class="sh">📈 SWH Weekly — w/e ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}</span>
 <span class="divider">━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
-Spend: <span class="sv">$${d.spend.toLocaleString()}</span>  ·  Cash: <span class="sv">$${d.cash.toLocaleString()}</span>  ·  ROAS: ${rF} <span class="sv">${d.spend?roas.toFixed(2)+'x':'—'}</span>
+Spend: <span class="sv">$${d.spend.toLocaleString()}</span>  ·  Ads revenue: <span class="sv">$${((d.htAds||0)+(d.lt||0)).toLocaleString()}</span>  ·  ROAS: ${rF} <span class="sv">${d.spend?roas.toFixed(2)+'x':'—'}</span>
 Leads: <span class="sv">${d.leads}</span>  ·  Booked: <span class="sv">${d.booked}</span>  ·  Show-up: ${sF} <span class="sv">${d.booked?Math.round(showup*100)+'%':'—'}</span>
 Closes: <span class="sv">${d.rawDeals.length}</span>  ·  Close rate: ${cF} <span class="sv">${d.shows?Math.round(cr*100)+'%':'—'}</span>
 Top closer: <span class="sv">${d.frankieCash>=d.mehdiCash?'Frankie':'Mehdi'} — $${Math.max(d.frankieCash,d.mehdiCash).toLocaleString()}</span>`;
@@ -4491,10 +4507,11 @@ function generateWrittenReport() {
   const cpbc   = d.booked ? d.spend/d.booked  : 0;
   const showR  = (d.showBase||d.booked) ? d.shows/(d.showBase||d.booked)  : 0;
   const cr     = d.shows  ? d.rawDeals.length/d.shows : 0;
-  const roas   = d.spend  ? d.cash/d.spend    : 0;
+  const roas   = d.spend  ? ((d.htAds||0)+(d.lt||0))/d.spend : 0; // ads revenue / ad spend
   const roasCon= d.spend  ? d.contractTotal/d.spend : 0;
   const cac    = d.rawDeals.length ? d.spend/d.rawDeals.length : 0;
-  const netPL  = d.cash - d.spend;
+  const adsRevenue = (d.htAds||0) + (d.lt||0);   // ads-sourced revenue: ads HT + LT
+  const netPL  = adsRevenue - d.spend;
   const netCon = d.contractTotal - d.spend;
   const ltSales= Math.round((d.lt||0)/27);
   const topCloser = d.frankieCash >= d.mehdiCash ? 'Frankie' : 'Mehdi';
@@ -4526,7 +4543,7 @@ function generateWrittenReport() {
   }
 
   // Total cash & P&L
-  lines.push(`In total, we collected $${d.cash.toLocaleString()} in cash this period against $${d.spend.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} in ad spend, resulting in a cash P&L of ${netPL >= 0 ? '+' : ''}$${netPL.toLocaleString()}. When factoring in signed contract values, our P&L improves to ${netCon >= 0 ? '+' : ''}$${netCon.toLocaleString()}.`);
+  lines.push(`In total, we generated $${adsRevenue.toLocaleString()} in ads-sourced revenue this period (HT ads $${(d.htAds||0).toLocaleString()} + low-ticket $${(d.lt||0).toLocaleString()}) against $${d.spend.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} in ad spend, resulting in an ads P&L of ${netPL >= 0 ? '+' : ''}$${netPL.toLocaleString()}. Organic HT cash of $${(d.htOrg||0).toLocaleString()} is tracked separately and not counted against ad spend. When factoring in signed contract values, our P&L improves to ${netCon >= 0 ? '+' : ''}$${netCon.toLocaleString()}.`);
 
   // ROAS & efficiency
   if (d.spend > 0) {
