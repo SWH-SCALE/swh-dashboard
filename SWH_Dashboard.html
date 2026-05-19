@@ -2537,13 +2537,12 @@ function computeMetrics(period) {
     const bcCount = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
       ? BOOKED_CALLS.filter(b => (b.status||'') !== 'cancelled').length
       : 0;
-    // BOOKED CALLS (All Time) = verified pre-April history + live booked_calls count.
-    // HISTORICAL_BOOKED_PRE_APRIL is a LOCKED constant: 110 verified booked calls from the
-    // Calendly "SWH - Work With Us 2026" export, Jan 1 - Mar 31 2026 (before the booked_calls
-    // table existed). It must never be recalculated. bcCount is the live booked_calls count
-    // (April onward, source of truth) and grows with every new booking. No overlap between them.
-    const HISTORICAL_BOOKED_PRE_APRIL = 110;
-    const bookedAuthoritative = HISTORICAL_BOOKED_PRE_APRIL + bcCount;
+    // BOOKED CALLS (All Time) = live booked_calls count, the single source of truth.
+    // As of 2026-05-19, booked_calls contains the FULL history: Jan-Mar 2026 calls were
+    // backfilled in (87 rows) alongside April-onward bookings. So bcCount alone is the
+    // complete all-time count — no separate historical constant is added (that would
+    // double-count). The card grows live with every new Calendly booking.
+    const bookedAuthoritative = bcCount;
     const dbShows  = DB_LOG.reduce((s,l)=>s+(l.shows||0),0);
     const dbNoshows= DB_LOG.reduce((s,l)=>s+(l.noshows||0),0);
     // Closer-logged shows/noshows from call_outcomes table
@@ -2557,32 +2556,24 @@ function computeMetrics(period) {
     // Use live sheet count for LT if available
     const sheetLtRevenue = LT_FROM_SHEET > 0 ? LT_FROM_SHEET * 27 : 0;
     console.log('All Time LT: sheet=', sheetLtRevenue, 'db=', dbLt, 'hardcoded=', ALL_TIME.lt);
-    // ── SHOW-UP RATE: verified baseline + live activity after cutoff ──
-    // Baseline = verified Apr 1 – May 18 2026 figures (ALL_TIME.booked 75 / shows 39 / noshows 36).
-    // On top of that we add LIVE booked_calls activity scheduled AFTER the cutoff date, so the
-    // show-up rate genuinely moves with every new booking + show — with no double-count of the
-    // verified window (the 12 existing rows are mid-May and fall inside the baseline).
-    const SHOW_RATE_CUTOFF = '2026-05-18';   // verified baseline covers up to & including this date
-    const afterCutoff = (b) => {
-      const when = b.scheduled_at ? String(b.scheduled_at).split('T')[0] : null;
-      return when && when > SHOW_RATE_CUTOFF;
-    };
-    const liveRows = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
-      ? BOOKED_CALLS.filter(b => afterCutoff(b) && (b.status||'') !== 'cancelled')
+    // ── SHOW-UP RATE (All Time) ──
+    // ALL-TIME SHOW-UP RATE (Option B — conservative floor):
+    // booked_calls now holds the complete history (Jan 2026 onward, backfilled 2026-05-19).
+    // Rate = showed / ALL booked calls. Calls with no recorded outcome ('scheduled') count
+    // in the denominator but not the numerator, so the rate is a deliberate FLOOR — it can
+    // only understate, never overstate. As unmatched calls get GHL outcomes, the rate rises
+    // toward the true value. (MTD / Last Month branches pull live and are unaffected.)
+    const atCalls = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
+      ? BOOKED_CALLS.filter(b => (b.status||'') !== 'cancelled')
       : [];
-    const newBooked  = liveRows.length;
-    const newShows   = liveRows.filter(b => b.status === 'showed').length;
-    const newNoshows = liveRows.filter(b => b.status === 'no_show').length;
-    // Pending = live rows after cutoff still awaiting an outcome (booked, not yet shown/no-shown).
-    // These DO count in the rate denominator, so the note explains any dip.
-    const pendingCallsAT = liveRows.filter(b => {
+    const showRateBooked   = atCalls.length;
+    const showsClampedAT    = atCalls.filter(b => b.status === 'showed').length;
+    const noshowsClampedAT  = atCalls.filter(b => b.status === 'no_show').length;
+    // Pending = booked calls with no outcome yet (future calls + unmatched history).
+    const pendingCallsAT = atCalls.filter(b => {
       const st = b.status || '';
       return st !== 'showed' && st !== 'no_show';
     }).length;
-    // Totals = verified baseline + new live activity
-    const showRateBooked = ALL_TIME.booked  + newBooked;   // rate denominator (75 + new)
-    const showsClampedAT   = ALL_TIME.shows   + newShows;  // rate numerator   (39 + new)
-    const noshowsClampedAT = ALL_TIME.noshows + newNoshows;
     // META SPEND: automated Meta ad spend is the source of truth when available; fall back to manual log/ALL_TIME
     const metaSpendAll = getMetaSpendForPeriod('all');
     const spendAuthoritative = metaSpendAll > 0 ? metaSpendAll : Math.max(dbSpend, ALL_TIME.spend);
@@ -2598,9 +2589,9 @@ function computeMetrics(period) {
       htCash, htAds, htOrg,
       deals.filter(d=>d.usd>0), contractTotal, pipeline, deals
     );
-    // Show-up rate denominator = verified baseline booked (75) + new live bookings after cutoff.
-    // The rate is (39 + new shows) / (75 + new booked) — it moves with every new booking + show.
-    // The Booked Calls CARD still shows bookedAuthoritative (the full live count incl. history).
+    // Show-up rate denominator = ALL booked calls (live count from booked_calls).
+    // Rate = showed / all booked — a conservative floor; calls awaiting an outcome
+    // count in the denominator only. showBase already defaults to booked in buildMetrics.
     allTimeMetrics.showBase = showRateBooked;
     allTimeMetrics.pendingCalls = pendingCallsAT;
     return allTimeMetrics;
@@ -3452,10 +3443,10 @@ function renderCallsTab(d) {
   set('c-cpbc',d.booked?fmtFull(cpbc):'—');
   // Booked card sub-label: clarify the 131 is the all-time count
   set('c-booked-sub', d.booked + ' all-time · ' + base + ' in show-rate scope');
-  // Scope note under Show-Ups: explains the 39/36/rate are measured against `base`, not the all-time 131
+  // Scope note under Show-Ups: rates are measured against `base` booked calls
   const pend = d.pendingCalls || 0;
   set('c-scope-note',
-    'show & no-show rates based on ' + base + ' calls (verified Apr 1 baseline + new)' +
+    'show & no-show rates based on ' + base + ' booked calls' +
     (pend > 0 ? ' · ' + pend + ' awaiting outcome' : ''));
 }
 
