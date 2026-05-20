@@ -3277,8 +3277,14 @@ function renderExec(d) {
     ? '↳ ' + pend + ' call' + (pend===1?'':'s') + ' booked, awaiting outcome'
     : '');
 
-  // Close Rate (Ads) — deals from ads source / showed calls
-  const adsDeals = d.rawDeals.filter(dl => isAdsDeal(dl)).length;
+  // Close Rate (Ads) — UNIQUE ads-source customers / showed calls.
+  // Dedupe by email so retainer payments and Whop repeat charges from the same
+  // customer count as ONE close, not many. Falls back to deal name if email missing.
+  const adsDealsRaw = d.rawDeals.filter(dl => isAdsDeal(dl));
+  const adsUniqueCustomers = new Set(
+    adsDealsRaw.map(dl => (dl.email || dl.name || '').toString().trim().toLowerCase()).filter(k => k)
+  );
+  const adsDeals = adsUniqueCustomers.size;
   const closeRateAds = d.shows > 0 ? adsDeals / d.shows : 0;
   set('k-close-rate', d.shows ? Math.round(closeRateAds*100)+'%' : '—');
   set('k-close-rate-meta', d.shows ? (adsDeals + ' of ' + d.shows + ' shows closed') : '— ads deals');
