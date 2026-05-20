@@ -3035,6 +3035,8 @@ function renderAll() {
   renderExec(d);
   renderCallsTab(d);
   renderLowTicket(d);
+  renderSalesDeals();   // Sales & Revenue tab — period-aware
+  renderCloserCards();  // Closers tab cards — period-aware (chart redraws on tab open)
   renderSlack(d);
 }
 
