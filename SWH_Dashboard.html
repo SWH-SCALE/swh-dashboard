@@ -2457,18 +2457,6 @@ const ALL_TIME = {
   noshows:36, closes:7, lt:3564, cash:21000,
 };
 
-// SHOW-RATE / CLOSE-RATE CUTOFF
-// Pre-April 2026 calls have unreliable outcome data — setters/closers weren't moving
-// GHL pipeline stages after calls, leaving 69 past calls stuck at 'Call Booked'.
-// From 2026-04-01 onward, the setter rule is enforced (every call tagged within 1hr).
-// All show-rate and close-rate math counts ONLY calls scheduled on/after this cutoff.
-const SHOW_RATE_CUTOFF = '2026-04-01';
-function isAfterCutoff(scheduledAt) {
-  if (!scheduledAt) return false;
-  const d = scheduledAt.split('T')[0];
-  return d >= SHOW_RATE_CUTOFF;
-}
-
 // ═══════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════
@@ -2619,19 +2607,14 @@ function computeMetrics(period) {
     const sheetLtRevenue = LT_FROM_SHEET > 0 ? LT_FROM_SHEET * 27 : 0;
     console.log('All Time LT: sheet=', sheetLtRevenue, 'db=', dbLt, 'hardcoded=', ALL_TIME.lt);
     // ── SHOW-UP RATE (All Time) ──
-    // CUTOFF-BOUNDED SHOW RATE:
-    // Only count calls scheduled on/after SHOW_RATE_CUTOFF (2026-04-01). Pre-cutoff
-    // data is unreliable (69 past calls stuck at 'Call Booked' in GHL — outcomes were
-    // never tagged). Calls with status 'cancelled' or 'rescheduled' are excluded from
-    // both numerator and denominator per the setter spec.
-    // Within the cutoff window, calls with no outcome yet ('scheduled') count in the
-    // denominator only — so the rate is a deliberate FLOOR that rises as outcomes are tagged.
+    // ALL-TIME SHOW-UP RATE (Option B — conservative floor):
+    // booked_calls now holds the complete history (Jan 2026 onward, backfilled 2026-05-19).
+    // Rate = showed / ALL booked calls. Calls with no recorded outcome ('scheduled') count
+    // in the denominator but not the numerator, so the rate is a deliberate FLOOR — it can
+    // only understate, never overstate. As unmatched calls get GHL outcomes, the rate rises
+    // toward the true value. (MTD / Last Month branches pull live and are unaffected.)
     const atCalls = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
-      ? BOOKED_CALLS.filter(b => {
-          const st = (b.status||'');
-          if (st === 'cancelled' || st === 'rescheduled') return false;
-          return isAfterCutoff(b.scheduled_at);
-        })
+      ? BOOKED_CALLS.filter(b => (b.status||'') !== 'cancelled')
       : [];
     const showRateBooked   = atCalls.length;
     const showsClampedAT    = atCalls.filter(b => b.status === 'showed').length;
@@ -2691,14 +2674,13 @@ function computeMetrics(period) {
   const spend  = spendFromMeta > 0 ? spendFromMeta : spendFromLog;
   const leadsRaw = pLog.reduce((s,l)=>s+(l.leads||0),0);
   // Booked Calls — Calendly is source of truth; count rows where scheduled_at falls in period
-  // and status is NOT cancelled/rescheduled. Apply SHOW_RATE_CUTOFF: pre-Apr 2026 calls have
-  // unreliable outcomes and are excluded. Fallback to daily_log only if BOOKED_CALLS has no rows at all.
+  // and status is NOT cancelled or rescheduled. Rescheduled calls have moved to a future date
+  // and shouldn't drag the rate down. Fallback to daily_log only if BOOKED_CALLS has no rows at all.
   const bookedFromLog = pLog.reduce((s,l)=>s+(l.booked||0),0);
   const bookedFromCalendly = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
     ? BOOKED_CALLS.filter(b => {
         const st = (b.status||'');
         if (st === 'cancelled' || st === 'rescheduled') return false;
-        if (!isAfterCutoff(b.scheduled_at)) return false;
         const when = b.scheduled_at ? b.scheduled_at.split('T')[0] : null;
         return when && inPeriod(when);
       }).length
@@ -2712,12 +2694,11 @@ function computeMetrics(period) {
   const showsCO    = pCallOut.filter(c=>c.showed==='showed').length;
   const noshowsCO  = pCallOut.filter(c=>c.showed==='noshow').length;
   // Booked calls in this period whose status reflects show/no-show outcomes.
-  // Same cutoff + rescheduled/cancelled exclusions as the booked count above.
+  // Same cancelled/rescheduled exclusions as the booked count above.
   const pBookedCalls = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
     ? BOOKED_CALLS.filter(b => {
         const st = (b.status||'');
         if (st === 'cancelled' || st === 'rescheduled') return false;
-        if (!isAfterCutoff(b.scheduled_at)) return false;
         const when = b.scheduled_at ? b.scheduled_at.split('T')[0] : null;
         return when && inPeriod(when);
       })
@@ -3290,28 +3271,18 @@ function renderExec(d) {
   const showOk=showR>=(S.tgt_showup/100)&&d.booked>0;
   set('k-showup-flag', d.booked?(showOk?'✓ healthy':'target '+S.tgt_showup+'%'):'—');
   badge('k-showup-flag', showOk?'up':d.booked?'warn':'neutral');
-  // Pending-calls note: explains why the rate may dip — calls booked but not yet held.
-  // Also displays the SHOW_RATE_CUTOFF so the floor is transparent.
+  // Pending-calls note: explains why the rate may dip — calls booked but not yet held
   const pend = d.pendingCalls || 0;
-  const cutoffNote = 'From Apr 1';
-  const pendNote = pend > 0
-    ? cutoffNote + ' · ' + pend + ' call' + (pend===1?'':'s') + ' awaiting outcome'
-    : cutoffNote;
-  set('k-showup-pending', d.booked > 0 ? pendNote : '');
+  set('k-showup-pending', pend > 0
+    ? '↳ ' + pend + ' call' + (pend===1?'':'s') + ' booked, awaiting outcome'
+    : '');
 
   // Close Rate (Ads) — deals from ads source / showed calls
-  // Display is capped at 100% — if the underlying ratio exceeds 100%, that signals
-  // an attribution problem (e.g. retainer/back-end payments counted as new closes).
-  // The 'attribution' badge flags it visually so we know to investigate.
   const adsDeals = d.rawDeals.filter(dl => isAdsDeal(dl)).length;
-  const closeRateAdsRaw = d.shows > 0 ? adsDeals / d.shows : 0;
-  const closeRateAds = Math.min(closeRateAdsRaw, 1);
-  const closeRateOver = closeRateAdsRaw > 1;
+  const closeRateAds = d.shows > 0 ? adsDeals / d.shows : 0;
   set('k-close-rate', d.shows ? Math.round(closeRateAds*100)+'%' : '—');
-  set('k-close-rate-meta', d.shows
-    ? (adsDeals + ' of ' + d.shows + ' shows closed' + (closeRateOver ? ' · check attribution' : ''))
-    : '— ads deals');
-  badge('k-close-rate-meta', closeRateOver ? 'warn' : (closeRateAds >= 0.25 && d.shows > 0 ? 'up' : d.shows > 0 ? 'warn' : 'neutral'));
+  set('k-close-rate-meta', d.shows ? (adsDeals + ' of ' + d.shows + ' shows closed') : '— ads deals');
+  badge('k-close-rate-meta', closeRateAds >= 0.25 && d.shows > 0 ? 'up' : d.shows > 0 ? 'warn' : 'neutral');
 
   // Cash Collected — Ads (sum of usd on ads-sourced deals this period)
   const adsDealCount = d.rawDeals.filter(dl => isAdsDeal(dl)).length;
