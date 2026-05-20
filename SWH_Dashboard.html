@@ -5206,11 +5206,11 @@ async function saveBcEdit() {
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
-document.getElementById('inp-date').valueAsDate=new Date();
-document.getElementById('deal-date').valueAsDate=new Date();
-document.getElementById('cl-date').valueAsDate=new Date();
-document.getElementById('co-date').valueAsDate=new Date();
-document.getElementById('fu-date').valueAsDate=new Date();
+// Initialize date inputs — guard against any removed tabs so init doesn't halt.
+['inp-date','deal-date','cl-date','co-date','fu-date'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.valueAsDate = new Date();
+});
 loadSettingsUI();
 initPeriodBtns();
 
