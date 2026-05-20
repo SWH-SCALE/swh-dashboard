@@ -3118,8 +3118,27 @@ function renderExec(d) {
       .filter(e => e)
       .filter(e => currentPeriod === 'all' ? true : _showedCallEmailsInPeriod.has(e))
   );
-  const adsDeals = adsUniqueCustomers.size;
-  const closeRateAds = d.shows > 0 ? adsDeals / d.shows : 0;
+  let adsDeals = adsUniqueCustomers.size;
+  let closeRateAds = d.shows > 0 ? adsDeals / d.shows : 0;
+
+  // ── MANUAL OVERRIDE: Last Month = April 2026 ──
+  // The auto-calc gives 0% for April because Whop deal emails don't reliably
+  // match Calendly booking emails, AND many April-collected payments are
+  // retainer continuations from March calls (not new closes).
+  // Verified manually from SWH_Payout_Tracker 2026 + SWH Monthly Team Payouts:
+  // April had 7 new closes (people who paid in April but NOT in March) vs
+  // 38 calls that showed → 18.4%. When the calendar rolls to June and
+  // "Last Mo" becomes May, this override stops applying.
+  const _today = new Date();
+  const _isLastMoButtonShowingApril2026 =
+    currentPeriod === 'lm' &&
+    _today.getFullYear() === 2026 &&
+    _today.getMonth() === 4; // 4 = May → "Last Mo" = April
+  if (_isLastMoButtonShowingApril2026) {
+    adsDeals = 7;
+    closeRateAds = 7 / 38;
+  }
+
   set('k-close-rate', d.shows ? Math.round(closeRateAds*100)+'%' : '—');
   set('k-close-rate-meta', d.shows ? (adsDeals + ' of ' + d.shows + ' shows closed') : '— ads deals');
   badge('k-close-rate-meta', closeRateAds >= 0.25 && d.shows > 0 ? 'up' : d.shows > 0 ? 'warn' : 'neutral');
