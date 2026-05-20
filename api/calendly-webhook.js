@@ -1,16 +1,60 @@
 // /api/calendly-webhook.js
-// Receives webhooks from Calendly and writes bookings to Supabase.
-// Handles: invitee.created (new booking) and invitee.canceled (cancellation).
+// Receives webhooks from Calendly and writes bookings to Supabase `calls` table.
+// Handles: invitee.created (new booking) and invitee.canceled (cancellation or reschedule).
+//
+// Single source of truth: the `calls` table. The dashboard reads from
+// the `calls_with_status` view which derives effective_status from the
+// stage field + manual_outcome.
 
 const SUPABASE_URL = 'https://qstlyvauppjkdiwpgtql.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY; // set in Vercel env vars
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+
+// Internal team emails — bookings from these auto-flag as test
+const INTERNAL_EMAILS = new Set([
+  'ms10.2004.09@gmail.com',
+  'mehdimullionz@gmail.com',
+  'mentormehdi@gmail.com',
+  'zmsyed2004@gmail.com',
+  'zanib.fiverr@gmail.com',
+  'shetalksaboutit@gmail.com',
+  'zsyedwep@theparkfederation.org',
+  'test@services.com',
+  'rentester123@gmail.com',
+]);
+
+// Test detection by name patterns (catches one-off test bookings)
+const TEST_NAME_PATTERNS = ['test', 'testing'];
+
+function detectIsTest(email, name) {
+  const em = (email || '').toLowerCase().trim();
+  if (INTERNAL_EMAILS.has(em)) return true;
+  const nm = (name || '').toLowerCase();
+  return TEST_NAME_PATTERNS.some(p => nm.includes(p));
+}
+
+function detectCloser(memberships, fallbackUserEmail) {
+  const candidates = [];
+  for (const m of memberships || []) {
+    if (m?.user_email) candidates.push(m.user_email.toLowerCase());
+  }
+  if (fallbackUserEmail) candidates.push(fallbackUserEmail.toLowerCase());
+
+  for (const em of candidates) {
+    if (em.includes('frankie')) return 'Frankie';
+    if (em.includes('mehdi'))   return 'Mehdi';
+    if (em.includes('salima'))  return 'Salima';
+    if (em.includes('zain'))    return 'Zain';
+  }
+  return null;
+}
 
 export default async function handler(req, res) {
-  // Health check — visiting the URL in a browser shows it's alive
+  // Health check
   if (req.method === 'GET') {
     return res.status(200).json({
       ok: true,
       service: 'SWH Calendly Webhook Receiver',
+      target_table: 'calls',
       message: 'POST a Calendly webhook payload to this URL',
     });
   }
@@ -21,7 +65,7 @@ export default async function handler(req, res) {
 
   try {
     const payload = req.body;
-    const event = payload?.event; // 'invitee.created' or 'invitee.canceled'
+    const event = payload?.event;        // 'invitee.created' or 'invitee.canceled'
     const invitee = payload?.payload;
 
     if (!event || !invitee) {
@@ -29,24 +73,27 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid payload shape' });
     }
 
-    // Extract the fields we care about
-    const calendlyEventUri = invitee?.event?.uri || invitee?.uri;
-    const name  = invitee?.name || '';
-    const email = invitee?.email || '';
-    const scheduledAt = invitee?.scheduled_event?.start_time || invitee?.event?.start_time;
-    const eventType   = invitee?.scheduled_event?.event_type || invitee?.event?.event_type || '';
+    // ---- Extract canonical fields ----
+    const scheduledEvent = invitee?.scheduled_event || invitee?.event || {};
+    const calendlyEventUri = scheduledEvent?.uri || invitee?.event?.uri;
+    const calendlyInviteeUri = invitee?.uri;
 
-    // Determine closer from round robin assignment
-    // Calendly puts the assigned host in event_memberships
-    const memberships = invitee?.scheduled_event?.event_memberships || [];
-    let closer = '';
-    for (const m of memberships) {
-      const userEmail = (m?.user_email || '').toLowerCase();
-      if (userEmail.includes('frankie')) { closer = 'Frankie'; break; }
-      if (userEmail.includes('mehdi'))   { closer = 'Mehdi';   break; }
+    const name  = (invitee?.name || '').trim();
+    const email = (invitee?.email || '').trim().toLowerCase();
+    const scheduledAt = scheduledEvent?.start_time;
+    const eventEndAt  = scheduledEvent?.end_time;
+    const eventType   = scheduledEvent?.event_type || '';
+
+    if (!calendlyEventUri || !email || !scheduledAt) {
+      console.error('Missing required fields:', { calendlyEventUri, email, scheduledAt });
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Pull phone from custom questions if you ask for it on Calendly
+    // Closer
+    const memberships = scheduledEvent?.event_memberships || [];
+    const closer = detectCloser(memberships, invitee?.user_email);
+
+    // Phone
     let phone = '';
     const questions = invitee?.questions_and_answers || [];
     for (const q of questions) {
@@ -57,11 +104,17 @@ export default async function handler(req, res) {
       }
     }
 
-    // Handle cancellation
+    // Reschedule detection: Calendly puts `rescheduled: true` on the cancel
+    // payload when the cancellation is part of a reschedule flow.
+    const isReschedule = invitee?.rescheduled === true || invitee?.cancellation?.canceled_by_type === 'invitee_reschedule';
+
+    // ---- Handle cancellation (or reschedule) ----
     if (event === 'invitee.canceled') {
-      const cancelReason = invitee?.cancellation?.reason || invitee?.cancel_url || 'Cancelled';
+      const newStage = isReschedule ? 'RESCHEDULED' : 'CANCELLED';
+      const cancelReason = invitee?.cancellation?.reason || (isReschedule ? 'Rescheduled' : 'Cancelled');
+
       const updateRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/booked_calls?calendly_event_uri=eq.${encodeURIComponent(calendlyEventUri)}`,
+        `${SUPABASE_URL}/rest/v1/calls?calendly_event_uri=eq.${encodeURIComponent(calendlyEventUri)}`,
         {
           method: 'PATCH',
           headers: {
@@ -71,23 +124,45 @@ export default async function handler(req, res) {
             'Prefer': 'return=representation',
           },
           body: JSON.stringify({
-            status: 'cancelled',
+            stage: newStage,
             cancellation_reason: cancelReason,
-            updated_at: new Date().toISOString(),
           }),
         }
       );
       if (!updateRes.ok) {
         const err = await updateRes.text();
-        console.error('Cancel patch failed:', err);
-        return res.status(500).json({ error: 'Cancel update failed', detail: err });
+        console.error('Cancel/reschedule patch failed:', err);
+        return res.status(500).json({ error: 'Update failed', detail: err });
       }
-      return res.status(200).json({ ok: true, action: 'cancelled', uri: calendlyEventUri });
+      return res.status(200).json({
+        ok: true,
+        action: isReschedule ? 'rescheduled' : 'cancelled',
+        uri: calendlyEventUri,
+      });
     }
 
-    // Handle new booking (invitee.created)
+    // ---- Handle new booking ----
     if (event === 'invitee.created') {
-      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/booked_calls`, {
+      const isTest = detectIsTest(email, name);
+
+      const row = {
+        calendly_event_uri: calendlyEventUri,
+        calendly_invitee_uri: calendlyInviteeUri,
+        invitee_name: name,
+        invitee_email: email,
+        phone: phone || null,
+        scheduled_at: scheduledAt,
+        event_end_at: eventEndAt || null,
+        booked_at: new Date().toISOString(),
+        closer: closer,
+        event_type: eventType,
+        stage: 'BOOKED',
+        is_test: isTest,
+        source: 'calendly_webhook',
+        raw_payload: payload,
+      };
+
+      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/calls`, {
         method: 'POST',
         headers: {
           'apikey': SUPABASE_KEY,
@@ -95,29 +170,26 @@ export default async function handler(req, res) {
           'Content-Type': 'application/json',
           'Prefer': 'resolution=merge-duplicates,return=representation',
         },
-        body: JSON.stringify({
-          calendly_event_uri: calendlyEventUri,
-          name,
-          email,
-          phone,
-          scheduled_at: scheduledAt,
-          booked_at: new Date().toISOString(),
-          closer,
-          event_type: eventType,
-          source: 'Calendly',
-          status: 'scheduled',
-          raw_payload: payload,
-        }),
+        body: JSON.stringify(row),
       });
+
       if (!insertRes.ok) {
         const err = await insertRes.text();
         console.error('Insert failed:', err);
         return res.status(500).json({ error: 'Insert failed', detail: err });
       }
-      return res.status(200).json({ ok: true, action: 'booked', uri: calendlyEventUri, closer, name });
+
+      return res.status(200).json({
+        ok: true,
+        action: 'booked',
+        uri: calendlyEventUri,
+        closer,
+        name,
+        is_test: isTest,
+      });
     }
 
-    // Unknown event type — log and acknowledge so Calendly doesn't retry
+    // Unknown event type — ack so Calendly doesn't retry
     console.log('Unhandled event type:', event);
     return res.status(200).json({ ok: true, action: 'ignored', event });
 
