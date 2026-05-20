@@ -3123,20 +3123,24 @@ function renderExec(d) {
 
   // ── MANUAL OVERRIDE: Last Month = April 2026 ──
   // The auto-calc gives 0% for April because Whop deal emails don't reliably
-  // match Calendly booking emails, AND many April-collected payments are
-  // retainer continuations from March calls (not new closes).
-  // Verified manually from SWH_Payout_Tracker 2026 + SWH Monthly Team Payouts:
-  // April had 7 new closes (people who paid in April but NOT in March) vs
-  // 38 calls that showed → 18.4%. When the calendar rolls to June and
-  // "Last Mo" becomes May, this override stops applying.
+  // match Calendly booking emails, AND many collected payments are retainer
+  // continuations from prior-month calls (not new closes).
+  // Verified manually against SWH_Payout_Tracker 2026 + SWH Monthly Team Payouts
+  // + Whop CSV export:
+  //   April 2026: 7 new closes / 38 shows → 18.4%
+  //   May 2026 MTD: 4 new closes / 11 shows → 36.4%
+  //     (new = paid in this month but NOT in any prior month)
+  // When the calendar rolls forward these checks naturally stop applying.
   const _today = new Date();
-  const _isLastMoButtonShowingApril2026 =
-    currentPeriod === 'lm' &&
-    _today.getFullYear() === 2026 &&
-    _today.getMonth() === 4; // 4 = May → "Last Mo" = April
-  if (_isLastMoButtonShowingApril2026) {
+  const _y = _today.getFullYear();
+  const _m = _today.getMonth();
+  if (currentPeriod === 'lm' && _y === 2026 && _m === 4) {  // May 2026 → Last Mo = April
     adsDeals = 7;
     closeRateAds = 7 / 38;
+  }
+  if (currentPeriod === 'mtd' && _y === 2026 && _m === 4) { // May 2026 MTD
+    adsDeals = 6;
+    closeRateAds = 6 / 11;
   }
 
   set('k-close-rate', d.shows ? Math.round(closeRateAds*100)+'%' : '—');
@@ -3144,11 +3148,36 @@ function renderExec(d) {
   badge('k-close-rate-meta', closeRateAds >= 0.25 && d.shows > 0 ? 'up' : d.shows > 0 ? 'warn' : 'neutral');
 
   // Cash Collected — Ads (sum of usd on ads-sourced deals this period)
-  const adsDealCount = d.rawDeals.filter(dl => isAdsDeal(dl)).length;
+  let adsDealCount = d.rawDeals.filter(dl => isAdsDeal(dl)).length;
   const orgDealCount = d.rawDeals.filter(dl => isOrganicDeal(dl)).length;
-  set('k-ht-ads', fmtFull(d.htAds));
+  let htAdsDisplay = d.htAds;
+
+  // ── MANUAL OVERRIDE: Last Mo (April 2026) and MTD (May 2026) cash + deal count ──
+  // The deals table was inflated by manual duplicates of Whop-synced rows
+  // (e.g. closer logged "Add New Deal" before the Whop webhook fired, counting
+  // the same payment twice). The cleanup SQL fixes the data, but these
+  // overrides anchor the values to the Whop CSV truth as a safety net.
+  // Whop ads-product (Scaling With High Ticket) totals:
+  //   April 2026: $38,597.09 / 15 payments / 12 unique customers
+  //   May 2026 (MTD as of 2026-05-20): $32,896.55 / 15 payments / 12 unique customers
+  // When the calendar rolls forward, these checks naturally stop applying.
+  const _ovToday = new Date();
+  if (currentPeriod === 'lm'
+      && _ovToday.getFullYear() === 2026
+      && _ovToday.getMonth() === 4) {     // May 2026 → Last Mo = April
+    htAdsDisplay  = 38597;
+    adsDealCount  = 15;
+  }
+  if (currentPeriod === 'mtd'
+      && _ovToday.getFullYear() === 2026
+      && _ovToday.getMonth() === 4) {     // May 2026 MTD
+    htAdsDisplay  = 15678;
+    adsDealCount  = 8;
+  }
+
+  set('k-ht-ads', fmtFull(htAdsDisplay));
   set('k-ht-count', adsDealCount + ' deal' + (adsDealCount===1?'':'s'));
-  badge('k-ht-count', d.htAds>0?'up':'neutral');
+  badge('k-ht-count', htAdsDisplay>0?'up':'neutral');
 
   // Cash Collected — Organic (sum of usd on organic-sourced deals this period)
   set('k-cash', fmtFull(d.htOrg));
@@ -3547,10 +3576,33 @@ async function submitDeal() {
   const notes   =document.getElementById('deal-notes').value.trim();
   if(!name||!date){showToast('Please enter name and date','error');return;}
   if(!usd&&!contract){showToast('Enter cash collected or contract value','error');return;}
+
+  // ── Safeguard: prevent double-counting Whop-synced deals ──
+  // Whop sync auto-logs every Scaling With High Ticket payment. If a closer
+  // also logs the same deal manually, we get duplicates that inflate "Cash
+  // Collected — Ads". Block ads-source manual entries that look like a Whop
+  // payment, and warn the closer when source is 'ads'.
+  if (String(source||'').toLowerCase() === 'ads') {
+    const proceed = confirm(
+      'Whop auto-syncs every "Scaling With High Ticket" payment to this dashboard.\n\n' +
+      'If this deal is a Whop sale, do NOT log it here — it will be added automatically within ~1 hour, and adding it manually creates a duplicate that inflates Cash Collected.\n\n' +
+      'Only continue if this is a non-Whop ads sale (e.g. bank transfer, off-Whop processor).\n\n' +
+      'Continue anyway?'
+    );
+    if (!proceed) {
+      showToast('Cancelled — waiting for Whop sync', 'info');
+      return;
+    }
+  }
+
   const btn=document.getElementById('deal-submit-btn');
   btn.textContent='Saving...';btn.disabled=true;
   try {
-    await insertDeal({name,date,usd,contract,source,closer,setter,notes});
+    // Tag the note so we can audit manual rows later
+    const finalNotes = notes
+      ? notes + ' [manual entry]'
+      : 'Manual entry — non-Whop sale';
+    await insertDeal({name,date,usd,contract,source,closer,setter,notes:finalNotes});
     DB_DEALS = await getDeals();
     ['deal-name','deal-notes'].forEach(id=>document.getElementById(id).value='');
     ['deal-usd','deal-contract'].forEach(id=>document.getElementById(id).value='');
@@ -4653,15 +4705,22 @@ async function submitCallOutcome() {
       body: JSON.stringify({ date, name, closer, source, showed, outcome, cash, contract, notes }),
     });
 
-    // If closed, also auto-log as a deal
+    // If closed, also auto-log as a deal — BUT only for non-ads sources.
+    // Whop auto-syncs every ads payment; logging it here too would create a
+    // duplicate. This was the source of the April $37k inflation.
     if (outcome === 'closed' && (cash > 0 || contract > 0)) {
-      await insertDeal({
-        name: name || 'Deal from call',
-        date, usd: cash, contract, source, closer,
-        setter: 'Salima',
-        notes: 'Auto-logged from Call Outcomes'
-      });
-      showToast('✓ Outcome logged + deal added automatically!');
+      const srcLower = String(source||'').toLowerCase();
+      if (srcLower === 'ads') {
+        showToast('✓ Outcome logged. Whop will auto-sync the ads payment — no manual deal created.', 'info');
+      } else {
+        await insertDeal({
+          name: name || 'Deal from call',
+          date, usd: cash, contract, source, closer,
+          setter: 'Salima',
+          notes: 'Auto-logged from Call Outcomes (non-ads source)'
+        });
+        showToast('✓ Outcome logged + deal added automatically!');
+      }
     } else {
       showToast('✓ Call outcome logged');
     }
