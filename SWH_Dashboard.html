@@ -847,29 +847,10 @@ select.input-field option { background: var(--bg2); }
     </svg>
     Low-Ticket
   </div>
-  <div class="nav-item" onclick="switchTab('ht-ads', this)">
-    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-      <path d="M8 1l2 4.5 5 .5-3.7 3.3 1.1 4.9L8 11.8 3.6 14.2l1.1-4.9L1 6l5-.5z"/>
-    </svg>
-    Scaling With High Ticket
-  </div>
-
   <div class="sidebar-section">Config</div>
   <div class="nav-item" onclick="switchTab('deals', this)">
     <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
     Add New Deal
-  </div>
-  <div class="nav-item" onclick="switchTab('daily', this)">
-    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-      <rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8h6M5 11h4M5 5h6"/>
-    </svg>
-    Daily Input
-  </div>
-  <div class="nav-item" onclick="switchTab('edit-log', this)">
-    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-      <path d="M11 2l3 3-8 8H3v-3l8-8z"/><path d="M9 4l3 3"/>
-    </svg>
-    Edit Log
   </div>
   <div class="nav-item" onclick="switchTab('calls-log', this)">
     <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1149,7 +1130,7 @@ select.input-field option { background: var(--bg2); }
 ══════════════════════════════════════ -->
 <div id="tab-calls" class="tab-view">
   <div class="section-label">Call performance</div>
-  <div class="kpi-tier kpi-tier-4">
+  <div class="kpi-tier kpi-tier-5">
     <div class="kpi-card blue">
       <div class="kpi-label">Booked Calls</div>
       <div class="kpi-value" id="c-booked">0</div>
@@ -1167,6 +1148,11 @@ select.input-field option { background: var(--bg2); }
       <div class="kpi-meta"><span class="kpi-badge down" id="c-noshow-pct">0% no-show</span></div>
     </div>
     <div class="kpi-card amber">
+      <div class="kpi-label">Pending Outcome</div>
+      <div class="kpi-value" id="c-pending">0</div>
+      <div class="kpi-meta"><span class="kpi-badge neutral" id="c-pending-sub">awaiting setter tag</span></div>
+    </div>
+    <div class="kpi-card purple">
       <div class="kpi-label">Cost / Booked Call</div>
       <div class="kpi-value mono" id="c-cpbc">$0</div>
       <div class="kpi-meta"><span class="kpi-badge warn">target $180</span></div>
@@ -1184,27 +1170,39 @@ select.input-field option { background: var(--bg2); }
      TAB: BOOKED CALLS (from Calendly)
 ══════════════════════════════════════ -->
 <div id="tab-booked-calls" class="tab-view">
-  <div class="section-label">Calendly bookings · live</div>
+  <div class="section-label">Calendly bookings · GHL pipeline outcomes · live</div>
+
+  <!-- Stage legend so the team knows exactly what each label means -->
+  <div class="chart-card" style="margin-bottom:14px;padding:14px 16px">
+    <div style="font-size:11px;color:var(--t2);line-height:1.7">
+      <strong style="color:var(--t1)">Stage definitions:</strong>
+      &nbsp;<span class="pill" style="background:var(--accentd);color:var(--accent)">BOOKED</span> call scheduled, awaiting outcome
+      &nbsp;<span class="pill" style="background:var(--blued);color:var(--blue)">SHOWED</span> prospect attended (setter moved GHL to Call Completed / Deposit / Closed-Won / Offered FU / Deal Lost within 1hr of call end)
+      &nbsp;<span class="pill" style="background:rgba(255,107,107,0.15);color:var(--red)">NO_SHOW</span> call time passed, no attendance
+      &nbsp;<span class="pill" style="background:var(--bg4);color:var(--t3)">RESCHEDULED</span> moved — excluded from rates until new date hits
+    </div>
+  </div>
+
   <div class="kpi-tier kpi-tier-4">
     <div class="kpi-card accent">
       <div class="kpi-label">Upcoming Calls</div>
       <div class="kpi-value" id="bc-upcoming">0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">scheduled, not cancelled</span></div>
-    </div>
-    <div class="kpi-card blue">
-      <div class="kpi-label">Past Calls</div>
-      <div class="kpi-value" id="bc-past">0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">all-time, ex-cancelled</span></div>
-    </div>
-    <div class="kpi-card purple">
-      <div class="kpi-label">Frankie</div>
-      <div class="kpi-value" id="bc-frankie">0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel" id="bc-frankie-sub">upcoming</span></div>
+      <div class="kpi-meta"><span class="kpi-sublabel">scheduled, future</span></div>
     </div>
     <div class="kpi-card amber">
-      <div class="kpi-label">Mehdi</div>
-      <div class="kpi-value" id="bc-mehdi">0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel" id="bc-mehdi-sub">upcoming</span></div>
+      <div class="kpi-label">Pending Outcome</div>
+      <div class="kpi-value" id="bc-pending">0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="bc-pending-sub">awaiting setter tag</span></div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Showed (All Time)</div>
+      <div class="kpi-value" id="bc-showed">0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="bc-showed-sub">show rate —</span></div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">No-Show (All Time)</div>
+      <div class="kpi-value" id="bc-noshow">0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="bc-noshow-sub">no-show rate —</span></div>
     </div>
   </div>
 
@@ -1382,58 +1380,6 @@ select.input-field option { background: var(--bg2); }
 </div>
 
 <!-- ══════════════════════════════════════
-     TAB: SCALING WITH HIGH TICKET (Whop ads sales)
-══════════════════════════════════════ -->
-<div id="tab-ht-ads" class="tab-view">
-  <div class="section-label">High-ticket ads sales · from Whop</div>
-  <div class="kpi-tier kpi-tier-4">
-    <div class="kpi-card accent">
-      <div class="kpi-label">Total Ads Sales</div>
-      <div class="kpi-value" id="ht-ads-count">0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">high-ticket closes via ads</span></div>
-    </div>
-    <div class="kpi-card accent">
-      <div class="kpi-label">Cash Collected (Gross)</div>
-      <div class="kpi-value mono" id="ht-ads-gross">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">total paid by clients</span></div>
-    </div>
-    <div class="kpi-card blue">
-      <div class="kpi-label">Cash After Fees (Net)</div>
-      <div class="kpi-value mono" id="ht-ads-net">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">after Whop fees</span></div>
-    </div>
-    <div class="kpi-card amber">
-      <div class="kpi-label">Average Sale</div>
-      <div class="kpi-value mono" id="ht-ads-avg">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">gross per sale</span></div>
-    </div>
-  </div>
-
-  <div style="display:flex;gap:8px;margin:16px 0 10px;align-items:center">
-    <div class="section-label" style="margin:0;flex:1">All ads high-ticket sales</div>
-    <button onclick="syncWhop()" id="whop-sync-btn" style="background:var(--accentd);color:var(--accent);border:1px solid rgba(0,245,168,0.2);border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;font-family:var(--font-mono);cursor:pointer">↻ Sync Whop</button>
-  </div>
-
-  <div class="chart-card">
-    <div class="deals-table-wrap">
-      <table class="deals-table" id="ht-ads-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Customer</th>
-            <th>Email</th>
-            <th>Gross (USD)</th>
-            <th>Net (USD)</th>
-            <th>Source</th>
-          </tr>
-        </thead>
-        <tbody id="ht-ads-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════
      TAB: RETAINERS
 ══════════════════════════════════════ -->
 <div id="tab-retainers" class="tab-view">
@@ -1539,47 +1485,6 @@ select.input-field option { background: var(--bg2); }
   <div style="margin-top:10px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">
     Each row is one scheduled retainer payment. <b style="color:var(--accent)">Outstanding</b> KPIs count only unpaid payments — tick <b style="color:var(--accent)">Paid?</b> and that amount drops out of the 30/60-day forecast instantly. This tab is standalone and does not feed the Executive Dashboard.
   </div>
-</div>
-
-<!-- ══════════════════════════════════════
-     TAB: DAILY INPUT
-══════════════════════════════════════ -->
-<div id="tab-daily" class="tab-view">
-  <div class="section-label">Log daily ad spend</div>
-  <div class="chart-card" style="margin-bottom:10px">
-    <div class="chart-card-title" style="margin-bottom:6px">Ads manager — daily spend logger</div>
-    <div class="chart-card-sub" style="margin-bottom:16px">Lead counts auto-sync from Sheets · Booked calls captured in Setters Daily Tracker · Show-ups + outcomes captured in Closers Daily Tracker</div>
-    <div class="input-grid">
-      <div class="input-group">
-        <div class="input-label">Date</div>
-        <input class="input-field" type="date" id="inp-date">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Ad Spend (USD)</div>
-        <input class="input-field" type="number" id="inp-spend" placeholder="e.g. 500" oninput="updatePreview()">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Campaign (optional)</div>
-        <input class="input-field" type="text" id="inp-campaign" placeholder="e.g. Meta — Cold Traffic">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Source</div>
-        <select class="input-field" id="inp-source">
-          <option value="">Select...</option>
-          <option>Meta Ads</option><option>Google Ads</option>
-          <option>Organic</option><option>Referral</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <div class="preview-bar" id="preview-bar">
-    <div class="preview-item">CPL: <span id="prev-cpl">—</span></div>
-    <div class="preview-item">CPBC: <span id="prev-cpbc">—</span></div>
-    <div class="preview-item">ROAS: <span id="prev-roas">—</span></div>
-  </div>
-
-  <button id="daily-submit-btn" class="submit-btn" onclick="submitDaily()">Log Ad Spend →</button>
 </div>
 
 <!-- ══════════════════════════════════════
@@ -1839,89 +1744,6 @@ select.input-field option { background: var(--bg2); }
           </tr>
         </thead>
         <tbody id="calls-log-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-
-<!-- ══════════════════════════════════════
-     TAB: EDIT LOG
-══════════════════════════════════════ -->
-<div id="tab-edit-log" class="tab-view">
-  <div class="section-label">Edit daily log entries</div>
-  <div class="chart-card" style="margin-bottom:10px;padding:14px 16px">
-    <div style="font-size:11px;color:var(--t2);line-height:1.8">
-      Click <strong style="color:var(--accent)">Edit</strong> on any row to change the numbers.
-      Percentages are calculated automatically — you only edit raw numbers.
-    </div>
-  </div>
-
-  <!-- Inline edit form (hidden until Edit clicked) -->
-  <div id="edit-form-card" class="chart-card" style="margin-bottom:10px;display:none">
-    <div class="chart-card-title" style="margin-bottom:14px">
-      Editing: <span id="edit-form-date" style="color:var(--accent)"></span>
-    </div>
-    <div class="input-grid">
-      <div class="input-group">
-        <div class="input-label">Ad Spend (USD)</div>
-        <input class="input-field" type="number" id="edit-spend" min="0">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Leads</div>
-        <input class="input-field" type="number" id="edit-leads" min="0">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Booked Calls</div>
-        <input class="input-field" type="number" id="edit-booked" min="0">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Show-Ups</div>
-        <input class="input-field" type="number" id="edit-shows" min="0">
-      </div>
-      <div class="input-group">
-        <div class="input-label">No-Shows</div>
-        <input class="input-field" type="number" id="edit-noshows" min="0">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Closes</div>
-        <input class="input-field" type="number" id="edit-closes" min="0">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Cash Collected (USD)</div>
-        <input class="input-field" type="number" id="edit-cash" min="0">
-      </div>
-      <div class="input-group">
-        <div class="input-label">Low-Ticket Revenue (USD)</div>
-        <input class="input-field" type="number" id="edit-lt" min="0">
-      </div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:12px">
-      <button id="edit-save-btn" class="submit-btn" onclick="saveEditLog()" style="margin-top:0">Save Changes →</button>
-      <button onclick="cancelEdit()" style="background:var(--bg4);color:var(--t2);border:1px solid var(--border2);border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:var(--font-display);cursor:pointer">Cancel</button>
-    </div>
-  </div>
-
-  <div class="section-label">All logged entries</div>
-  <div class="chart-card">
-    <div class="deals-table-wrap">
-      <table class="deals-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Spend</th>
-            <th>Leads</th>
-            <th>Booked</th>
-            <th>Shows</th>
-            <th>No-Shows</th>
-            <th>Closes</th>
-            <th>Cash</th>
-            <th>LT Rev</th>
-            <th>Source</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="edit-log-tbody"></tbody>
       </table>
     </div>
   </div>
@@ -2234,23 +2056,20 @@ select.input-field option { background: var(--bg2); }
             <option value="">Unassigned</option><option>Frankie</option><option>Mehdi</option>
           </select>
         </div>
-        <div class="input-group"><div class="input-label">Status</div>
+        <div class="input-group"><div class="input-label">Stage</div>
           <select class="input-field" id="bc-edit-status">
-            <option value="scheduled">Scheduled</option>
-            <option value="showed">Showed</option>
-            <option value="no_show">No Show</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="rescheduled">Rescheduled</option>
+            <option value="BOOKED">Booked (awaiting outcome)</option>
+            <option value="SHOWED">Showed</option>
+            <option value="NO_SHOW">No-Show</option>
+            <option value="CANCELLED">Cancelled</option>
+            <option value="RESCHEDULED">Rescheduled</option>
           </select>
         </div>
-        <div class="input-group"><div class="input-label">Outcome</div>
+        <div class="input-group"><div class="input-label">Manual Outcome Override (optional)</div>
           <select class="input-field" id="bc-edit-outcome">
             <option value="">—</option>
-            <option value="closed">Closed</option>
-            <option value="followup">Follow-up</option>
-            <option value="lost">Lost</option>
-            <option value="noshow">No-show</option>
-            <option value="notqualified">Not Qualified</option>
+            <option value="SHOWED">Force SHOWED (for unmatched GHL)</option>
+            <option value="NO_SHOW">Force NO_SHOW (for unmatched GHL)</option>
           </select>
         </div>
         <div class="input-group"><div class="input-label">Source</div><input class="input-field" type="text" id="bc-edit-source" placeholder="Calendly"></div>
@@ -2500,10 +2319,7 @@ const PAGE_TITLES = {
   retainers: ['Retainers',             'Forecasted recurring cash · ads vs organic'],
   closers:   ['Closer Performance',    'Frankie vs Mehdi · live attribution'],
   lowticket: ['Low-Ticket',            '$27 course · GHL purchases'],
-  'ht-ads':  ['Scaling With High Ticket', 'High-ticket ads sales · live from Whop'],
-  daily:     ['Daily Input',           'Log today\'s numbers · saves instantly for everyone'],
   'calls-log': ['Setters Daily Tracker',    'Log appointments · outreach · follow-ups'],
-  'edit-log':     ['Edit Log Entries',    'Fix any previously logged numbers'],
   'call-outcomes':['Closers Daily Tracker', 'Log every call outcome · 20 seconds per call'],
   'followup':     ['Follow-Up Tracker',  'Track all leads · pipeline stages · conversion rates'],
   deals:     ['Add New Deal',          'Log a closed deal · updates all metrics live'],
@@ -2527,11 +2343,9 @@ function switchTab(id,el) {
   if(id==='sales')      renderSalesDeals();
   if(id==='deals')      renderDealLog();
   if(id==='calls-log')  renderCallsLogTable();
-  if(id==='edit-log')      renderEditLog();
   if(id==='call-outcomes') renderCallOutcomes();
   if(id==='followup')      renderFollowUpTracker();
   if(id==='booked-calls')  renderBookedCalls();
-  if(id==='ht-ads')        renderHtAds();
   if(id==='retainers')     renderRetainers();
   if(id==='slack')      { renderSlack(computeMetrics(currentPeriod)); renderDailyReport(); }
 }
@@ -2583,47 +2397,33 @@ function computeMetrics(period) {
     // Authoritative all-time lead count: unique people in followup_leads (deduped at DB level)
     const fuTotal = (typeof FU_LEADS !== 'undefined' && FU_LEADS) ? FU_LEADS.length : 0;
     const dbBooked = DB_LOG.reduce((s,l)=>s+(l.booked||0),0);
-    // Calendly is now source of truth for Booked Calls (excludes cancelled)
-    const bcCount = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
-      ? BOOKED_CALLS.filter(b => (b.status||'') !== 'cancelled').length
-      : 0;
-    // BOOKED CALLS (All Time) = live booked_calls count, the single source of truth.
-    // As of 2026-05-19, booked_calls contains the FULL history: Jan-Mar 2026 calls were
-    // backfilled in (87 rows) alongside April-onward bookings. So bcCount alone is the
-    // complete all-time count — no separate historical constant is added (that would
-    // double-count). The card grows live with every new Calendly booking.
-    const bookedAuthoritative = bcCount;
-    const dbShows  = DB_LOG.reduce((s,l)=>s+(l.shows||0),0);
-    const dbNoshows= DB_LOG.reduce((s,l)=>s+(l.noshows||0),0);
-    // Closer-logged shows/noshows from call_outcomes table
-    const coShows   = (typeof CALL_OUTCOMES !== 'undefined' && CALL_OUTCOMES) ? CALL_OUTCOMES.filter(c=>c.showed==='showed').length : 0;
-    const coNoshows = (typeof CALL_OUTCOMES !== 'undefined' && CALL_OUTCOMES) ? CALL_OUTCOMES.filter(c=>c.showed==='noshow').length : 0;
-    // Calendly/GHL-driven shows/noshows from booked_calls.status (now source of truth via GHL sync)
-    const bcShows   = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS) ? BOOKED_CALLS.filter(b=>b.status==='showed').length : 0;
-    const bcNoshows = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS) ? BOOKED_CALLS.filter(b=>b.status==='no_show').length : 0;
+    // ── BOOKED CALLS (All Time) — single source: calls_with_status view ──
+    // The view computes effective_status: showed | no_show | pending | cancelled
+    //                                   | rescheduled | excluded (tests)
+    //
+    //   booked  = count of (showed + no_show + pending) — anything still "in play"
+    //   shows   = count of effective_status='showed'
+    //   noshows = count of effective_status='no_show'
+    //   pending = count of effective_status='pending'  (kept OUT of show-rate denominator)
+    //
+    // Cancelled/rescheduled/excluded never touch any KPI.
+    const _allCalls = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS) ? BOOKED_CALLS : [];
+    const _atActive = _allCalls.filter(b => {
+      const e = b.effective_status;
+      return e === 'showed' || e === 'no_show' || e === 'pending';
+    });
+    const bookedAuthoritative = _atActive.length;
+    const showsClampedAT      = _atActive.filter(b => b.effective_status === 'showed').length;
+    const noshowsClampedAT    = _atActive.filter(b => b.effective_status === 'no_show').length;
+    const pendingCallsAT      = _atActive.filter(b => b.effective_status === 'pending').length;
+    const slaBreachedAT       = _atActive.filter(b => b.sla_breached).length;
+    // Show-rate denominator excludes pending (per locked rule: pending = unknown, not a no-show).
+    const showRateBookedAT    = showsClampedAT + noshowsClampedAT;
+
     const dbCloses = DB_LOG.reduce((s,l)=>s+(l.closes||0),0);
     const dbLt     = DB_LOG.reduce((s,l)=>s+(l.lt||0),0);
-    // Use live sheet count for LT if available
     const sheetLtRevenue = LT_FROM_SHEET > 0 ? LT_FROM_SHEET * 27 : 0;
     console.log('All Time LT: sheet=', sheetLtRevenue, 'db=', dbLt, 'hardcoded=', ALL_TIME.lt);
-    // ── SHOW-UP RATE (All Time) ──
-    // ALL-TIME SHOW-UP RATE (Option B — conservative floor):
-    // booked_calls now holds the complete history (Jan 2026 onward, backfilled 2026-05-19).
-    // Rate = showed / ALL booked calls. Calls with no recorded outcome ('scheduled') count
-    // in the denominator but not the numerator, so the rate is a deliberate FLOOR — it can
-    // only understate, never overstate. As unmatched calls get GHL outcomes, the rate rises
-    // toward the true value. (MTD / Last Month branches pull live and are unaffected.)
-    const atCalls = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
-      ? BOOKED_CALLS.filter(b => (b.status||'') !== 'cancelled')
-      : [];
-    const showRateBooked   = atCalls.length;
-    const showsClampedAT    = atCalls.filter(b => b.status === 'showed').length;
-    const noshowsClampedAT  = atCalls.filter(b => b.status === 'no_show').length;
-    // Pending = booked calls with no outcome yet (future calls + unmatched history).
-    const pendingCallsAT = atCalls.filter(b => {
-      const st = b.status || '';
-      return st !== 'showed' && st !== 'no_show';
-    }).length;
     // META SPEND: automated Meta ad spend is the source of truth when available; fall back to manual log/ALL_TIME
     const metaSpendAll = getMetaSpendForPeriod('all');
     const spendAuthoritative = metaSpendAll > 0 ? metaSpendAll : Math.max(dbSpend, ALL_TIME.spend);
@@ -2639,11 +2439,10 @@ function computeMetrics(period) {
       htCash, htAds, htOrg,
       deals.filter(d=>d.usd>0), contractTotal, pipeline, deals
     );
-    // Show-up rate denominator = ALL booked calls (live count from booked_calls).
-    // Rate = showed / all booked — a conservative floor; calls awaiting an outcome
-    // count in the denominator only. showBase already defaults to booked in buildMetrics.
-    allTimeMetrics.showBase = showRateBooked;
+    // Show-rate denominator = showed + no_show (pending excluded — outcome unknown).
+    allTimeMetrics.showBase     = showRateBookedAT;
     allTimeMetrics.pendingCalls = pendingCallsAT;
+    allTimeMetrics.slaBreached  = slaBreachedAT;
     return allTimeMetrics;
   }
 
@@ -2673,47 +2472,24 @@ function computeMetrics(period) {
   const spendFromMeta = getMetaSpendForPeriod(period);
   const spend  = spendFromMeta > 0 ? spendFromMeta : spendFromLog;
   const leadsRaw = pLog.reduce((s,l)=>s+(l.leads||0),0);
-  // Booked Calls — Calendly is source of truth; count rows where scheduled_at falls in period
-  // and status is NOT cancelled or rescheduled. Rescheduled calls have moved to a future date
-  // and shouldn't drag the rate down. Fallback to daily_log only if BOOKED_CALLS has no rows at all.
-  const bookedFromLog = pLog.reduce((s,l)=>s+(l.booked||0),0);
-  const bookedFromCalendly = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
+  // ── BOOKED CALLS for this period — single source: calls_with_status view ──
+  // Same rule as All Time: booked = showed + no_show + pending, in this period.
+  // Cancelled/rescheduled/excluded never counted.
+  const _periodCalls = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
     ? BOOKED_CALLS.filter(b => {
-        const st = (b.status||'');
-        if (st === 'cancelled' || st === 'rescheduled') return false;
-        const when = b.scheduled_at ? b.scheduled_at.split('T')[0] : null;
-        return when && inPeriod(when);
-      }).length
-    : 0;
-  const hasAnyCalendly = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS && BOOKED_CALLS.length > 0);
-  const booked = hasAnyCalendly ? bookedFromCalendly : bookedFromLog;
-  // Shows/noshows: prefer the largest of daily_log, call_outcomes (legacy), or booked_calls.status (GHL-driven, new source of truth)
-  const showsLog   = pLog.reduce((s,l)=>s+(l.shows||0),0);
-  const noshowsLog = pLog.reduce((s,l)=>s+(l.noshows||0),0);
-  const pCallOut   = (typeof CALL_OUTCOMES !== 'undefined' && CALL_OUTCOMES) ? CALL_OUTCOMES.filter(c=>inPeriod(c.date)) : [];
-  const showsCO    = pCallOut.filter(c=>c.showed==='showed').length;
-  const noshowsCO  = pCallOut.filter(c=>c.showed==='noshow').length;
-  // Booked calls in this period whose status reflects show/no-show outcomes.
-  // Same cancelled/rescheduled exclusions as the booked count above.
-  const pBookedCalls = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS)
-    ? BOOKED_CALLS.filter(b => {
-        const st = (b.status||'');
-        if (st === 'cancelled' || st === 'rescheduled') return false;
+        const e = b.effective_status;
+        if (e !== 'showed' && e !== 'no_show' && e !== 'pending') return false;
         const when = b.scheduled_at ? b.scheduled_at.split('T')[0] : null;
         return when && inPeriod(when);
       })
     : [];
-  const showsBC    = pBookedCalls.filter(b=>b.status==='showed').length;
-  const noshowsBC  = pBookedCalls.filter(b=>b.status==='no_show').length;
-  // SHOWS / NO-SHOWS for this period: use booked_calls.status ONLY — that is the GHL-driven
-  // source of truth. The legacy daily_log (showsLog) and call_outcomes (showsCO) are stale
-  // manual data; including them in a max() let an old daily_log number force e.g. 12/12 = 100%.
-  // showsLog/showsCO/noshowsLog/noshowsCO computed above are intentionally NOT used here.
-  const showsRaw   = showsBC;
-  const noshowsRaw = noshowsBC;
-  // Clamp as a safety net so shows + noshows can never exceed booked calls in this period.
-  const shows   = Math.min(showsRaw, booked);
-  const noshows = Math.min(noshowsRaw, Math.max(0, booked - shows));
+  const booked  = _periodCalls.length;
+  const shows   = _periodCalls.filter(b => b.effective_status === 'showed').length;
+  const noshows = _periodCalls.filter(b => b.effective_status === 'no_show').length;
+  const pending = _periodCalls.filter(b => b.effective_status === 'pending').length;
+  const slaBreached = _periodCalls.filter(b => b.sla_breached).length;
+  // Show-rate denominator excludes pending — outcome unknown ≠ no-show.
+  const showBaseForPeriod = shows + noshows;
   const closes = pLog.reduce((s,l)=>s+(l.closes||0),0);
   const ltFromLog = pLog.reduce((s,l)=>s+(l.lt||0),0);
   const ltFromSheetPeriod = getLTForPeriod(period);
@@ -2728,7 +2504,11 @@ function computeMetrics(period) {
   const contractTotal = pDeals.reduce((s,d)=>s+(d.contract||0),0);
   const pipeline = deals.filter(d=>(!d.usd||d.usd===0)&&inPeriod(d.date)).reduce((s,d)=>s+(d.contract||0),0);
 
-  return buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,pDeals,contractTotal,pipeline,deals);
+  const periodMetrics = buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,pDeals,contractTotal,pipeline,deals);
+  periodMetrics.showBase     = showBaseForPeriod;
+  periodMetrics.pendingCalls = pending;
+  periodMetrics.slaBreached  = slaBreached;
+  return periodMetrics;
 }
 
 function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,dealsArr,contractTotal,pipeline,allDeals) {
@@ -3174,7 +2954,7 @@ async function loadAndRender() {
   try {
     [DB_DEALS, DB_LOG, CALL_OUTCOMES, FU_LEADS] = await Promise.all([getDeals(), getLog(), syncLTFromSheets().then(()=>Promise.resolve([])), getCallOutcomes(), syncLeadsFromSheets().then(()=>Promise.resolve([])), getFollowUpLeads()]);
     // Fetch Calendly booked calls (separate await so a failure here doesn't break the dashboard)
-    try { BOOKED_CALLS = await getBookedCalls(); } catch(e) { console.warn('booked_calls load failed:', e.message); BOOKED_CALLS = []; }
+    try { BOOKED_CALLS = await getBookedCalls(); } catch(e) { console.warn('calls load failed:', e.message); BOOKED_CALLS = []; }
     // Fetch automated Meta ad spend (separate await — a failure here must not break the dashboard)
     try { META_SPEND = await getMetaSpend(); } catch(e) { console.warn('meta_spend load failed:', e.message); META_SPEND = []; }
     // Fetch automated Whop high-ticket ads sales (separate await — a failure here must not break the dashboard)
@@ -3469,24 +3249,29 @@ function renderPL(d) {
 // ═══════════════════════════════════════════
 function renderCallsTab(d) {
   const S=getSettings();
-  const base=(d.showBase||d.booked);          // show-rate scope denominator (e.g. 83)
+  const base=(d.showBase||d.booked);          // show-rate denominator = showed + no_show (pending excluded)
   const showR=base?d.shows/base:0;
-  const noshowR=base?d.noshows/base:0;          // no-show rate on the SAME denominator as show rate
+  const noshowR=base?d.noshows/base:0;
   const cpbc=d.booked?d.spend/d.booked:0;
+  const pend = d.pendingCalls || 0;
+  const sla  = d.slaBreached  || 0;
   set('c-booked',d.booked);
   set('c-shows',d.shows);
-  set('c-showup-pct',Math.round(showR*100)+'% show rate');
-  document.getElementById('c-showup-pct').className='kpi-badge '+(showR>=(S.tgt_showup/100)?'up':'warn');
+  set('c-showup-pct',base?Math.round(showR*100)+'% show rate':'—');
+  document.getElementById('c-showup-pct').className='kpi-badge '+(base&&showR>=(S.tgt_showup/100)?'up':base?'warn':'neutral');
   set('c-noshows',d.noshows);
-  set('c-noshow-pct',Math.round(noshowR*100)+'% no-show');
+  set('c-noshow-pct',base?Math.round(noshowR*100)+'% no-show':'—');
+  set('c-pending', pend);
+  set('c-pending-sub', sla > 0 ? `⚠ ${sla} past 1hr SLA` : 'awaiting setter tag');
+  document.getElementById('c-pending-sub').className='kpi-badge '+(sla>0?'warn':'neutral');
   set('c-cpbc',d.booked?fmtFull(cpbc):'—');
-  // Booked card sub-label: clarify the 131 is the all-time count
-  set('c-booked-sub', d.booked + ' all-time · ' + base + ' in show-rate scope');
+  // Booked card sub-label
+  set('c-booked-sub', d.booked + ' total · ' + base + ' resolved · ' + pend + ' pending');
   // Scope note under Show-Ups: rates are measured against `base` booked calls
-  const pend = d.pendingCalls || 0;
   set('c-scope-note',
-    'show & no-show rates based on ' + base + ' booked calls' +
-    (pend > 0 ? ' · ' + pend + ' awaiting outcome' : ''));
+    base
+      ? 'show & no-show rates based on ' + base + ' resolved calls (pending excluded)'
+      : 'no resolved calls yet in this period');
 }
 
 function renderCallsTrend() {
@@ -3873,46 +3658,9 @@ async function syncMeta() {
 // ═══════════════════════════════════════════
 // SCALING WITH HIGH TICKET (Whop ads sales)
 // ═══════════════════════════════════════════
-// Renders the ht_sales table (high-ticket ads sales pulled from Whop by /api/whop-sync).
-function renderHtAds() {
-  const rows = (typeof HT_ADS !== 'undefined' && HT_ADS) ? HT_ADS : [];
-
-  // Top KPI cards
-  const count = rows.length;
-  const gross = rows.reduce((s,r) => s + (parseFloat(r.amount_gross) || 0), 0);
-  const net   = rows.reduce((s,r) => s + (parseFloat(r.amount_net) || 0), 0);
-  const avg   = count ? gross / count : 0;
-
-  set('ht-ads-count', count);
-  set('ht-ads-gross', fmtFull(gross));
-  set('ht-ads-net',   fmtFull(net));
-  set('ht-ads-avg',   count ? fmtFull(avg) : '$0');
-
-  // Sales table — newest first (already ordered by paid_at desc from Supabase)
-  const tbody = document.getElementById('ht-ads-tbody');
-  if (!tbody) return;
-
-  if (!count) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:24px">No high-ticket ads sales yet — they appear here automatically once a client pays via the ads product</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = rows.map(r => {
-    const when = r.paid_at
-      ? new Date(r.paid_at).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })
-      : '—';
-    const grossVal = parseFloat(r.amount_gross) || 0;
-    const netVal   = r.amount_net != null ? parseFloat(r.amount_net) : null;
-    return `<tr>
-      <td style="font-family:var(--font-mono);color:var(--accent);font-weight:700">${when}</td>
-      <td style="font-weight:700">${r.customer_name || '—'}</td>
-      <td style="color:var(--t2);font-size:11px">${r.customer_email || '—'}</td>
-      <td style="font-family:var(--font-mono);color:var(--accent);font-weight:700">$${grossVal.toLocaleString()}</td>
-      <td style="font-family:var(--font-mono);color:var(--blue)">${netVal != null ? '$'+netVal.toLocaleString() : '—'}</td>
-      <td><span class="pill ads">Ads</span></td>
-    </tr>`;
-  }).join('');
-}
+// Stubbed — the "Scaling With High Ticket" tab was removed; the data still feeds
+// other parts of the dashboard via HT_ADS, but there's no dedicated UI to render.
+function renderHtAds() { /* no-op */ }
 
 // Manual Whop sync — calls the /api/whop-sync endpoint, then refreshes the tab.
 // The cron also runs this daily; this button is for an on-demand refresh.
@@ -5143,17 +4891,61 @@ async function deleteFuLead(id) {
 }
 
 // ═══════════════════════════════════════════
-// BOOKED CALLS (Calendly) — source of truth for Booked Calls KPI
+// CALLS (Calendly + GHL via calls_with_status view) — single source of truth
 // ═══════════════════════════════════════════
+// As of 2026-05-20: dashboard reads from the new `calls` table (via the
+// calls_with_status view), not `booked_calls`. Both Calendly and GHL webhooks
+// write to `calls`. The view computes:
+//   effective_status: 'showed' | 'no_show' | 'pending' | 'cancelled' | 'rescheduled' | 'excluded'
+//   sla_breached:     boolean (true if BOOKED + 1hr past event_end_at + no outcome)
+//   closed_won:       boolean (joined from deals by email)
+//
+// Variable name kept as BOOKED_CALLS for backward compat with existing render
+// code. Each row is shaped to match the legacy schema (name/email/status)
+// so renderBookedCalls and computeMetrics keep working.
 let BOOKED_CALLS = [];
 let bookedFilter = 'all'; // 'all' | 'Frankie' | 'Mehdi' | 'unassigned'
 
+// Map effective_status from the view → legacy status field used everywhere else
+function _mapEffStatusToLegacy(eff) {
+  if (eff === 'showed')      return 'showed';
+  if (eff === 'no_show')     return 'no_show';
+  if (eff === 'cancelled')   return 'cancelled';
+  if (eff === 'rescheduled') return 'rescheduled';
+  if (eff === 'excluded')    return 'cancelled';   // tests: hide from UI same as cancelled
+  return 'scheduled';                              // 'pending' → legacy 'scheduled'
+}
+
 async function getBookedCalls() {
   try {
-    // Fetch all; sorted soonest-upcoming-last on server, but we re-sort client-side anyway
-    return await sbFetch('booked_calls?order=scheduled_at.asc');
+    // Pull everything (the view is small — a few hundred rows max)
+    const rows = await sbFetch('calls_with_status?order=scheduled_at.asc');
+    // Shape rows to look like the old booked_calls schema so legacy code is unchanged
+    return rows.map(r => ({
+      id: r.id,
+      calendly_event_uri: r.calendly_event_uri,
+      name:  r.invitee_name,
+      email: r.invitee_email,
+      phone: r.phone,
+      scheduled_at: r.scheduled_at,
+      event_end_at: r.event_end_at,
+      booked_at: r.booked_at,
+      closer: r.closer,
+      source: 'Calendly',
+      // Legacy status field (derived from effective_status)
+      status: _mapEffStatusToLegacy(r.effective_status),
+      // Pass through new fields for the new UI
+      effective_status: r.effective_status,
+      stage: r.stage,
+      ghl_pipeline_stage: r.ghl_stage_raw,
+      sla_breached: r.sla_breached,
+      closed_won: r.closed_won,
+      is_test: r.is_test,
+      manual_outcome: r.manual_outcome,
+      manual_outcome_note: r.manual_outcome_note,
+    }));
   } catch(e) {
-    console.log('booked_calls table not ready:', e.message);
+    console.log('calls_with_status not ready:', e.message);
     return [];
   }
 }
@@ -5192,8 +4984,10 @@ function fmtBookedAt(iso) {
 }
 
 function renderBookedCalls() {
-  // Filter by closer
-  let calls = [...(BOOKED_CALLS||[])];
+  const all = (BOOKED_CALLS || []);
+
+  // Filter by closer (UI filter, only affects the tables)
+  let calls = [...all];
   if (bookedFilter === 'Frankie' || bookedFilter === 'Mehdi') {
     calls = calls.filter(c => (c.closer||'') === bookedFilter);
   } else if (bookedFilter === 'unassigned') {
@@ -5201,29 +4995,66 @@ function renderBookedCalls() {
   }
 
   // Split upcoming vs past based on scheduled_at
+  // - Upcoming = future AND still active (BOOKED/SHOWED/NO_SHOW/RESCHEDULED — anything except CANCELLED/test)
+  // - Past = anything in the past, OR cancelled/excluded
   const now = new Date();
   const upcoming = calls.filter(c => {
-    if ((c.status||'') === 'cancelled') return false;
+    if (c.effective_status === 'cancelled' || c.effective_status === 'excluded') return false;
     if (!c.scheduled_at) return false;
     return new Date(c.scheduled_at) >= now;
   }).sort((a,b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
 
   const past = calls.filter(c => {
+    if (c.effective_status === 'excluded') return false; // hide tests entirely
     if (!c.scheduled_at) return true; // no time = treat as past
-    return new Date(c.scheduled_at) < now || (c.status||'') === 'cancelled';
+    return new Date(c.scheduled_at) < now;
   }).sort((a,b) => new Date(b.scheduled_at) - new Date(a.scheduled_at));
 
-  // Top KPIs — always reflect ALL calls (ignoring filter) so the headline numbers are stable
-  const allUpcoming = (BOOKED_CALLS||[]).filter(c => (c.status||'') !== 'cancelled' && c.scheduled_at && new Date(c.scheduled_at) >= now);
-  const allPast = (BOOKED_CALLS||[]).filter(c => (c.status||'') !== 'cancelled' && c.scheduled_at && new Date(c.scheduled_at) < now);
+  // ── Top KPIs (always reflect ALL calls, ignoring the closer filter) ──
+  // All-time counts so the headline numbers stay stable as the filter changes.
+  const allActive = all.filter(c => c.effective_status !== 'excluded' && c.effective_status !== 'cancelled');
+  const allUpcoming = allActive.filter(c => c.scheduled_at && new Date(c.scheduled_at) >= now && c.effective_status !== 'rescheduled');
+  const allShowed   = allActive.filter(c => c.effective_status === 'showed');
+  const allNoshow   = allActive.filter(c => c.effective_status === 'no_show');
+  const allPending  = allActive.filter(c => c.effective_status === 'pending');
+  const slaBreached = allPending.filter(c => c.sla_breached).length;
+  const showRateDen = allShowed.length + allNoshow.length;
+  const showRate    = showRateDen > 0 ? Math.round(allShowed.length / showRateDen * 100) : 0;
+  const noshowRate  = showRateDen > 0 ? Math.round(allNoshow.length / showRateDen * 100) : 0;
+
   set('bc-upcoming', allUpcoming.length);
-  set('bc-past', allPast.length);
-  const frankieUpcoming = allUpcoming.filter(c => c.closer === 'Frankie').length;
-  const mehdiUpcoming   = allUpcoming.filter(c => c.closer === 'Mehdi').length;
-  set('bc-frankie', frankieUpcoming);
-  set('bc-mehdi', mehdiUpcoming);
-  set('bc-frankie-sub', frankieUpcoming === 1 ? 'upcoming call' : 'upcoming calls');
-  set('bc-mehdi-sub',   mehdiUpcoming === 1 ? 'upcoming call' : 'upcoming calls');
+  set('bc-pending',  allPending.length);
+  set('bc-showed',   allShowed.length);
+  set('bc-noshow',   allNoshow.length);
+  set('bc-pending-sub', slaBreached > 0 ? `⚠ ${slaBreached} past 1hr SLA` : 'awaiting setter tag');
+  set('bc-showed-sub',  showRateDen > 0 ? `show rate ${showRate}% (of ${showRateDen})` : 'show rate —');
+  set('bc-noshow-sub',  showRateDen > 0 ? `no-show rate ${noshowRate}%` : 'no-show rate —');
+
+  // Helpers for stage pills in the past table
+  function stagePill(c) {
+    const e = c.effective_status;
+    if (e === 'showed') {
+      return `<span class="pill" style="background:var(--blued);color:var(--blue);font-size:10px">SHOWED</span>`;
+    }
+    if (e === 'no_show') {
+      const note = c.manual_outcome_note || '';
+      const title = note ? ` title="${note.replace(/"/g,'&quot;')}"` : '';
+      return `<span class="pill"${title} style="background:rgba(255,107,107,0.15);color:var(--red);font-size:10px">NO_SHOW</span>`;
+    }
+    if (e === 'pending') {
+      const breach = c.sla_breached
+        ? '<span style="color:var(--red);font-weight:700;margin-left:4px" title="1hr+ past call end with no setter update">⚠</span>'
+        : '';
+      return `<span class="pill" style="background:rgba(255,159,67,0.15);color:var(--amber);font-size:10px">PENDING</span>${breach}`;
+    }
+    if (e === 'cancelled') {
+      return `<span class="pill" style="background:var(--bg4);color:var(--t3);font-size:10px">CANCELLED</span>`;
+    }
+    if (e === 'rescheduled') {
+      return `<span class="pill" style="background:var(--bg4);color:var(--t3);font-size:10px">RESCHEDULED</span>`;
+    }
+    return `<span class="pill" style="background:var(--bg4);color:var(--t3);font-size:10px">—</span>`;
+  }
 
   // Upcoming table
   const upBody = document.getElementById('bc-upcoming-tbody');
@@ -5259,41 +5090,12 @@ function renderBookedCalls() {
           const closerPill = c.closer
             ? `<span class="pill ${(c.closer||'').toLowerCase()}">${c.closer}</span>`
             : `<span class="pill" style="background:var(--bg4);color:var(--t3)">—</span>`;
-          // GHL pipeline stage pill — color-coded by outcome
-          // Falls back to status if no GHL stage yet (e.g. closer hasn't updated GHL)
-          const stage = (c.ghl_pipeline_stage || '').trim();
-          const status = (c.status || 'scheduled');
-          let stageLabel, stageBg, stageColor;
-          if (stage) {
-            // Color by stage semantics
-            const s = stage.toLowerCase();
-            if (s.includes('closed - won') || s === 'deposit') {
-              stageBg = 'var(--accentd)'; stageColor = 'var(--accent)';
-            } else if (s === 'call completed' || s.includes('offered')) {
-              stageBg = 'var(--blued)'; stageColor = 'var(--blue)';
-            } else if (s === 'no show') {
-              stageBg = 'rgba(255,159,67,0.15)'; stageColor = 'var(--amber)';
-            } else if (s === 'cancelled' || s.includes('deal lost')) {
-              stageBg = 'rgba(255,107,107,0.15)'; stageColor = 'var(--red)';
-            } else {
-              stageBg = 'var(--bg4)'; stageColor = 'var(--t2)';
-            }
-            stageLabel = stage;
-          } else {
-            // Fallback: legacy status if GHL hasn't updated yet
-            stageLabel = status === 'cancelled' ? 'Cancelled'
-              : status === 'no_show' ? 'No Show'
-              : status === 'showed' ? 'Showed'
-              : status === 'rescheduled' ? 'Rescheduled'
-              : 'Awaiting update';
-            stageBg = 'var(--bg4)'; stageColor = 'var(--t3)';
-          }
           return `<tr>
             <td style="font-family:var(--font-mono);color:var(--t2)">${fmtBookedWhen(c.scheduled_at)}</td>
             <td style="font-weight:700">${c.name || '—'}</td>
             <td style="color:var(--t2);font-size:11px">${c.email || '—'}</td>
             <td>${closerPill}</td>
-            <td><span class="pill" style="background:${stageBg};color:${stageColor};font-size:10px">${stageLabel}</span></td>
+            <td>${stagePill(c)}</td>
             <td style="color:var(--t3);font-size:11px">${fmtBookedAt(c.booked_at)}</td>
             <td style="white-space:nowrap">
               <button onclick="openBcEdit('${c.id}')" title="Edit this call" style="background:var(--blued);color:var(--blue);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;margin-right:4px">✎</button>
@@ -5311,7 +5113,7 @@ async function deleteBookedCall(id, name) {
   if (!id) return;
   if (!confirm(`Delete the booked call for ${name}?\n\nThis removes the row from Supabase and cannot be undone.`)) return;
   try {
-    await deleteRow('booked_calls', id);
+    await deleteRow('calls', id);
     BOOKED_CALLS = await getBookedCalls();
     renderBookedCalls();
     renderAll(); // updates Executive dashboard counts too
@@ -5348,8 +5150,8 @@ function openBcEdit(id) {
     document.getElementById('bc-edit-scheduled').value = '';
   }
   document.getElementById('bc-edit-closer').value    = c.closer    || '';
-  document.getElementById('bc-edit-status').value    = c.status    || 'scheduled';
-  document.getElementById('bc-edit-outcome').value   = c.outcome   || '';
+  document.getElementById('bc-edit-status').value    = c.stage     || 'BOOKED';
+  document.getElementById('bc-edit-outcome').value   = c.manual_outcome || '';
   document.getElementById('bc-edit-source').value    = c.source    || 'Calendly';
   document.getElementById('bc-edit-ghl-stage').value = c.ghl_pipeline_stage || '— not synced yet —';
   document.getElementById('bc-edit-modal').style.display = 'flex';
@@ -5363,21 +5165,21 @@ function closeBcModal() {
 async function saveBcEdit() {
   if (!bcEditingId) return;
   const scheduledRaw = document.getElementById('bc-edit-scheduled').value;
+  const stageVal = document.getElementById('bc-edit-status').value || 'BOOKED';
+  const outcomeVal = document.getElementById('bc-edit-outcome').value || null;
   const updated = {
-    name:     document.getElementById('bc-edit-name').value.trim()  || null,
-    email:    document.getElementById('bc-edit-email').value.trim() || null,
-    phone:    document.getElementById('bc-edit-phone').value.trim() || null,
-    scheduled_at: scheduledRaw ? new Date(scheduledRaw).toISOString() : null,
-    closer:   document.getElementById('bc-edit-closer').value       || null,
-    status:   document.getElementById('bc-edit-status').value       || null,
-    outcome:  document.getElementById('bc-edit-outcome').value      || null,
-    source:   document.getElementById('bc-edit-source').value.trim()|| null,
-    updated_at: new Date().toISOString(),
+    invitee_name:  document.getElementById('bc-edit-name').value.trim()  || null,
+    invitee_email: (document.getElementById('bc-edit-email').value || '').trim().toLowerCase() || null,
+    phone:         document.getElementById('bc-edit-phone').value.trim() || null,
+    scheduled_at:  scheduledRaw ? new Date(scheduledRaw).toISOString() : null,
+    closer:        document.getElementById('bc-edit-closer').value       || null,
+    stage:         stageVal,
+    manual_outcome: outcomeVal,
   };
   const btn = document.getElementById('bc-edit-save-btn');
   btn.textContent = 'Saving...'; btn.disabled = true;
   try {
-    await sbFetch('booked_calls?id=eq.' + bcEditingId, {
+    await sbFetch('calls?id=eq.' + bcEditingId, {
       method: 'PATCH',
       headers: { 'Prefer': 'return=representation' },
       body: JSON.stringify(updated),
