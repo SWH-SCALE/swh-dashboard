@@ -1289,12 +1289,7 @@ select.input-field option { background: var(--bg2); }
       <div class="kpi-meta"><span class="kpi-badge neutral" id="s-lt-offset">covers 0% of spend</span></div>
     </div>
   </div>
-  <div class="kpi-tier kpi-tier-4" style="margin-top:10px">
-    <div class="kpi-card accent">
-      <div class="kpi-label">Close Rate</div>
-      <div class="kpi-value mono" id="s-cr">0%</div>
-      <div class="kpi-meta"><span class="kpi-badge warn">target 30%</span></div>
-    </div>
+  <div class="kpi-tier kpi-tier-3" style="margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
     <div class="kpi-card amber">
       <div class="kpi-label">CAC (ad-attributable)</div>
       <div class="kpi-value mono" id="s-cac">$0</div>
@@ -3118,66 +3113,21 @@ function renderExec(d) {
       .filter(e => e)
       .filter(e => currentPeriod === 'all' ? true : _showedCallEmailsInPeriod.has(e))
   );
-  let adsDeals = adsUniqueCustomers.size;
-  let closeRateAds = d.shows > 0 ? adsDeals / d.shows : 0;
-
-  // ── MANUAL OVERRIDE: Last Month = April 2026 ──
-  // The auto-calc gives 0% for April because Whop deal emails don't reliably
-  // match Calendly booking emails, AND many collected payments are retainer
-  // continuations from prior-month calls (not new closes).
-  // Verified manually against SWH_Payout_Tracker 2026 + SWH Monthly Team Payouts
-  // + Whop CSV export:
-  //   April 2026: 7 new closes / 38 shows → 18.4%
-  //   May 2026 MTD: 4 new closes / 11 shows → 36.4%
-  //     (new = paid in this month but NOT in any prior month)
-  // When the calendar rolls forward these checks naturally stop applying.
-  const _today = new Date();
-  const _y = _today.getFullYear();
-  const _m = _today.getMonth();
-  if (currentPeriod === 'lm' && _y === 2026 && _m === 4) {  // May 2026 → Last Mo = April
-    adsDeals = 7;
-    closeRateAds = 7 / 38;
-  }
-  if (currentPeriod === 'mtd' && _y === 2026 && _m === 4) { // May 2026 MTD
-    adsDeals = 6;
-    closeRateAds = 6 / 11;
-  }
+  const adsDeals = adsUniqueCustomers.size;
+  const closeRateAds = d.shows > 0 ? adsDeals / d.shows : 0;
 
   set('k-close-rate', d.shows ? Math.round(closeRateAds*100)+'%' : '—');
   set('k-close-rate-meta', d.shows ? (adsDeals + ' of ' + d.shows + ' shows closed') : '— ads deals');
   badge('k-close-rate-meta', closeRateAds >= 0.25 && d.shows > 0 ? 'up' : d.shows > 0 ? 'warn' : 'neutral');
 
   // Cash Collected — Ads (sum of usd on ads-sourced deals this period)
-  let adsDealCount = d.rawDeals.filter(dl => isAdsDeal(dl)).length;
+  // Source of truth: deals table. Whop sync writes here automatically.
+  // Manual entries are gated (see submitDeal + submitCallOutcome safeguards).
+  const adsDealCount = d.rawDeals.filter(dl => isAdsDeal(dl)).length;
   const orgDealCount = d.rawDeals.filter(dl => isOrganicDeal(dl)).length;
-  let htAdsDisplay = d.htAds;
-
-  // ── MANUAL OVERRIDE: Last Mo (April 2026) and MTD (May 2026) cash + deal count ──
-  // The deals table was inflated by manual duplicates of Whop-synced rows
-  // (e.g. closer logged "Add New Deal" before the Whop webhook fired, counting
-  // the same payment twice). The cleanup SQL fixes the data, but these
-  // overrides anchor the values to the Whop CSV truth as a safety net.
-  // Whop ads-product (Scaling With High Ticket) totals:
-  //   April 2026: $38,597.09 / 15 payments / 12 unique customers
-  //   May 2026 (MTD as of 2026-05-20): $32,896.55 / 15 payments / 12 unique customers
-  // When the calendar rolls forward, these checks naturally stop applying.
-  const _ovToday = new Date();
-  if (currentPeriod === 'lm'
-      && _ovToday.getFullYear() === 2026
-      && _ovToday.getMonth() === 4) {     // May 2026 → Last Mo = April
-    htAdsDisplay  = 38597;
-    adsDealCount  = 15;
-  }
-  if (currentPeriod === 'mtd'
-      && _ovToday.getFullYear() === 2026
-      && _ovToday.getMonth() === 4) {     // May 2026 MTD
-    htAdsDisplay  = 15678;
-    adsDealCount  = 8;
-  }
-
-  set('k-ht-ads', fmtFull(htAdsDisplay));
+  set('k-ht-ads', fmtFull(d.htAds));
   set('k-ht-count', adsDealCount + ' deal' + (adsDealCount===1?'':'s'));
-  badge('k-ht-count', htAdsDisplay>0?'up':'neutral');
+  badge('k-ht-count', d.htAds>0?'up':'neutral');
 
   // Cash Collected — Organic (sum of usd on organic-sourced deals this period)
   set('k-cash', fmtFull(d.htOrg));
@@ -3414,7 +3364,6 @@ function renderSalesDeals() {
   set('s-ht-ads',fmtFull(d.htAds)); set('s-ht-ads-pct',pct(d.htAds,d.cash||1)+' of HT');
   set('s-ht-org',fmtFull(d.htOrg)); set('s-ht-org-pct',pct(d.htOrg,d.cash||1)+' of HT');
   set('s-lt',fmtFull(d.lt)); set('s-lt-offset','covers '+ltCov+'% of spend');
-  set('s-cr',d.shows?Math.round(cr*100)+'%':'—');
   set('s-cac',d.rawDeals.length?fmtFull(cac):'—');
   set('s-rpl',d.leads?fmtFull(rpl):'—');
   set('s-rps',d.shows?fmtFull(rps):'—');
