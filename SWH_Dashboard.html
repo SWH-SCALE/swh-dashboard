@@ -3088,7 +3088,15 @@ function renderExec(d) {
       .map(c => (c.email || '').trim().toLowerCase())
       .filter(e => e)
   );
-  const adsDealsRaw = d.rawDeals.filter(dl => isAdsDeal(dl));
+  // Close Rate counts ONLY deal_type='new_ht' — retainers, back-end payments,
+  // and LT sales don't represent new closes from booked calls.
+  // Legacy deals without deal_type default to 'new_ht' (treated as new closes
+  // historically — same behaviour as before this column existed).
+  const adsDealsRaw = d.rawDeals.filter(dl => {
+    if (!isAdsDeal(dl)) return false;
+    const t = String(dl.deal_type || 'new_ht').toLowerCase();
+    return t === 'new_ht';
+  });
   const adsUniqueCustomers = new Set(
     adsDealsRaw
       .map(dl => (dl.email || '').toString().trim().toLowerCase())
