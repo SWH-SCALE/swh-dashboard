@@ -1378,12 +1378,14 @@ select.input-field option { background: var(--bg2); }
      TAB: RETAINERS
 ══════════════════════════════════════ -->
 <div id="tab-retainers" class="tab-view">
-  <div class="section-label">Forecasted recurring cash · retainer schedule</div>
+  <div class="section-label">Retainer tracking · auto-synced from Whop · isolated from Executive metrics</div>
+
+  <!-- Forecast KPI row -->
   <div class="kpi-tier kpi-tier-4">
     <div class="kpi-card accent">
       <div class="kpi-label">Outstanding — Next 30 Days</div>
       <div class="kpi-value mono" id="ret-30">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">unpaid payments due ≤30d</span></div>
+      <div class="kpi-meta"><span class="kpi-sublabel">unpaid installments due ≤30d</span></div>
     </div>
     <div class="kpi-card accent">
       <div class="kpi-label">Outstanding — Next 60 Days</div>
@@ -1393,12 +1395,12 @@ select.input-field option { background: var(--bg2); }
     <div class="kpi-card amber">
       <div class="kpi-label">Total Outstanding</div>
       <div class="kpi-value mono" id="ret-outstanding">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">all unpaid scheduled payments</span></div>
+      <div class="kpi-meta"><span class="kpi-sublabel">all unpaid · across active clients</span></div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Active Retainers</div>
-      <div class="kpi-value" id="ret-active">0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel" id="ret-clients-sub">0 clients</span></div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Overdue</div>
+      <div class="kpi-value mono" id="ret-overdue">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="ret-overdue-sub">0 past due date</span></div>
     </div>
   </div>
 
@@ -1406,69 +1408,49 @@ select.input-field option { background: var(--bg2); }
     <div class="kpi-card accent">
       <div class="kpi-label">Collected To Date</div>
       <div class="kpi-value mono" id="ret-collected">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">retainer payments marked paid</span></div>
+      <div class="kpi-meta"><span class="kpi-sublabel">all retainer payments paid</span></div>
     </div>
     <div class="kpi-card blue">
-      <div class="kpi-label">Total Scheduled</div>
+      <div class="kpi-label">Total Contract Value</div>
       <div class="kpi-value mono" id="ret-scheduled">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">paid + unpaid · full book</span></div>
-    </div>
-    <div class="kpi-card red">
-      <div class="kpi-label">Overdue</div>
-      <div class="kpi-value mono" id="ret-overdue">$0</div>
-      <div class="kpi-meta"><span class="kpi-badge neutral" id="ret-overdue-badge">unpaid · past due date</span></div>
+      <div class="kpi-meta"><span class="kpi-sublabel">sum of total_deal_value across clients</span></div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Payments Logged</div>
-      <div class="kpi-value" id="ret-rowcount">0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">scheduled payment rows</span></div>
+      <div class="kpi-label">Active Clients</div>
+      <div class="kpi-value" id="ret-active">0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="ret-clients-sub">0 setup complete</span></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Setup Pending</div>
+      <div class="kpi-value" id="ret-pending">0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">need totals entered</span></div>
     </div>
   </div>
 
-  <!-- Add a retainer payment -->
-  <div class="chart-card" style="margin-top:16px">
-    <div class="section-label" style="margin:0 0 10px">Add a retainer payment</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-      <div>
-        <div style="font-size:10px;color:var(--t3);margin-bottom:3px;font-family:var(--font-mono)">CLIENT NAME</div>
-        <input type="text" id="ret-add-name" placeholder="e.g. Candice" list="ret-client-list" style="width:170px;background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;color:var(--t1);font-size:12px">
-        <datalist id="ret-client-list"></datalist>
-      </div>
-      <div>
-        <div style="font-size:10px;color:var(--t3);margin-bottom:3px;font-family:var(--font-mono)">DUE DATE</div>
-        <input type="date" id="ret-add-date" style="background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;color:var(--t1);font-size:12px">
-      </div>
-      <div>
-        <div style="font-size:10px;color:var(--t3);margin-bottom:3px;font-family:var(--font-mono)">AMOUNT (USD)</div>
-        <input type="number" id="ret-add-amount" placeholder="3000" style="width:110px;background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;color:var(--t1);font-family:var(--font-mono);font-size:12px">
-      </div>
-      <div>
-        <div style="font-size:10px;color:var(--t3);margin-bottom:3px;font-family:var(--font-mono)">SOURCE</div>
-        <select id="ret-add-source" style="background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;color:var(--t1);font-size:12px">
-          <option value="ads">Ads</option>
-          <option value="organic">Organic</option>
-        </select>
-      </div>
-      <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t2);padding-bottom:8px;cursor:pointer">
-        <input type="checkbox" id="ret-add-last"> last payment
-      </label>
-      <button onclick="addRetainerPayment()" style="background:var(--accent);color:#04140d;border:none;border-radius:6px;padding:8px 16px;font-size:11px;font-weight:800;font-family:var(--font-mono);cursor:pointer">+ Add</button>
+  <!-- ── Setup pending clients (banner if any) ── -->
+  <div id="ret-pending-section" style="margin-top:16px;display:none">
+    <div class="section-label" style="margin:0 0 10px;color:var(--amber)">⚠ Setup pending — enter retainer totals to unlock automation</div>
+    <div class="chart-card">
+      <div id="ret-pending-list"></div>
     </div>
-    <div style="font-size:10px;color:var(--t3);margin-top:8px">Add each scheduled payment for a client one at a time — reuse the same client name to add their 2nd, 3rd, etc. Tick the box on a row once a payment lands to remove it from the forecast.</div>
   </div>
 
-  <div class="section-label" style="margin:16px 0 10px">Retainer schedule · grouped by client</div>
+  <!-- ── Active retainers table ── -->
+  <div class="section-label" style="margin:16px 0 10px">Active retainers · one row per client</div>
   <div class="chart-card">
     <div class="deals-table-wrap">
       <table class="deals-table" id="ret-table">
         <thead>
           <tr>
             <th>Client</th>
-            <th>Source</th>
-            <th>Due Date</th>
-            <th>Amount</th>
-            <th>Status</th>
-            <th>Paid?</th>
+            <th>Deposit Date</th>
+            <th>Total Deal</th>
+            <th>Paid</th>
+            <th>Outstanding</th>
+            <th>Deposit</th>
+            <th>Retainer 2</th>
+            <th>Final</th>
+            <th>Next Due</th>
             <th></th>
           </tr>
         </thead>
@@ -1478,7 +1460,7 @@ select.input-field option { background: var(--bg2); }
   </div>
 
   <div style="margin-top:10px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">
-    Each row is one scheduled retainer payment. <b style="color:var(--accent)">Outstanding</b> KPIs count only unpaid payments — tick <b style="color:var(--accent)">Paid?</b> and that amount drops out of the 30/60-day forecast instantly. This tab is standalone and does not feed the Executive Dashboard.
+    <b style="color:var(--accent)">How this works:</b> Whop sync auto-creates a client row on first payment (deposit). Enter <b>Total Deal Value</b>, <b>Retainer 2</b>, and <b>Final Retainer</b> amounts once to enable automation. Subsequent Whop payments auto-allocate to the next unpaid installment in sequence. Due dates calculated as deposit + 30d / + 60d. <b style="color:var(--accent)">This tab does not feed any Executive Dashboard metric.</b>
   </div>
 </div>
 
@@ -2141,32 +2123,26 @@ async function getHtSales() {
     return [];
   }
 }
-// ── Retainer schedule (manual per-client payment rows, from retainer_schedule table) ──
-async function getRetainerSchedule() {
+// ── Retainer system: read from retainer_status VIEW (one row per client, computed) ──
+async function getRetainerStatus() {
   try {
-    return await sbFetch('retainer_schedule?order=due_date.asc');
-  } catch(e) {
-    console.log('retainer_schedule table not ready:', e.message);
+    return await sbFetch('retainer_status?order=deposit_date.desc');
+  } catch (e) {
+    console.log('retainer_status view not ready:', e.message);
     return [];
   }
 }
-// ── Patch a retainer_schedule row (e.g. toggle paid, change source) ──
-async function patchRetainerRow(id, fields) {
-  return await sbFetch('retainer_schedule?id=eq.' + id, {
+// ── Update setup fields on a retainer_clients row (totals + mark setup_complete) ──
+async function updateRetainerSetup(clientId, totals) {
+  return await sbFetch('retainer_clients?id=eq.' + clientId, {
     method: 'PATCH',
-    body: JSON.stringify(fields),
+    body: JSON.stringify({
+      total_deal_value: totals.total_deal_value,
+      retainer_2_amount: totals.retainer_2_amount,
+      final_retainer_amount: totals.final_retainer_amount,
+      setup_complete: true,
+    }),
   });
-}
-// ── Insert a new retainer_schedule payment row ──
-async function insertRetainerRow(row) {
-  return await sbFetch('retainer_schedule', {
-    method: 'POST',
-    body: JSON.stringify(row),
-  });
-}
-// ── Delete a retainer_schedule row ──
-async function deleteRetainerRow(id) {
-  return await sbFetch('retainer_schedule?id=eq.' + id, { method: 'DELETE' });
 }
 // Sum Meta spend (USD) for a given dashboard period: 'all' | 'today' | '7d' | 'mtd' | 'lm'
 function getMetaSpendForPeriod(period) {
@@ -2280,7 +2256,7 @@ let DB_DEALS = [];
 let DB_LOG   = [];
 let META_SPEND = [];   // rows from meta_spend table: {spend_date, spend, ...} — automated Meta ad spend
 let HT_ADS = [];       // rows from ht_sales table: {customer_name, amount_gross, ...} — automated Whop high-ticket ads sales
-let RETAINER_SCHEDULE = []; // rows from retainer_schedule table — one row per scheduled retainer payment
+let RETAINER_STATUS = []; // rows from retainer_status view — one row per client with computed installments
 let loading  = false;
 
 // ═══════════════════════════════════════════
@@ -2986,7 +2962,7 @@ async function loadAndRender() {
     // Fetch automated Whop high-ticket ads sales (separate await — a failure here must not break the dashboard)
     try { HT_ADS = await getHtSales(); } catch(e) { console.warn('ht_sales load failed:', e.message); HT_ADS = []; }
     // Fetch retainer payments (separate await — a failure here must not break the dashboard)
-    try { RETAINER_SCHEDULE = await getRetainerSchedule(); } catch(e) { console.warn('retainer_schedule load failed:', e.message); RETAINER_SCHEDULE = []; }
+    try { RETAINER_STATUS = await getRetainerStatus(); } catch(e) { console.warn('retainer_status load failed:', e.message); RETAINER_STATUS = []; }
     // Background: pull any new leads from Sheets into followup_leads
     // Don't block initial render — kick off after, then refresh tracker silently
     syncSheetsToFollowUpTracker({ silent: true }).catch(()=>{});
@@ -3763,15 +3739,16 @@ async function syncWhop() {
 
 
 // ═══════════════════════════════════════════
-// RETAINERS TAB
+// RETAINERS TAB — auto-synced via Whop, isolated from Executive
 // ═══════════════════════════════════════════
-// Data model — retainer_schedule table, one row per scheduled retainer payment:
-//   id, client_name, due_date, amount, paid (bool), is_last (bool),
-//   source ('ads'|'organic'), notes, created_at
-// A client is just a group of rows sharing the same client_name.
-// Forecast KPIs (Outstanding 30/60) count UNPAID rows only — ticking "Paid?"
-// removes that amount from the forecast. This tab is standalone: it does NOT
-// feed the Executive Dashboard.
+// Data model: TWO Supabase tables (see retainers_migration.sql):
+//   - retainer_clients   : one row per client (name, email, deposit_date, totals, setup_complete)
+//   - retainer_payments  : one row per Whop payment (allocated_to: deposit|retainer_2|final_retainer|unallocated)
+// We read from the retainer_status VIEW which joins these and computes:
+//   paid_deposit, paid_retainer_2, paid_final, outstanding,
+//   deposit_status, retainer_2_status, final_retainer_status,
+//   next_due_date, next_due_amount, retainer_2_due_date, final_retainer_due_date
+// This tab does NOT feed any Executive metric — those still read from `deals`.
 
 function retFmtDate(d) {
   if (!d) return '—';
@@ -3787,203 +3764,214 @@ function retDaysFromNow(dateStr) {
   const now = new Date(); now.setHours(0,0,0,0);
   return Math.round((d - now) / 86400000);
 }
+function retInstallmentPill(status, days) {
+  if (status === 'paid')          return '<span class="pill" style="background:var(--accentd);color:var(--accent)">Paid</span>';
+  if (status === 'overdue')       return `<span class="pill" style="background:var(--redd);color:var(--red)">Overdue ${Math.abs(days)}d</span>`;
+  if (status === 'setup_pending') return '<span class="pill" style="background:var(--bg3);color:var(--t3)">Setup —</span>';
+  if (days <= 30)                 return `<span class="pill" style="background:var(--amberd);color:var(--amber)">Due ${days}d</span>`;
+  return `<span class="pill" style="background:var(--bg3);color:var(--t2)">Due ${days}d</span>`;
+}
 
 function renderRetainers() {
-  const rows = (typeof RETAINER_SCHEDULE !== 'undefined' && RETAINER_SCHEDULE) ? RETAINER_SCHEDULE : [];
+  const rows = (typeof RETAINER_STATUS !== 'undefined' && RETAINER_STATUS) ? RETAINER_STATUS : [];
 
-  let out30 = 0, out60 = 0, outstanding = 0, collected = 0, scheduled = 0, overdue = 0;
+  // ── Compute KPIs across all clients ──
+  let out30 = 0, out60 = 0, outstanding = 0, collected = 0, totalContract = 0;
+  let overdueAmt = 0, overdueCount = 0;
+  let setupPendingCount = 0;
+  let setupCompleteCount = 0;
 
-  rows.forEach(r => {
-    const amt = parseFloat(r.amount) || 0;
-    scheduled += amt;
-    if (r.paid) {
-      collected += amt;
-    } else {
-      outstanding += amt;
-      const days = retDaysFromNow(r.due_date);
-      if (days <= 30) out30 += amt;          // includes overdue (days < 0)
-      if (days <= 60) out60 += amt;
-      if (days < 0)   overdue += amt;
+  rows.forEach(c => {
+    collected     += parseFloat(c.paid_total) || 0;
+    totalContract += parseFloat(c.total_deal_value) || 0;
+    outstanding   += parseFloat(c.outstanding) || 0;
+
+    if (!c.setup_complete) {
+      setupPendingCount++;
+      return;
     }
-  });
+    setupCompleteCount++;
 
-  // distinct clients
-  const clientNames = [];
-  rows.forEach(r => { if (clientNames.indexOf(r.client_name) === -1) clientNames.push(r.client_name); });
+    // Per-installment overdue / forecast
+    [
+      { amt: c.retainer_2_amount, paid: c.paid_retainer_2, due: c.retainer_2_due_date, status: c.retainer_2_status },
+      { amt: c.final_retainer_amount, paid: c.paid_final, due: c.final_retainer_due_date, status: c.final_retainer_status },
+    ].forEach(inst => {
+      if (inst.status === 'paid') return;
+      const owe = Math.max((parseFloat(inst.amt) || 0) - (parseFloat(inst.paid) || 0), 0);
+      const days = retDaysFromNow(inst.due);
+      if (days < 0)  { overdueAmt += owe; overdueCount++; }
+      if (days <= 30) out30 += owe;
+      if (days <= 60) out60 += owe;
+    });
+  });
 
   set('ret-30',          fmtFull(out30));
   set('ret-60',          fmtFull(out60));
   set('ret-outstanding', fmtFull(outstanding));
-  set('ret-active',      clientNames.length);
-  set('ret-clients-sub', clientNames.length + ' client' + (clientNames.length===1?'':'s'));
+  set('ret-overdue',     fmtFull(overdueAmt));
+  set('ret-overdue-sub', overdueCount + ' past due date');
   set('ret-collected',   fmtFull(collected));
-  set('ret-scheduled',   fmtFull(scheduled));
-  set('ret-overdue',     fmtFull(overdue));
-  set('ret-rowcount',    rows.length);
-  badge('ret-overdue-badge', overdue > 0 ? 'down' : 'up');
+  set('ret-scheduled',   fmtFull(totalContract));
+  set('ret-active',      setupCompleteCount);
+  set('ret-clients-sub', setupCompleteCount + ' setup complete');
+  set('ret-pending',     setupPendingCount);
 
-  // datalist of existing client names for the add form
-  const dl = document.getElementById('ret-client-list');
-  if (dl) dl.innerHTML = clientNames.map(n => `<option value="${(n||'').replace(/"/g,'&quot;')}">`).join('');
+  // ── Setup-pending banner ──
+  const pendingSection = document.getElementById('ret-pending-section');
+  const pendingList    = document.getElementById('ret-pending-list');
+  const pendingClients = rows.filter(c => !c.setup_complete);
+  if (pendingSection && pendingList) {
+    if (pendingClients.length === 0) {
+      pendingSection.style.display = 'none';
+    } else {
+      pendingSection.style.display = 'block';
+      pendingList.innerHTML = pendingClients.map(c => {
+        const safeName = (c.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        return `
+          <div style="display:grid;grid-template-columns:1.4fr 0.9fr 1fr 1fr 1fr auto;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--border2)">
+            <div>
+              <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:3px">CLIENT</div>
+              <div style="font-weight:700;color:var(--t1);font-size:13px">${c.name || '—'}</div>
+              <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px">
+                Deposit ${retFmtDate(c.deposit_date)} · $${(parseFloat(c.paid_deposit)||0).toLocaleString()} paid
+              </div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:3px">TOTAL DEAL</div>
+              <input type="number" id="setup-total-${c.id}" placeholder="12000"
+                style="width:100%;background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;color:var(--t1);font-family:var(--font-mono);font-size:12px">
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:3px">RETAINER 2</div>
+              <input type="number" id="setup-r2-${c.id}" placeholder="4000"
+                style="width:100%;background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;color:var(--t1);font-family:var(--font-mono);font-size:12px">
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:3px">FINAL RETAINER</div>
+              <input type="number" id="setup-final-${c.id}" placeholder="4000"
+                style="width:100%;background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;color:var(--t1);font-family:var(--font-mono);font-size:12px">
+            </div>
+            <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);line-height:1.5">
+              Due dates auto-calc:<br>
+              R2: ${retFmtDate(c.retainer_2_due_date)}<br>
+              Final: ${retFmtDate(c.final_retainer_due_date)}
+            </div>
+            <button onclick="saveRetainerSetup('${c.id}')"
+              style="background:var(--accent);color:#04140d;border:none;border-radius:6px;padding:8px 14px;font-size:11px;font-weight:800;font-family:var(--font-mono);cursor:pointer;height:fit-content">Save</button>
+          </div>
+        `;
+      }).join('');
+    }
+  }
 
+  // ── Active retainers table ──
   const tbody = document.getElementById('ret-tbody');
   if (!tbody) return;
 
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:24px">No retainer payments yet — add one above.</td></tr>';
+  const activeClients = rows.filter(c => c.setup_complete);
+
+  if (activeClients.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:24px">No active retainers yet — clients will appear here once Whop sync creates them and setup is complete.</td></tr>';
     return;
   }
 
-  // group rows by client, each client's payments sorted by due date
-  const groups = {};
-  rows.forEach(r => { (groups[r.client_name] = groups[r.client_name] || []).push(r); });
-  // order clients by their earliest unpaid due date (soonest first)
-  const orderedClients = Object.keys(groups).sort((a, b) => {
-    const ea = Math.min(...groups[a].map(r => r.paid ? Infinity : retDaysFromNow(r.due_date)));
-    const eb = Math.min(...groups[b].map(r => r.paid ? Infinity : retDaysFromNow(r.due_date)));
-    return ea - eb;
+  // Sort by next due date (soonest first, completed clients at bottom)
+  activeClients.sort((a, b) => {
+    const da = a.next_due_date ? retDaysFromNow(a.next_due_date) : Infinity;
+    const db = b.next_due_date ? retDaysFromNow(b.next_due_date) : Infinity;
+    return da - db;
   });
 
-  let html = '';
-  orderedClients.forEach(name => {
-    const list = groups[name].slice().sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
-    const clientOutstanding = list.reduce((s,r) => s + (r.paid ? 0 : (parseFloat(r.amount)||0)), 0);
-    const clientTotal       = list.reduce((s,r) => s + (parseFloat(r.amount)||0), 0);
+  tbody.innerHTML = activeClients.map(c => {
+    const total       = parseFloat(c.total_deal_value) || 0;
+    const paid        = parseFloat(c.paid_total) || 0;
+    const owe         = parseFloat(c.outstanding) || 0;
+    const isPaidUp    = !c.next_due_date;
+    const flagBadge   = c.has_flagged_payment ? ' <span class="pill" style="background:var(--redd);color:var(--red);font-size:9px">⚠ flag</span>' : '';
+    const nextDueCell = isPaidUp
+      ? '<span style="color:var(--accent);font-weight:700">Paid in full</span>'
+      : `<span style="font-family:var(--font-mono);font-weight:700;color:var(--t1)">${retFmtDate(c.next_due_date)}</span>
+         <span style="font-family:var(--font-mono);color:var(--t3);font-size:10px;margin-left:5px">$${(parseFloat(c.next_due_amount)||0).toLocaleString()}</span>`;
 
-    // client group header row
-    html += `<tr style="background:var(--bg4)">
-      <td colspan="7" style="font-weight:800;color:var(--t1);font-size:12px;padding:8px 10px">
-        ${name || '—'}
-        <span style="font-family:var(--font-mono);font-weight:600;color:var(--t3);font-size:10px;margin-left:8px">
-          ${list.length} payment${list.length===1?'':'s'} ·
-          <span style="color:var(--accent)">${fmtFull(clientOutstanding)} outstanding</span> /
-          ${fmtFull(clientTotal)} total
-        </span>
+    return `<tr>
+      <td>
+        <div style="font-weight:700;color:var(--t1)">${c.name || '—'}${flagBadge}</div>
+        <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">${c.email || ''}</div>
+      </td>
+      <td style="font-family:var(--font-mono);color:var(--t2)">${retFmtDate(c.deposit_date)}</td>
+      <td style="font-family:var(--font-mono);font-weight:700">$${total.toLocaleString()}</td>
+      <td style="font-family:var(--font-mono);color:var(--accent);font-weight:700">$${paid.toLocaleString()}</td>
+      <td style="font-family:var(--font-mono);color:${owe>0?'var(--amber)':'var(--t3)'};font-weight:700">$${owe.toLocaleString()}</td>
+      <td>${retInstallmentPill(c.deposit_status, retDaysFromNow(c.deposit_date))}</td>
+      <td>${retInstallmentPill(c.retainer_2_status, retDaysFromNow(c.retainer_2_due_date))}</td>
+      <td>${retInstallmentPill(c.final_retainer_status, retDaysFromNow(c.final_retainer_due_date))}</td>
+      <td>${nextDueCell}</td>
+      <td>
+        <button onclick="editRetainerSetup('${c.id}')" title="Edit setup amounts"
+          style="background:var(--bg3);color:var(--t2);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;font-family:var(--font-mono);cursor:pointer">Edit</button>
       </td>
     </tr>`;
+  }).join('');
+}
 
-    // payment rows for this client
-    list.forEach(r => {
-      const amt   = parseFloat(r.amount) || 0;
-      const days  = retDaysFromNow(r.due_date);
-      const isOverdue = !r.paid && days < 0;
+// Save retainer setup totals — one-time form submission per client.
+async function saveRetainerSetup(clientId) {
+  const totalEl = document.getElementById('setup-total-' + clientId);
+  const r2El    = document.getElementById('setup-r2-' + clientId);
+  const finalEl = document.getElementById('setup-final-' + clientId);
+  const total   = totalEl && totalEl.value !== '' ? parseFloat(totalEl.value) : NaN;
+  const r2      = r2El    && r2El.value    !== '' ? parseFloat(r2El.value)    : NaN;
+  const finalAmt= finalEl && finalEl.value !== '' ? parseFloat(finalEl.value) : NaN;
 
-      const srcPill = (r.source === 'organic')
-        ? `<span class="pill" onclick="retToggleSource('${r.id}')" title="Click to switch to Ads" style="background:var(--amberd);color:var(--amber);cursor:pointer">Organic</span>`
-        : `<span class="pill ads" onclick="retToggleSource('${r.id}')" title="Click to switch to Organic" style="cursor:pointer">Ads</span>`;
+  if (isNaN(total) || total <= 0)      { showToast('Enter Total Deal Value', 'error'); return; }
+  if (isNaN(r2) || r2 < 0)             { showToast('Enter Retainer 2 amount', 'error'); return; }
+  if (isNaN(finalAmt) || finalAmt < 0) { showToast('Enter Final Retainer amount', 'error'); return; }
 
-      let statusCell;
-      if (r.paid) {
-        statusCell = '<span class="pill" style="background:var(--accentd);color:var(--accent)">Paid</span>';
-      } else if (isOverdue) {
-        statusCell = `<span class="pill" style="background:var(--redd);color:var(--red)">Overdue ${Math.abs(days)}d</span>`;
-      } else if (days <= 30) {
-        statusCell = `<span class="pill" style="background:var(--amberd);color:var(--amber)">Due ${days}d</span>`;
-      } else {
-        statusCell = `<span class="pill" style="background:var(--bg3);color:var(--t2)">Due ${days}d</span>`;
-      }
-      const lastTag = r.is_last
-        ? '<span style="font-size:9px;color:var(--t3);font-family:var(--font-mono);margin-left:6px">LAST</span>' : '';
-
-      html += `<tr style="${r.paid ? 'opacity:0.55' : ''}">
-        <td style="color:var(--t3);padding-left:22px">↳</td>
-        <td>${srcPill}</td>
-        <td style="font-family:var(--font-mono);color:${isOverdue?'var(--red)':'var(--t2)'}">${retFmtDate(r.due_date)}${lastTag}</td>
-        <td style="font-family:var(--font-mono);font-weight:700">$${amt.toLocaleString()}</td>
-        <td>${statusCell}</td>
-        <td style="text-align:center">
-          <input type="checkbox" ${r.paid ? 'checked' : ''} onchange="retTogglePaid('${r.id}', this.checked)"
-                 style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
-        </td>
-        <td>
-          <button onclick="retDeleteRow('${r.id}')" title="Delete this payment"
-                  style="background:var(--redd);color:var(--red);border:1px solid rgba(255,82,82,0.25);border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;font-family:var(--font-mono);cursor:pointer">✕</button>
-        </td>
-      </tr>`;
+  try {
+    await updateRetainerSetup(clientId, {
+      total_deal_value: total,
+      retainer_2_amount: r2,
+      final_retainer_amount: finalAmt,
     });
-  });
-
-  tbody.innerHTML = html;
-}
-
-// Tick / untick a scheduled payment as paid. Persists to Supabase, then
-// re-renders so the 30/60-day forecast updates instantly.
-async function retTogglePaid(id, isPaid) {
-  try {
-    await patchRetainerRow(id, { paid: !!isPaid });
-    RETAINER_SCHEDULE = await getRetainerSchedule();
+    RETAINER_STATUS = await getRetainerStatus();
     renderRetainers();
-    showToast(isPaid ? '✓ Marked paid — removed from forecast' : '✓ Marked unpaid — back in forecast');
+    showToast('✓ Setup saved — future Whop payments will auto-allocate');
   } catch(e) {
-    showToast('Error updating payment: ' + e.message, 'error');
-    RETAINER_SCHEDULE = await getRetainerSchedule();
-    renderRetainers();
+    showToast('Error saving setup: ' + e.message, 'error');
   }
 }
 
-// Flip a payment row's source between ads and organic.
-async function retToggleSource(id) {
-  try {
-    const rows = (typeof RETAINER_SCHEDULE !== 'undefined' && RETAINER_SCHEDULE) ? RETAINER_SCHEDULE : [];
-    const row = rows.find(r => String(r.id) === String(id));
-    const current = (row && row.source === 'organic') ? 'organic' : 'ads';
-    const next = current === 'ads' ? 'organic' : 'ads';
-    await patchRetainerRow(id, { source: next });
-    RETAINER_SCHEDULE = await getRetainerSchedule();
-    renderRetainers();
-    showToast('✓ Source set to ' + (next === 'ads' ? 'Ads' : 'Organic'));
-  } catch(e) {
-    showToast('Error updating source: ' + e.message, 'error');
+// Edit setup amounts after they've been entered (e.g. correction).
+async function editRetainerSetup(clientId) {
+  const rows = (typeof RETAINER_STATUS !== 'undefined' && RETAINER_STATUS) ? RETAINER_STATUS : [];
+  const c = rows.find(r => r.id === clientId);
+  if (!c) return;
+  const total = prompt('Total Deal Value (USD)', c.total_deal_value || '');
+  if (total === null) return;
+  const r2 = prompt('Retainer 2 amount (USD)', c.retainer_2_amount || '');
+  if (r2 === null) return;
+  const finalAmt = prompt('Final Retainer amount (USD)', c.final_retainer_amount || '');
+  if (finalAmt === null) return;
+
+  const t  = parseFloat(total);
+  const r  = parseFloat(r2);
+  const fa = parseFloat(finalAmt);
+  if (isNaN(t) || t <= 0 || isNaN(r) || r < 0 || isNaN(fa) || fa < 0) {
+    showToast('Invalid values', 'error');
+    return;
   }
-}
-
-// Add a new scheduled retainer payment from the add form.
-async function addRetainerPayment() {
-  const nameEl   = document.getElementById('ret-add-name');
-  const dateEl   = document.getElementById('ret-add-date');
-  const amtEl    = document.getElementById('ret-add-amount');
-  const srcEl    = document.getElementById('ret-add-source');
-  const lastEl   = document.getElementById('ret-add-last');
-
-  const name = (nameEl && nameEl.value || '').trim();
-  const date = dateEl && dateEl.value || '';
-  const amt  = amtEl && amtEl.value !== '' ? parseFloat(amtEl.value) : null;
-
-  if (!name)              { showToast('Enter a client name', 'error'); return; }
-  if (!date)              { showToast('Pick a due date', 'error'); return; }
-  if (amt == null || isNaN(amt) || amt <= 0) { showToast('Enter a valid amount', 'error'); return; }
-
   try {
-    await insertRetainerRow({
-      client_name: name,
-      due_date:    date,
-      amount:      amt,
-      paid:        false,
-      is_last:     !!(lastEl && lastEl.checked),
-      source:      (srcEl && srcEl.value) || 'ads',
+    await updateRetainerSetup(clientId, {
+      total_deal_value: t,
+      retainer_2_amount: r,
+      final_retainer_amount: fa,
     });
-    RETAINER_SCHEDULE = await getRetainerSchedule();
+    RETAINER_STATUS = await getRetainerStatus();
     renderRetainers();
-    // keep client name (likely adding more payments for same client), clear the rest
-    if (dateEl) dateEl.value = '';
-    if (amtEl)  amtEl.value  = '';
-    if (lastEl) lastEl.checked = false;
-    showToast('✓ Payment added for ' + name);
+    showToast('✓ Setup updated');
   } catch(e) {
-    showToast('Error adding payment: ' + e.message, 'error');
-  }
-}
-
-// Delete a scheduled payment row.
-async function retDeleteRow(id) {
-  if (!confirm('Delete this scheduled payment?')) return;
-  try {
-    await deleteRetainerRow(id);
-    RETAINER_SCHEDULE = await getRetainerSchedule();
-    renderRetainers();
-    showToast('✓ Payment deleted');
-  } catch(e) {
-    showToast('Error deleting payment: ' + e.message, 'error');
+    showToast('Error: ' + e.message, 'error');
   }
 }
 
@@ -5325,7 +5313,7 @@ async function autoSync() {
       (async () => { try { BOOKED_CALLS = await getBookedCalls(); } catch(e) { /* ignore */ } })(),
       (async () => { try { META_SPEND = await getMetaSpend(); } catch(e) { /* ignore */ } })(),
       (async () => { try { HT_ADS = await getHtSales(); } catch(e) { /* ignore */ } })(),
-      (async () => { try { RETAINER_SCHEDULE = await getRetainerSchedule(); } catch(e) { /* ignore */ } })(),
+      (async () => { try { RETAINER_STATUS = await getRetainerStatus(); } catch(e) { /* ignore */ } })(),
     ]);
     renderAll();
     if (typeof renderFollowUpTracker === 'function') renderFollowUpTracker();
