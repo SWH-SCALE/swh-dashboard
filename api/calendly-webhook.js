@@ -5,6 +5,13 @@
 // Single source of truth: the `calls` table. The dashboard reads from
 // the `calls_with_status` view which derives effective_status from the
 // stage field + manual_outcome.
+//
+// CLOSER ATTRIBUTION:
+// Calendly bookings flow through a round-robin that routes to either
+// Frankie's or Mehdi's calendar. The host's user_email in event_memberships
+// tells us which closer the call went to. We map that email → closer name.
+// EXACT email map first (handles aliases like frankgrb.1234@gmail.com that
+// don't include the closer's name), with a substring fallback for safety.
 
 const SUPABASE_URL = 'https://qstlyvauppjkdiwpgtql.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
@@ -32,19 +39,39 @@ function detectIsTest(email, name) {
   return TEST_NAME_PATTERNS.some(p => nm.includes(p));
 }
 
+// EXACT map: calendar-owner email → closer name.
+// Keyed on the exact email used in Calendly because some emails don't
+// contain the closer's name (e.g. frankgrb.1234@gmail.com).
+// Add new closers here as the team grows.
+const CALENDAR_OWNER_TO_CLOSER = {
+  'frankgrb.1234@gmail.com':  'Frankie',
+  'mentormehdi@gmail.com':    'Mehdi',
+  // Aliases (safety net for old / alt emails)
+  'frankierogers@gmail.com':  'Frankie',
+  'mehdisyed@gmail.com':      'Mehdi',
+};
+
 function detectCloser(memberships, fallbackUserEmail) {
+  // Collect candidate host emails from event memberships + fallback
   const candidates = [];
   for (const m of memberships || []) {
-    if (m?.user_email) candidates.push(m.user_email.toLowerCase());
+    if (m?.user_email) candidates.push(String(m.user_email).toLowerCase().trim());
   }
-  if (fallbackUserEmail) candidates.push(fallbackUserEmail.toLowerCase());
+  if (fallbackUserEmail) candidates.push(String(fallbackUserEmail).toLowerCase().trim());
 
+  // 1. Exact email match (preferred)
   for (const em of candidates) {
-    if (em.includes('frankie')) return 'Frankie';
-    if (em.includes('mehdi'))   return 'Mehdi';
-    if (em.includes('salima'))  return 'Salima';
-    if (em.includes('zain'))    return 'Zain';
+    if (CALENDAR_OWNER_TO_CLOSER[em]) return CALENDAR_OWNER_TO_CLOSER[em];
   }
+
+  // 2. Substring fallback (handles unmapped aliases like 'frankie.r@…')
+  for (const em of candidates) {
+    if (em.includes('frankgrb') || em.includes('frankie')) return 'Frankie';
+    if (em.includes('mentormehdi') || em.includes('mehdi')) return 'Mehdi';
+    if (em.includes('salima')) return 'Salima';
+    if (em.includes('zain'))   return 'Zain';
+  }
+
   return null;
 }
 
@@ -89,7 +116,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Closer
+    // Closer detection: read host email from event memberships
     const memberships = scheduledEvent?.event_memberships || [];
     const closer = detectCloser(memberships, invitee?.user_email);
 
