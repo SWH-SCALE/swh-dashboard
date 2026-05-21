@@ -329,6 +329,74 @@ body {
   background: var(--border);
 }
 
+/* ─── COMPARISON TAB ─── */
+.cmp-grid {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.cmp-row {
+  display: grid;
+  grid-template-columns: 220px 1fr 1fr 110px;
+  gap: 12px;
+  align-items: center;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.cmp-row:hover { border-color: var(--border2); }
+.cmp-row .cmp-metric {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t2);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+}
+.cmp-row .cmp-val {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--t1);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.cmp-row .cmp-val.dim {
+  color: var(--t3);
+  font-size: 18px;
+}
+.cmp-row .cmp-delta {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.cmp-delta.up   { background: var(--accentd); color: var(--accent); }
+.cmp-delta.down { background: var(--redd);    color: var(--red); }
+.cmp-delta.flat { background: var(--bg4);     color: var(--t2); }
+.cmp-delta.na   { background: var(--bg4);     color: var(--t3); }
+
+/* highlight bottom-line row */
+.cmp-row.cmp-bottom {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, var(--bg2), var(--accentd));
+}
+.cmp-row.cmp-bottom .cmp-val { font-size: 24px; }
+
+@media (max-width: 900px) {
+  .cmp-row { grid-template-columns: 1fr; gap: 4px; padding: 12px 14px; }
+  .cmp-row .cmp-delta { justify-self: start; }
+}
+
 /* ─── CHART ROW ─── */
 .chart-row {
   display: grid;
@@ -831,6 +899,12 @@ select.input-field option { background: var(--bg2); }
       <path d="M2 5h12v8H2z"/><path d="M2 8h12"/><circle cx="5" cy="10.5" r="1"/>
     </svg>
     Retainers
+  </div>
+  <div class="nav-item" onclick="switchTab('compare', this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M2 14V6M6 14V2M10 14v-6M14 14V4"/>
+    </svg>
+    Comparison
   </div>
 
   <div class="sidebar-section">Team</div>
@@ -1461,6 +1535,47 @@ select.input-field option { background: var(--bg2); }
 
   <div style="margin-top:10px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">
     <b style="color:var(--accent)">How this works:</b> Whop sync auto-creates a client row on first payment (deposit). Enter <b>Total Deal Value</b>, <b>Retainer 2</b>, and <b>Final Retainer</b> amounts once to enable automation. Subsequent Whop payments auto-allocate to the next unpaid installment in sequence. Due dates calculated as deposit + 30d / + 60d. <b style="color:var(--accent)">This tab does not feed any Executive Dashboard metric.</b>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TAB: MONTHLY COMPARISON
+══════════════════════════════════════ -->
+<div id="tab-compare" class="tab-view">
+
+  <!-- Period labels (auto-filled by JS based on current date) -->
+  <div class="section-label">
+    <span id="cmp-period-label">This Month vs Last Month</span>
+  </div>
+
+  <!-- Side-by-side header cards -->
+  <div class="kpi-tier" style="grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+    <div class="kpi-card accent" style="padding: 14px 18px;">
+      <div class="kpi-label">This Month</div>
+      <div class="kpi-value" id="cmp-this-label" style="font-size:18px;">—</div>
+      <div class="kpi-sublabel" id="cmp-this-range" style="margin-top:4px;">—</div>
+    </div>
+    <div class="kpi-card blue" style="padding: 14px 18px;">
+      <div class="kpi-label">Last Month</div>
+      <div class="kpi-value" id="cmp-last-label" style="font-size:18px;">—</div>
+      <div class="kpi-sublabel" id="cmp-last-range" style="margin-top:4px;">—</div>
+    </div>
+  </div>
+
+  <!-- ── FUNNEL: CALLS ── -->
+  <div class="section-label">Funnel · calls</div>
+  <div id="cmp-funnel" class="cmp-grid"></div>
+
+  <!-- ── REVENUE ── -->
+  <div class="section-label">Revenue breakdown</div>
+  <div id="cmp-revenue" class="cmp-grid"></div>
+
+  <!-- ── TOTAL ── -->
+  <div class="section-label">Bottom line</div>
+  <div id="cmp-total" class="cmp-grid"></div>
+
+  <div style="margin-top:14px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">
+    <b style="color:var(--accent)">How this works:</b> All numbers are calendar-month totals. Calls come from <code>calls_with_status</code>. Sales come from <code>deals</code> split by <code>deal_type</code>. % change uses <code>(this − last) / last</code>. Up-arrow (green) = improvement for that metric; down-arrow (red) = decline. <i>Note: "this month" is partial until month-end — direct comparison can mislead in the first week.</i>
   </div>
 </div>
 
@@ -2337,6 +2452,7 @@ const PAGE_TITLES = {
   calls:     ['Call Tracking',         'Booked calls · show-ups · no-shows'],
   sales:     ['Sales & Revenue',       'HT sales · LT revenue · pipeline'],
   retainers: ['Retainers',             'Auto-synced retainer tracking · isolated from Executive metrics'],
+  compare:   ['Monthly Comparison',    'This month vs last month · full funnel · % change'],
   closers:   ['Closer Performance',    'Frankie vs Mehdi · live attribution'],
   lowticket: ['Low-Ticket',            '$27 course · GHL purchases'],
   'calls-log': ['Setters Daily Tracker',    'Log appointments · outreach · follow-ups'],
@@ -2367,6 +2483,7 @@ function switchTab(id,el) {
   if(id==='followup')      renderFollowUpTracker();
   if(id==='booked-calls')  renderBookedCalls();
   if(id==='retainers')     renderRetainers();
+  if(id==='compare')       renderComparison();
   if(id==='slack')      { renderSlack(computeMetrics(currentPeriod)); renderDailyReport(); }
 }
 
@@ -4162,6 +4279,145 @@ async function editRetainerSetup(clientId) {
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
   }
+}
+
+
+// ═══════════════════════════════════════════
+// MONTHLY COMPARISON TAB
+// ═══════════════════════════════════════════
+// This Month vs Last Month, full funnel + revenue breakdown.
+// Calls source: BOOKED_CALLS (calls_with_status view) — excludes is_test=true.
+// Deals source: DB_DEALS — split by deal_type (new_ht / retainer / back_end / lt).
+// % change uses (this − last) / last. Positive change colored green for metrics
+// where "bigger is better" (everything except no-shows, which we don't surface).
+// ═══════════════════════════════════════════
+function renderComparison() {
+  // --- Period bounds: full calendar months, "this" and "last" ---
+  const now = new Date();
+  const thisStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const thisEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1); // exclusive
+  const lastStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastEnd   = new Date(now.getFullYear(), now.getMonth(), 1);     // exclusive
+
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const thisLabel = `${MONTHS[thisStart.getMonth()]} ${thisStart.getFullYear()}`;
+  const lastLabel = `${MONTHS[lastStart.getMonth()]} ${lastStart.getFullYear()}`;
+  const fmtDay = (d) => `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`;
+  const thisRange = `${fmtDay(thisStart)} → ${fmtDay(now)} (MTD)`;
+  const lastRange = `${fmtDay(lastStart)} → ${fmtDay(new Date(lastEnd - 1))}`;
+
+  set('cmp-this-label', thisLabel);
+  set('cmp-last-label', lastLabel);
+  set('cmp-this-range', thisRange);
+  set('cmp-last-range', lastRange);
+  set('cmp-period-label', `${thisLabel} vs ${lastLabel}`);
+
+  // --- Bucket calls by month ---
+  // Only non-test, non-excluded calls count toward the funnel.
+  function bucketCalls(start, end) {
+    const calls = (BOOKED_CALLS || []).filter(c => {
+      if (c.is_test) return false;
+      if (c.effective_status === 'excluded') return false;
+      if (!c.scheduled_at) return false;
+      const d = new Date(c.scheduled_at);
+      return d >= start && d < end;
+    });
+    return {
+      booked: calls.length,
+      showed: calls.filter(c => c.effective_status === 'showed').length,
+      no_show: calls.filter(c => c.effective_status === 'no_show').length,
+    };
+  }
+  const c1 = bucketCalls(thisStart, thisEnd);
+  const c0 = bucketCalls(lastStart, lastEnd);
+
+  // --- Bucket deals by month + deal_type ---
+  function bucketDeals(start, end) {
+    const yyyy_mm_dd = (d) => d.toISOString().slice(0,10);
+    const startStr = yyyy_mm_dd(start);
+    const endStr   = yyyy_mm_dd(end);
+    const inRange = (DB_DEALS || []).filter(d => {
+      if (!d.date) return false;
+      return d.date >= startStr && d.date < endStr;
+    });
+    const byType = (t) => inRange.filter(d => String(d.deal_type || 'new_ht').toLowerCase() === t);
+    const sumUsd = (arr) => arr.reduce((s, r) => s + (Number(r.usd) || 0), 0);
+    const newHt   = byType('new_ht');
+    const retainer = byType('retainer');
+    const backEnd  = byType('back_end');
+    const lt       = byType('lt');
+    return {
+      newHtCount: newHt.length,
+      newHtCash:  sumUsd(newHt),
+      retainerCash: sumUsd(retainer),
+      backEndCash:  sumUsd(backEnd),
+      ltCash:       sumUsd(lt),
+      totalCash:    sumUsd(inRange),
+    };
+  }
+  const d1 = bucketDeals(thisStart, thisEnd);
+  const d0 = bucketDeals(lastStart, lastEnd);
+
+  // --- Derived: rates ---
+  const showRate1  = c1.booked ? c1.showed / c1.booked : 0;
+  const showRate0  = c0.booked ? c0.showed / c0.booked : 0;
+  const closeRate1 = c1.showed ? d1.newHtCount / c1.showed : 0;
+  const closeRate0 = c0.showed ? d0.newHtCount / c0.showed : 0;
+
+  // --- Render helpers ---
+  // Bigger-is-better delta: green up, red down.
+  function deltaCell(thisVal, lastVal) {
+    if (lastVal === 0 || lastVal == null) {
+      if (thisVal > 0) return `<span class="cmp-delta up">NEW</span>`;
+      return `<span class="cmp-delta na">—</span>`;
+    }
+    if (thisVal === lastVal) return `<span class="cmp-delta flat">0%</span>`;
+    const pctChange = ((thisVal - lastVal) / lastVal) * 100;
+    const cls = pctChange > 0 ? 'up' : 'down';
+    const arrow = pctChange > 0 ? '▲' : '▼';
+    const num = Math.abs(pctChange);
+    const display = num >= 100 ? num.toFixed(0) : num.toFixed(1);
+    return `<span class="cmp-delta ${cls}">${arrow} ${display}%</span>`;
+  }
+  function row(metric, thisVal, lastVal, thisStr, lastStr, dim = false) {
+    const valCls = dim ? 'cmp-val dim' : 'cmp-val';
+    return `<div class="cmp-row">
+      <div class="cmp-metric">${metric}</div>
+      <div class="${valCls}">${thisStr}</div>
+      <div class="${valCls}">${lastStr}</div>
+      <div>${deltaCell(thisVal, lastVal)}</div>
+    </div>`;
+  }
+  function bottomRow(metric, thisVal, lastVal, thisStr, lastStr) {
+    return `<div class="cmp-row cmp-bottom">
+      <div class="cmp-metric">${metric}</div>
+      <div class="cmp-val">${thisStr}</div>
+      <div class="cmp-val">${lastStr}</div>
+      <div>${deltaCell(thisVal, lastVal)}</div>
+    </div>`;
+  }
+  const m = (n) => `$${Math.round(n).toLocaleString()}`;
+  const p = (r) => `${(r * 100).toFixed(1)}%`;
+  const n = (x) => `${x}`;
+
+  // --- FUNNEL ---
+  document.getElementById('cmp-funnel').innerHTML =
+    row('Booked calls',  c1.booked, c0.booked, n(c1.booked), n(c0.booked)) +
+    row('Showed calls',  c1.showed, c0.showed, n(c1.showed), n(c0.showed)) +
+    row('Show rate',     showRate1, showRate0, p(showRate1), p(showRate0)) +
+    row('New HT closes', d1.newHtCount, d0.newHtCount, n(d1.newHtCount), n(d0.newHtCount)) +
+    row('Close rate',    closeRate1, closeRate0, p(closeRate1), p(closeRate0));
+
+  // --- REVENUE ---
+  document.getElementById('cmp-revenue').innerHTML =
+    row('New HT sales cash',   d1.newHtCash,    d0.newHtCash,    m(d1.newHtCash),    m(d0.newHtCash)) +
+    row('Retainer payments',   d1.retainerCash, d0.retainerCash, m(d1.retainerCash), m(d0.retainerCash)) +
+    row('Back-end payments',   d1.backEndCash,  d0.backEndCash,  m(d1.backEndCash),  m(d0.backEndCash)) +
+    row('Low-ticket sales',    d1.ltCash,       d0.ltCash,       m(d1.ltCash),       m(d0.ltCash));
+
+  // --- BOTTOM LINE ---
+  document.getElementById('cmp-total').innerHTML =
+    bottomRow('Total cash collected', d1.totalCash, d0.totalCash, m(d1.totalCash), m(d0.totalCash));
 }
 
 
