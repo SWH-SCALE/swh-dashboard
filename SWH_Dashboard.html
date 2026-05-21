@@ -2544,9 +2544,18 @@ function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,ht
   const mehdiDeals   = mehdiAll.filter(isNewHt);
   const frankieCash  = frankieAll.reduce((s,d)=>s+(d.usd||0),0);
   const mehdiCash    = mehdiAll.reduce((s,d)=>s+(d.usd||0),0);
+  // Closer "shows" count: pull from calls_with_status (the new single source
+  // of truth for call data), filtered to effective_status='showed' and the
+  // closer field matching. Old code pulled from DB_LOG (daily log) which was
+  // rarely filled in, causing absurd close rates like 1100%.
+  const _allCallsForCloserStats = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS) ? BOOKED_CALLS : [];
+  const frankieShows = _allCallsForCloserStats.filter(c =>
+    c.closer === 'Frankie' && c.effective_status === 'showed'
+  ).length;
+  const mehdiShows = _allCallsForCloserStats.filter(c =>
+    c.closer === 'Mehdi' && c.effective_status === 'showed'
+  ).length;
   const log = DB_LOG;
-  const frankieShows = log.reduce((s,l)=>s+(l.closer==='Frankie'?(l.shows||0):0),0);
-  const mehdiShows   = log.reduce((s,l)=>s+(l.closer==='Mehdi'?(l.shows||0):0),0);
   const adsBooked    = log.reduce((s,l)=>s+((l.source||'').toLowerCase().includes('ads')?(l.booked||0):0),0);
   const totalCash    = htCash + lt;
   const today = new Date();
@@ -3478,7 +3487,14 @@ function renderCloserCards() {
      adsCash:DB_DEALS.filter(dl=>dl.closer==='Mehdi'&&isAdsDeal(dl)).reduce((s,dl)=>s+(dl.usd||0),0)},
   ];
   document.getElementById('closer-grid').innerHTML=closers.map(c=>{
-    const cr=c.shows?Math.round(c.deals/c.shows*100):0;
+    // Close rate sanity: never display >100%. If closes > shows it means
+    // some deals were closed without a matching call attributed to this
+    // closer (e.g. retainer payments, manual assignment mismatch) — show '—'
+    // and let the explicit closes/shows numbers speak for themselves.
+    let cr;
+    if (!c.shows) cr = '—';
+    else if (c.deals > c.shows) cr = '—';
+    else cr = Math.round(c.deals/c.shows*100) + '%';
     const totalCash=d.frankieCash+d.mehdiCash;
     const revPct=totalCash?Math.round(c.cash/totalCash*100):0;
     return `<div class="closer-card">
@@ -3489,7 +3505,7 @@ function renderCloserCards() {
       </div>
       <div class="closer-stats">
         <div class="closer-stat"><div class="closer-stat-val" style="color:${c.color}">${c.deals}</div><div class="closer-stat-label">CLOSES</div></div>
-        <div class="closer-stat"><div class="closer-stat-val" style="color:${c.color}">${cr}%</div><div class="closer-stat-label">CLOSE RATE</div></div>
+        <div class="closer-stat"><div class="closer-stat-val" style="color:${c.color}">${cr}</div><div class="closer-stat-label">CLOSE RATE</div></div>
         <div class="closer-stat"><div class="closer-stat-val">${c.shows}</div><div class="closer-stat-label">SHOWS</div></div>
       </div>
       <div class="closer-bar-label"><span>Cash share</span><span style="color:${c.color}">${revPct}%</span></div>
@@ -3510,8 +3526,11 @@ function renderCloserCharts() {
   renderCloserCards();
   if(chartCloser)chartCloser.destroy();
   const ctx=document.getElementById('chart-closer-compare');if(!ctx)return;
-  const fCR=d.frankieShows?Math.round(d.frankieDeals/d.frankieShows*100):0;
-  const mCR=d.mehdiShows?Math.round(d.mehdiDeals/d.mehdiShows*100):0;
+  // Sanity-clamp close rate to never exceed 100% (data-inconsistency guard)
+  const fCR = (!d.frankieShows || d.frankieDeals > d.frankieShows) ? 0 :
+              Math.round(d.frankieDeals/d.frankieShows*100);
+  const mCR = (!d.mehdiShows || d.mehdiDeals > d.mehdiShows) ? 0 :
+              Math.round(d.mehdiDeals/d.mehdiShows*100);
   chartCloser=new Chart(ctx,{type:'bar',data:{labels:['Cash ($)','Close Rate (%)','Deals','Shows'],datasets:[
     {label:'Frankie',data:[d.frankieCash,fCR,d.frankieDeals,d.frankieShows],backgroundColor:'rgba(183,148,244,0.6)',borderColor:'#B794F4',borderWidth:1,borderRadius:4},
     {label:'Mehdi',  data:[d.mehdiCash,  mCR,d.mehdiDeals,  d.mehdiShows],  backgroundColor:'rgba(255,183,66,0.6)', borderColor:'#FFB742',borderWidth:1,borderRadius:4},
