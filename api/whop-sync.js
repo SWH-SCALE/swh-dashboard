@@ -1,26 +1,32 @@
 // /api/whop-sync.js
 // Pulls ALL payments from the Whop API and syncs them to TWO Supabase tables:
 //
-//   1. `deals`              — Executive tab cash-collected (existing behaviour).
-//   2. `retainer_payments`  — Retainers tab tracking (NEW).
+//   1. `deals`              — Executive tab cash-collected (all payments, with deal_type tag)
+//   2. `retainer_payments`  — Retainers tab tracking (HT only)
 //
-// Rules for `deals` (unchanged from previous version):
-//   - Pull every Whop payment for the company.
-//   - Exclude low-ticket product + low-ticket upsell amounts.
-//   - Every remaining payment is logged as a deal with source = 'ads'.
-//   - Idempotent via whop_payment_id.
+// Rules for `deals`:
+//   - Pull every paid Whop payment for the company.
+//   - LOW-TICKET payments (LT product ID or LT upsell amounts) are INCLUDED
+//     with deal_type='lt' so cash-collected totals are complete.
+//   - HIGH-TICKET payments go through the retainer matcher and get tagged:
+//       - deposit          → deal_type='new_ht'
+//       - retainer_2/final → deal_type='retainer'
+//       - unallocated      → deal_type='back_end'
+//   - source='ads' for everything; manual override to 'organic' allowed in UI.
+//   - Idempotent via whop_payment_id UNIQUE constraint.
 //
-// Rules for retainer system (NEW):
+// Rules for retainer system (HT payments only):
 //   - Match client by email (case-insensitive) → fallback to name match.
 //   - No match → create new client (setup_complete=false), allocate as deposit.
 //   - Existing client + setup complete → allocate to next unpaid installment
 //     in sequence (retainer_2 → final_retainer). Amount > $50 below expected
 //     → status 'partial' and flagged for review.
 //   - Existing client + setup pending → 'unallocated' (defensive).
-//   - Idempotent via whop_payment_id UNIQUE constraint.
 //
 // Failure isolation: retainer-sync errors NEVER block deals-sync. The Executive
-// tab keeps working even if the new retainer tables are misconfigured.
+// tab keeps working even if the new retainer tables are misconfigured. In a
+// retainer-failure case, the deal still gets written with deal_type='new_ht'
+// (fail-safe default — the closer can manually correct via the UI dropdown).
 //
 // Runs daily via Vercel cron and on a manual GET to /api/whop-sync.
 
@@ -30,10 +36,10 @@ const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
 
 const WHOP_COMPANY_ID = 'biz_6YYccxU9EzDgfU';
 
-// Low-ticket product(s) to EXCLUDE — these are not high-ticket revenue.
+// Low-ticket product(s) — these get tagged deal_type='lt' but still flow into deals.
 const LT_PRODUCT_IDS = ['prod_Q0nZad1rnebtx'];
 
-// Low-ticket UPSELL amounts to EXCLUDE.
+// Low-ticket UPSELL amounts (no dedicated product id, identified by exact $).
 const LT_UPSELL_AMOUNTS = [97];
 
 // Retainer partial-match tolerance: within $50 = "paid in full".
@@ -83,6 +89,17 @@ async function supaInsertOne(table, row, returnRow = false) {
   }
 }
 
+// Map a retainer allocation bucket to a deals.deal_type value.
+function allocationToDealType(bucket) {
+  switch (bucket) {
+    case 'deposit':        return 'new_ht';
+    case 'retainer_2':     return 'retainer';
+    case 'final_retainer': return 'retainer';
+    case 'unallocated':    return 'back_end';
+    default:               return 'new_ht'; // fail-safe
+  }
+}
+
 export default async function handler(req, res) {
   if (!WHOP_KEY)     return res.status(500).json({ ok: false, error: 'WHOP_API_KEY not set' });
   if (!SUPABASE_KEY) return res.status(500).json({ ok: false, error: 'SUPABASE_ANON_KEY not set' });
@@ -124,69 +141,56 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, message: 'No payments returned from Whop', dealsWritten: 0 });
     }
 
-    // --- 2. keep paid/succeeded, drop low-ticket ---
+    // --- 2. keep paid/succeeded ---
     const paid = payments.filter(p =>
       p && (p.status === 'paid' || p.substatus === 'succeeded')
     );
     const isLowTicket = (p) =>
       LT_PRODUCT_IDS.includes(productIdOf(p)) || isLtUpsellAmount(grossOf(p));
 
-    const ltSkipped   = paid.filter(p => isLowTicket(p)).length;
-    const htPayments  = paid.filter(p => !isLowTicket(p));
-
-    if (htPayments.length === 0) {
-      return res.status(200).json({
-        ok: true, message: 'No high-ticket payments to log (all were low-ticket or unpaid)',
-        dealsWritten: 0, ltSkipped,
-      });
-    }
-
-    // --- 3. find which Whop payments are already in `deals` (idempotency) ---
-    const ids = htPayments.map(p => p.id).filter(Boolean);
+    // --- 3. find which Whop payments are already in `deals` and `retainer_payments` ---
+    const ids = paid.map(p => p.id).filter(Boolean);
     const existingDeals = new Set();
+    const existingRetainerPayments = new Set();
+
     for (let i = 0; i < ids.length; i += 50) {
       const chunk = ids.slice(i, i + 50);
       const inList = chunk.map(id => `"${id}"`).join(',');
-      const checkRes = await fetch(
+
+      // deals
+      const dealsRes = await fetch(
         `${SUPABASE_URL}/rest/v1/deals?select=whop_payment_id&whop_payment_id=in.(${inList})`,
         { headers: supaHeaders() }
       );
-      if (checkRes.ok) {
-        const rows = await checkRes.json();
-        rows.forEach(r => { if (r.whop_payment_id) existingDeals.add(r.whop_payment_id); });
+      if (dealsRes.ok) {
+        (await dealsRes.json()).forEach(r => { if (r.whop_payment_id) existingDeals.add(r.whop_payment_id); });
       }
-    }
 
-    // --- 3b. find which Whop payments are already in `retainer_payments` ---
-    const existingRetainerPayments = new Set();
-    for (let i = 0; i < ids.length; i += 50) {
-      const chunk = ids.slice(i, i + 50);
-      const inList = chunk.map(id => `"${id}"`).join(',');
+      // retainer_payments
       try {
-        const checkRes = await fetch(
+        const retRes = await fetch(
           `${SUPABASE_URL}/rest/v1/retainer_payments?select=whop_payment_id&whop_payment_id=in.(${inList})`,
           { headers: supaHeaders() }
         );
-        if (checkRes.ok) {
-          const rows = await checkRes.json();
-          rows.forEach(r => { if (r.whop_payment_id) existingRetainerPayments.add(r.whop_payment_id); });
+        if (retRes.ok) {
+          (await retRes.json()).forEach(r => { if (r.whop_payment_id) existingRetainerPayments.add(r.whop_payment_id); });
         }
-      } catch (e) {
-        // Don't block deals sync if retainer table query fails
-      }
+      } catch (e) { /* don't block deals if retainer table errors */ }
     }
 
-    // --- 4. build deal rows for payments not already logged + run retainer sync ---
+    // --- 4. process each payment ---
     const seen = new Set();
     const newDealRows = [];
-    const retainerStats = {
+    const stats = {
+      newDealsHT: 0,
+      newDealsLT: 0,
       newClientsCreated: 0,
       paymentsAllocated: 0,
       paymentsFlagged: 0,
       retainerErrors: [],
     };
 
-    for (const p of htPayments) {
+    for (const p of paid) {
       if (!p.id || seen.has(p.id)) continue;
       seen.add(p.id);
 
@@ -195,8 +199,45 @@ export default async function handler(req, res) {
       const dateOnly = paidAt ? String(paidAt).split('T')[0] : null;
       const customerName  = (p.billing_address && p.billing_address.name) || (p.user && p.user.name) || null;
       const customerEmail = (p.user && p.user.email) || null;
+      const lt = isLowTicket(p);
 
-      // ── Deals row (existing behaviour) ──
+      let dealType;
+
+      if (lt) {
+        // ── LOW-TICKET payment ──
+        // Goes into deals as deal_type='lt', does NOT touch retainer system.
+        dealType = 'lt';
+      } else {
+        // ── HIGH-TICKET payment ──
+        // Run through retainer matcher to determine deal_type.
+        dealType = 'new_ht'; // safe default
+        if (!existingRetainerPayments.has(p.id) && dateOnly && gross > 0) {
+          try {
+            const allocation = await syncToRetainerSystem({
+              whop_payment_id: p.id,
+              amount: gross,
+              paid_at: dateOnly,
+              customer_name: (customerName || '').trim(),
+              customer_email: (customerEmail || '').trim().toLowerCase(),
+            }, stats);
+            dealType = allocationToDealType(allocation.bucket);
+          } catch (err) {
+            stats.retainerErrors.push({ payment_id: p.id, error: err.message });
+            // dealType stays 'new_ht' (fail-safe — manually correctable in UI)
+          }
+        } else if (existingRetainerPayments.has(p.id)) {
+          // Retainer record exists already — look up its allocated_to to backfill deal_type
+          // for the case where deals row also already exists but lacks deal_type.
+          try {
+            const rows = await supaSelect(
+              `retainer_payments?select=allocated_to&whop_payment_id=eq.${encodeURIComponent(p.id)}&limit=1`
+            );
+            if (rows && rows[0]) dealType = allocationToDealType(rows[0].allocated_to);
+          } catch (e) { /* fail-safe stays 'new_ht' */ }
+        }
+      }
+
+      // ── Insert into deals if not already there ──
       if (!existingDeals.has(p.id)) {
         newDealRows.push({
           name:    customerName,
@@ -207,28 +248,15 @@ export default async function handler(req, res) {
           source:  'ads',
           closer:  null,
           setter:  null,
-          notes:   'Auto-synced from Whop',
+          notes:   lt ? 'Auto-synced from Whop (LT)' : 'Auto-synced from Whop',
           whop_payment_id: p.id,
+          deal_type: dealType,
         });
-      }
-
-      // ── Retainer sync (NEW) ──
-      if (!existingRetainerPayments.has(p.id) && dateOnly && gross > 0) {
-        try {
-          await syncToRetainerSystem({
-            whop_payment_id: p.id,
-            amount: gross,
-            paid_at: dateOnly,
-            customer_name: (customerName || '').trim(),
-            customer_email: (customerEmail || '').trim().toLowerCase(),
-          }, retainerStats);
-        } catch (err) {
-          retainerStats.retainerErrors.push({ payment_id: p.id, error: err.message });
-        }
+        if (lt) stats.newDealsLT++; else stats.newDealsHT++;
       }
     }
 
-    // --- 5. insert the new deals (if any) ---
+    // --- 5. batch insert new deals ---
     let dealsWritten = 0;
     if (newDealRows.length > 0) {
       const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/deals`, {
@@ -249,11 +277,19 @@ export default async function handler(req, res) {
       ok: true,
       dealsWritten,
       totalGrossUsd: +totalGross.toFixed(2),
-      ltSkipped,
       alreadyLogged: existingDeals.size,
       whopPaymentsSeen: payments.length,
       whopPagesFetched: pages,
-      retainer: retainerStats,
+      breakdown: {
+        newDealsHT: stats.newDealsHT,
+        newDealsLT: stats.newDealsLT,
+      },
+      retainer: {
+        newClientsCreated: stats.newClientsCreated,
+        paymentsAllocated: stats.paymentsAllocated,
+        paymentsFlagged: stats.paymentsFlagged,
+        retainerErrors: stats.retainerErrors,
+      },
     });
 
   } catch (e) {
@@ -262,11 +298,12 @@ export default async function handler(req, res) {
 }
 
 // =========================================================
-// RETAINER SYSTEM
+// RETAINER SYSTEM (HT only)
 // =========================================================
+// Returns { bucket, status, expected, notes } so the caller can use bucket
+// to determine deal_type for the deals row.
 
 async function syncToRetainerSystem(payment, stats) {
-  // ── Match client: email → name → create new ──
   let client = await findClientByEmail(payment.customer_email);
   if (!client) client = await findClientByName(payment.customer_name);
 
@@ -277,10 +314,8 @@ async function syncToRetainerSystem(payment, stats) {
     stats.newClientsCreated++;
   }
 
-  // ── Determine allocation ──
   const allocation = await determineAllocation(client, payment, isNewClient);
 
-  // ── Insert retainer_payments row ──
   await supaInsertOne('retainer_payments', {
     client_id:       client.id,
     whop_payment_id: payment.whop_payment_id,
@@ -293,6 +328,8 @@ async function syncToRetainerSystem(payment, stats) {
   });
   stats.paymentsAllocated++;
   if (allocation.status !== 'paid') stats.paymentsFlagged++;
+
+  return allocation;
 }
 
 async function findClientByEmail(email) {
@@ -300,7 +337,7 @@ async function findClientByEmail(email) {
   const encoded = encodeURIComponent(email);
   const rows = await supaSelect(`retainer_clients?email=ilike.${encoded}&limit=2`);
   if (!rows || rows.length === 0) return null;
-  if (rows.length > 1) return null;  // ambiguous → don't auto-match
+  if (rows.length > 1) return null;
   return rows[0];
 }
 
@@ -311,7 +348,7 @@ async function findClientByName(name) {
   const encoded = encodeURIComponent(trimmed);
   const rows = await supaSelect(`retainer_clients?name=ilike.${encoded}&limit=2`);
   if (!rows || rows.length === 0) return null;
-  if (rows.length > 1) return null;  // ambiguous → don't auto-match
+  if (rows.length > 1) return null;
   return rows[0];
 }
 
@@ -322,11 +359,10 @@ async function createNewClient(payment) {
     deposit_date:   payment.paid_at,
     setup_complete: false,
     notes:          'Auto-created from Whop payment — awaiting retainer setup',
-  }, /* returnRow */ true);
+  }, true);
 }
 
 async function determineAllocation(client, payment, isNewClient) {
-  // New client → first payment is always deposit
   if (isNewClient) {
     return {
       bucket: 'deposit',
@@ -336,7 +372,6 @@ async function determineAllocation(client, payment, isNewClient) {
     };
   }
 
-  // Existing client: tally what's already paid per installment
   const prior = await supaSelect(
     `retainer_payments?select=allocated_to,amount&client_id=eq.${client.id}`
   );
@@ -347,7 +382,6 @@ async function determineAllocation(client, payment, isNewClient) {
     }
   }
 
-  // Setup not complete → can't auto-allocate yet
   if (!client.setup_complete) {
     return {
       bucket: 'unallocated',
@@ -357,7 +391,6 @@ async function determineAllocation(client, payment, isNewClient) {
     };
   }
 
-  // Sequence: retainer_2 → final_retainer
   const r2Expected = Number(client.retainer_2_amount || 0);
   const r2Paid     = totals.retainer_2;
   if (r2Paid < r2Expected - PARTIAL_TOLERANCE) {
@@ -388,7 +421,6 @@ async function determineAllocation(client, payment, isNewClient) {
     };
   }
 
-  // All installments covered → over-payment / extra
   return {
     bucket: 'unallocated',
     status: 'flagged',
