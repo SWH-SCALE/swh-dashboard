@@ -1313,7 +1313,7 @@ select.input-field option { background: var(--bg2); }
         <thead>
           <tr>
             <th>#</th><th>Name</th><th>Date</th><th>USD</th><th>AED</th>
-            <th>Source</th><th>Closer</th><th>Setter</th><th>Notes</th>
+            <th>Source</th><th>Type</th><th>Closer</th><th>Setter</th><th>Notes</th>
           </tr>
         </thead>
         <tbody id="deals-tbody"></tbody>
@@ -1656,7 +1656,7 @@ select.input-field option { background: var(--bg2); }
   <div class="chart-card">
     <div class="deals-table-wrap">
       <table class="deals-table">
-        <thead><tr><th>Name</th><th>Date</th><th>Cash (USD)</th><th>Contract</th><th>Source</th><th>Closer</th><th>Setter</th><th>Notes</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Date</th><th>Cash (USD)</th><th>Contract</th><th>Source</th><th>Type</th><th>Closer</th><th>Setter</th><th>Notes</th><th></th></tr></thead>
         <tbody id="deal-log-tbody"></tbody>
       </table>
     </div>
@@ -2178,6 +2178,12 @@ async function updateDealSource(id, source) {
     body: JSON.stringify({ source: source }),
   });
 }
+async function updateDealType(id, dealType) {
+  return await sbFetch('deals?id=eq.' + id, {
+    method: 'PATCH',
+    body: JSON.stringify({ deal_type: dealType }),
+  });
+}
 async function insertLog(entry) {
   return await sbFetch('daily_log', {
     method: 'POST',
@@ -2318,7 +2324,7 @@ const PAGE_TITLES = {
   exec:      ['Executive Dashboard',   'TCC · Dec 2025 – present · USD · live data'],
   calls:     ['Call Tracking',         'Booked calls · show-ups · no-shows'],
   sales:     ['Sales & Revenue',       'HT sales · LT revenue · pipeline'],
-  retainers: ['Retainers',             'Forecasted recurring cash · ads vs organic'],
+  retainers: ['Retainers',             'Auto-synced retainer tracking · isolated from Executive metrics'],
   closers:   ['Closer Performance',    'Frankie vs Mehdi · live attribution'],
   lowticket: ['Low-Ticket',            '$27 course · GHL purchases'],
   'calls-log': ['Setters Daily Tracker',    'Log appointments · outreach · follow-ups'],
@@ -3355,6 +3361,17 @@ function renderSalesDeals() {
           <option value="ads"${isOrg?'':' selected'}>Ads</option>
           <option value="organic"${isOrg?' selected':''}>Organic</option>
         </select>`;
+      // editable deal type dropdown — drives close-rate logic
+      const dt = String(deal.deal_type || 'new_ht').toLowerCase();
+      const dtColors = { new_ht:'var(--accent)', retainer:'var(--blue)', back_end:'var(--amber)', lt:'var(--t3)' };
+      const dtColor = dtColors[dt] || 'var(--t2)';
+      const typeSel = `<select onchange="changeDealType('${deal.id}', this.value)"
+          style="background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:3px 6px;color:${dtColor};font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer">
+          <option value="new_ht"${dt==='new_ht'?' selected':''}>New HT</option>
+          <option value="retainer"${dt==='retainer'?' selected':''}>Retainer</option>
+          <option value="back_end"${dt==='back_end'?' selected':''}>Back-end</option>
+          <option value="lt"${dt==='lt'?' selected':''}>LT</option>
+        </select>`;
       return `
       <tr>
         <td>${sorted.length-i}</td>
@@ -3362,12 +3379,13 @@ function renderSalesDeals() {
         <td style="color:${deal.usd>0?'var(--accent)':'var(--t3)'};font-family:var(--font-mono);font-weight:700">${deal.usd>0?'$'+deal.usd.toLocaleString():'—'}</td>
         <td style="font-family:var(--font-mono);color:var(--blue)">$${(deal.contract||0).toLocaleString()}</td>
         <td>${srcSel}</td>
+        <td>${typeSel}</td>
         <td><span class="pill ${(deal.closer||'').toLowerCase()}">${deal.closer||'—'}</span></td>
         <td>${deal.setter||'—'}</td>
         <td style="color:var(--t3)">${deal.notes||'—'}</td>
       </tr>`;
     }).join('')
-    :'<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:24px">No deals yet — use Add New Deal</td></tr>';
+    :'<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:24px">No deals yet — use Add New Deal</td></tr>';
   }
 }
 
@@ -3459,19 +3477,31 @@ function renderDealLog() {
         <option value="ads"${isOrg?'':' selected'}>Ads</option>
         <option value="organic"${isOrg?' selected':''}>Organic</option>
       </select>`;
+    // deal type dropdown
+    const dt = String(d.deal_type || 'new_ht').toLowerCase();
+    const dtColors = { new_ht:'var(--accent)', retainer:'var(--blue)', back_end:'var(--amber)', lt:'var(--t3)' };
+    const dtColor = dtColors[dt] || 'var(--t2)';
+    const typeSel = `<select onchange="changeDealType('${d.id}', this.value)"
+        style="background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:3px 6px;color:${dtColor};font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer">
+        <option value="new_ht"${dt==='new_ht'?' selected':''}>New HT</option>
+        <option value="retainer"${dt==='retainer'?' selected':''}>Retainer</option>
+        <option value="back_end"${dt==='back_end'?' selected':''}>Back-end</option>
+        <option value="lt"${dt==='lt'?' selected':''}>LT</option>
+      </select>`;
     return `
     <tr>
       <td>${d.name}</td><td>${d.date}</td>
       <td style="color:${d.usd>0?'var(--accent)':'var(--t3)'};font-weight:700;font-family:var(--font-mono)">${d.usd>0?'$'+d.usd.toLocaleString():'—'}</td>
       <td style="color:var(--blue);font-family:var(--font-mono)">$${(d.contract||0).toLocaleString()}</td>
       <td>${srcSel}</td>
+      <td>${typeSel}</td>
       <td><span class="pill ${(d.closer||'').toLowerCase()}">${d.closer||'—'}</span></td>
       <td>${d.setter||'—'}</td>
       <td style="color:var(--t3)">${d.notes||'—'}</td>
       <td><button onclick="deleteDeal('${d.id}')" style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer">×</button></td>
     </tr>`;
   })
-  .join(''):'<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:24px">No deals yet</td></tr>';
+  .join(''):'<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:24px">No deals yet</td></tr>';
 }
 
 // Change a deal's source from the Deal Log dropdown. Persists to Supabase and
@@ -3485,6 +3515,23 @@ async function changeDealSource(id, source) {
     showToast('✓ Source set to ' + (source==='organic'?'Organic':'Ads'));
   } catch(e) {
     showToast('Error updating source: ' + e.message, 'error');
+    DB_DEALS = await getDeals();
+    renderDealLog();
+  }
+}
+
+// Change a deal's type from the Deal Log dropdown. Updates close-rate
+// immediately since close-rate filters to deal_type='new_ht' only.
+async function changeDealType(id, dealType) {
+  try {
+    await updateDealType(id, dealType);
+    DB_DEALS = await getDeals();
+    renderDealLog();
+    renderAll();
+    const labels = { new_ht:'New HT', retainer:'Retainer', back_end:'Back-end', lt:'LT' };
+    showToast('✓ Type set to ' + (labels[dealType] || dealType));
+  } catch(e) {
+    showToast('Error updating type: ' + e.message, 'error');
     DB_DEALS = await getDeals();
     renderDealLog();
   }
@@ -3527,7 +3574,7 @@ async function submitDeal() {
     const finalNotes = notes
       ? notes + ' [manual entry]'
       : 'Manual entry — non-Whop sale';
-    await insertDeal({name,date,usd,contract,source,closer,setter,notes:finalNotes});
+    await insertDeal({name,date,usd,contract,source,closer,setter,notes:finalNotes,deal_type:'new_ht'});
     DB_DEALS = await getDeals();
     ['deal-name','deal-notes'].forEach(id=>document.getElementById(id).value='');
     ['deal-usd','deal-contract'].forEach(id=>document.getElementById(id).value='');
