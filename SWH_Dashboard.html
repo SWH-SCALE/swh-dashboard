@@ -1646,7 +1646,7 @@ select.input-field option { background: var(--bg2); }
       <div class="input-group"><div class="input-label">Contract Value (USD)</div><input class="input-field" type="number" id="deal-contract" placeholder="e.g. 10000"></div>
       <div class="input-group"><div class="input-label">Source</div><select class="input-field" id="deal-source"><option value="">Select...</option><option>Ads</option><option>Organic</option><option>Referral</option><option>Other</option></select></div>
       <div class="input-group"><div class="input-label">Closer</div><select class="input-field" id="deal-closer"><option value="">Select...</option><option>Frankie</option><option>Mehdi</option></select></div>
-      <div class="input-group"><div class="input-label">Setter</div><select class="input-field" id="deal-setter"><option value="">Select...</option><option>Salima</option><option>Other</option></select></div>
+      <div class="input-group"><div class="input-label">Setter</div><select class="input-field" id="deal-setter"><option value="">Select...</option><option>Salim</option><option>Salim</option><option>Salima</option><option>Other</option></select></div>
       <div class="input-group"><div class="input-label">Notes</div><input class="input-field" type="text" id="deal-notes" placeholder="e.g. OTO, balance owed"></div>
     </div>
     <div style="margin-top:10px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">All KPI cards, ROAS, CAC and closer stats update instantly on save</div>
@@ -1695,7 +1695,7 @@ select.input-field option { background: var(--bg2); }
         <div class="input-label">Setter (optional)</div>
         <select class="input-field" id="cl-setter">
           <option value="">Select...</option>
-          <option>Salima</option>
+          <option>Salim</option><option>Salima</option>
         </select>
       </div>
     </div>
@@ -1874,7 +1874,7 @@ select.input-field option { background: var(--bg2); }
     </select>
     <select id="fu-filter-assigned" class="input-field" style="width:auto;padding:6px 12px;font-size:11px" onchange="renderFollowUpTracker()">
       <option value="">All Team</option>
-      <option>Salima</option>
+      <option>Salim</option><option>Salima</option>
       <option>Frankie</option>
       <option>Mehdi</option>
     </select>
@@ -1964,7 +1964,7 @@ select.input-field option { background: var(--bg2); }
         <div class="input-label">Assigned To</div>
         <select class="input-field" id="fu-assigned">
           <option value="">Unassigned</option>
-          <option>Salima</option>
+          <option>Salim</option><option>Salima</option>
           <option>Frankie</option>
           <option>Mehdi</option>
         </select>
@@ -2002,7 +2002,7 @@ select.input-field option { background: var(--bg2); }
         </div>
         <div class="input-group"><div class="input-label">Assigned To</div>
           <select class="input-field" id="fu-edit-assigned">
-            <option value="">Unassigned</option><option>Salima</option><option>Frankie</option><option>Mehdi</option>
+            <option value="">Unassigned</option><option>Salim</option><option>Salima</option><option>Frankie</option><option>Mehdi</option>
           </select>
         </div>
       </div>
@@ -2182,6 +2182,18 @@ async function updateDealType(id, dealType) {
   return await sbFetch('deals?id=eq.' + id, {
     method: 'PATCH',
     body: JSON.stringify({ deal_type: dealType }),
+  });
+}
+async function updateDealCloser(id, closer) {
+  return await sbFetch('deals?id=eq.' + id, {
+    method: 'PATCH',
+    body: JSON.stringify({ closer: closer || null }),
+  });
+}
+async function updateDealSetter(id, setter) {
+  return await sbFetch('deals?id=eq.' + id, {
+    method: 'PATCH',
+    body: JSON.stringify({ setter: setter || null }),
   });
 }
 async function insertLog(entry) {
@@ -2520,10 +2532,18 @@ function computeMetrics(period) {
 }
 
 function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,dealsArr,contractTotal,pipeline,allDeals) {
-  const frankieDeals = dealsArr.filter(d=>d.closer==='Frankie');
-  const mehdiDeals   = dealsArr.filter(d=>d.closer==='Mehdi');
-  const frankieCash  = frankieDeals.reduce((s,d)=>s+(d.usd||0),0);
-  const mehdiCash    = mehdiDeals.reduce((s,d)=>s+(d.usd||0),0);
+  const frankieAll   = dealsArr.filter(d=>d.closer==='Frankie');
+  const mehdiAll     = dealsArr.filter(d=>d.closer==='Mehdi');
+  // Closer "close count" filters to new_ht only so close-rate math matches
+  // the Executive tab. Cash totals include everything (revenue is revenue).
+  const isNewHt = (d) => {
+    const t = String(d.deal_type || 'new_ht').toLowerCase();
+    return t === 'new_ht';
+  };
+  const frankieDeals = frankieAll.filter(isNewHt);
+  const mehdiDeals   = mehdiAll.filter(isNewHt);
+  const frankieCash  = frankieAll.reduce((s,d)=>s+(d.usd||0),0);
+  const mehdiCash    = mehdiAll.reduce((s,d)=>s+(d.usd||0),0);
   const log = DB_LOG;
   const frankieShows = log.reduce((s,l)=>s+(l.closer==='Frankie'?(l.shows||0):0),0);
   const mehdiShows   = log.reduce((s,l)=>s+(l.closer==='Mehdi'?(l.shows||0):0),0);
@@ -3406,6 +3426,25 @@ function renderSalesDeals() {
           <option value="back_end"${dt==='back_end'?' selected':''}>Back-end</option>
           <option value="lt"${dt==='lt'?' selected':''}>LT</option>
         </select>`;
+      // editable closer dropdown
+      const cl = deal.closer || '';
+      const closerColors = { Frankie:'#B794F4', Mehdi:'#FFB742' };
+      const closerColor = closerColors[cl] || 'var(--t3)';
+      const closerSel = `<select onchange="changeDealCloser('${deal.id}', this.value)"
+          style="background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:3px 6px;color:${closerColor};font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer">
+          <option value=""${!cl?' selected':''}>—</option>
+          <option value="Frankie"${cl==='Frankie'?' selected':''}>Frankie</option>
+          <option value="Mehdi"${cl==='Mehdi'?' selected':''}>Mehdi</option>
+        </select>`;
+      // editable setter dropdown
+      const st = deal.setter || '';
+      const setterColor = st ? 'var(--t1)' : 'var(--t3)';
+      const setterSel = `<select onchange="changeDealSetter('${deal.id}', this.value)"
+          style="background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:3px 6px;color:${setterColor};font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer">
+          <option value=""${!st?' selected':''}>—</option>
+          <option value="Salim"${st==='Salim'?' selected':''}>Salim</option>
+          <option value="Salima"${st==='Salima'?' selected':''}>Salima</option>
+        </select>`;
       return `
       <tr>
         <td>${sorted.length-i}</td>
@@ -3414,8 +3453,8 @@ function renderSalesDeals() {
         <td style="font-family:var(--font-mono);color:var(--blue)">$${(deal.contract||0).toLocaleString()}</td>
         <td>${srcSel}</td>
         <td>${typeSel}</td>
-        <td><span class="pill ${(deal.closer||'').toLowerCase()}">${deal.closer||'—'}</span></td>
-        <td>${deal.setter||'—'}</td>
+        <td>${closerSel}</td>
+        <td>${setterSel}</td>
         <td style="color:var(--t3)">${deal.notes||'—'}</td>
       </tr>`;
     }).join('')
@@ -3522,6 +3561,25 @@ function renderDealLog() {
         <option value="back_end"${dt==='back_end'?' selected':''}>Back-end</option>
         <option value="lt"${dt==='lt'?' selected':''}>LT</option>
       </select>`;
+    // editable closer dropdown
+    const cl = d.closer || '';
+    const closerColors = { Frankie:'#B794F4', Mehdi:'#FFB742' };
+    const closerColor = closerColors[cl] || 'var(--t3)';
+    const closerSel = `<select onchange="changeDealCloser('${d.id}', this.value)"
+        style="background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:3px 6px;color:${closerColor};font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer">
+        <option value=""${!cl?' selected':''}>—</option>
+        <option value="Frankie"${cl==='Frankie'?' selected':''}>Frankie</option>
+        <option value="Mehdi"${cl==='Mehdi'?' selected':''}>Mehdi</option>
+      </select>`;
+    // editable setter dropdown
+    const st = d.setter || '';
+    const setterColor = st ? 'var(--t1)' : 'var(--t3)';
+    const setterSel = `<select onchange="changeDealSetter('${d.id}', this.value)"
+        style="background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:3px 6px;color:${setterColor};font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer">
+        <option value=""${!st?' selected':''}>—</option>
+        <option value="Salim"${st==='Salim'?' selected':''}>Salim</option>
+        <option value="Salima"${st==='Salima'?' selected':''}>Salima</option>
+      </select>`;
     return `
     <tr>
       <td>${d.name}</td><td>${d.date}</td>
@@ -3529,8 +3587,8 @@ function renderDealLog() {
       <td style="color:var(--blue);font-family:var(--font-mono)">$${(d.contract||0).toLocaleString()}</td>
       <td>${srcSel}</td>
       <td>${typeSel}</td>
-      <td><span class="pill ${(d.closer||'').toLowerCase()}">${d.closer||'—'}</span></td>
-      <td>${d.setter||'—'}</td>
+      <td>${closerSel}</td>
+      <td>${setterSel}</td>
       <td style="color:var(--t3)">${d.notes||'—'}</td>
       <td><button onclick="deleteDeal('${d.id}')" style="background:var(--redd);color:var(--red);border:none;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer">×</button></td>
     </tr>`;
@@ -3566,6 +3624,37 @@ async function changeDealType(id, dealType) {
     showToast('✓ Type set to ' + (labels[dealType] || dealType));
   } catch(e) {
     showToast('Error updating type: ' + e.message, 'error');
+    DB_DEALS = await getDeals();
+    renderDealLog();
+  }
+}
+
+// Inline edit closer on a deal row. Refreshes Closer cards which split
+// revenue + counts by closer name.
+async function changeDealCloser(id, closer) {
+  try {
+    await updateDealCloser(id, closer);
+    DB_DEALS = await getDeals();
+    renderDealLog();
+    renderAll();
+    showToast('✓ Closer set to ' + (closer || 'unassigned'));
+  } catch(e) {
+    showToast('Error updating closer: ' + e.message, 'error');
+    DB_DEALS = await getDeals();
+    renderDealLog();
+  }
+}
+
+// Inline edit setter on a deal row.
+async function changeDealSetter(id, setter) {
+  try {
+    await updateDealSetter(id, setter);
+    DB_DEALS = await getDeals();
+    renderDealLog();
+    renderAll();
+    showToast('✓ Setter set to ' + (setter || 'unassigned'));
+  } catch(e) {
+    showToast('Error updating setter: ' + e.message, 'error');
     DB_DEALS = await getDeals();
     renderDealLog();
   }
