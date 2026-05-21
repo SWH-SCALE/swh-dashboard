@@ -4,6 +4,14 @@
 //   1. `deals`              — Executive tab cash-collected (all payments, with deal_type tag)
 //   2. `retainer_payments`  — Retainers tab tracking (HT only)
 //
+// CLOSER AUTO-ATTRIBUTION (new):
+//   For every new HT deal, this sync looks up the customer's most recent
+//   `showed` call in calls_with_status by email match. If found, it copies
+//   `closer` onto the new deals row. Falls back to most recent call of ANY
+//   status if no `showed` call exists. NULL if no calendly call matches.
+//   This means: customer books with Frankie's calendar → pays → deal row
+//   gets closer='Frankie' automatically. No manual tagging required.
+//
 // Rules for `deals`:
 //   - Pull every paid Whop payment for the company.
 //   - LOW-TICKET payments (LT product ID or LT upsell amounts) are INCLUDED
@@ -23,10 +31,9 @@
 //     → status 'partial' and flagged for review.
 //   - Existing client + setup pending → 'unallocated' (defensive).
 //
-// Failure isolation: retainer-sync errors NEVER block deals-sync. The Executive
-// tab keeps working even if the new retainer tables are misconfigured. In a
-// retainer-failure case, the deal still gets written with deal_type='new_ht'
-// (fail-safe default — the closer can manually correct via the UI dropdown).
+// Failure isolation: retainer-sync errors NEVER block deals-sync. Closer
+// lookup errors NEVER block deals-sync. Worst case: deal gets closer=null
+// and can be manually tagged via the UI dropdown.
 //
 // Runs daily via Vercel cron and on a manual GET to /api/whop-sync.
 
@@ -98,6 +105,45 @@ function allocationToDealType(bucket) {
     case 'unallocated':    return 'back_end';
     default:               return 'new_ht'; // fail-safe
   }
+}
+
+// ── CLOSER AUTO-ATTRIBUTION ────────────────────────────
+// Look up customer's call in calls_with_status by email and return closer.
+// Prefers a `showed` call (the one they actually closed on). Falls back to
+// most recent call of any status. Returns null on no match or any error.
+async function lookupCloserForCustomer(email) {
+  if (!email) return null;
+  const cleanEmail = String(email).trim().toLowerCase();
+  if (!cleanEmail) return null;
+
+  try {
+    // Try showed calls first
+    const showedRows = await supaSelect(
+      `calls_with_status?select=closer,scheduled_at`
+      + `&invitee_email=ilike.${encodeURIComponent(cleanEmail)}`
+      + `&effective_status=eq.showed`
+      + `&closer=not.is.null`
+      + `&order=scheduled_at.desc&limit=1`
+    );
+    if (showedRows && showedRows.length > 0 && showedRows[0].closer) {
+      return showedRows[0].closer;
+    }
+
+    // Fallback: most recent call regardless of status
+    const anyRows = await supaSelect(
+      `calls_with_status?select=closer,scheduled_at`
+      + `&invitee_email=ilike.${encodeURIComponent(cleanEmail)}`
+      + `&closer=not.is.null`
+      + `&order=scheduled_at.desc&limit=1`
+    );
+    if (anyRows && anyRows.length > 0 && anyRows[0].closer) {
+      return anyRows[0].closer;
+    }
+  } catch (e) {
+    // Swallow — closer attribution is best-effort
+    return null;
+  }
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -187,6 +233,8 @@ export default async function handler(req, res) {
       newClientsCreated: 0,
       paymentsAllocated: 0,
       paymentsFlagged: 0,
+      closersAttributed: 0,
+      closersUnmatched: 0,
       retainerErrors: [],
     };
 
@@ -239,6 +287,15 @@ export default async function handler(req, res) {
 
       // ── Insert into deals if not already there ──
       if (!existingDeals.has(p.id)) {
+        // CLOSER AUTO-ATTRIBUTION: look up which closer this customer booked with.
+        // Only for HT deals — LT payments don't go through closers.
+        let attributedCloser = null;
+        if (!lt) {
+          attributedCloser = await lookupCloserForCustomer(customerEmail);
+          if (attributedCloser) stats.closersAttributed++;
+          else stats.closersUnmatched++;
+        }
+
         newDealRows.push({
           name:    customerName,
           email:   customerEmail,
@@ -246,7 +303,7 @@ export default async function handler(req, res) {
           usd:     gross,
           contract: 0,
           source:  'ads',
-          closer:  null,
+          closer:  attributedCloser,
           setter:  null,
           notes:   lt ? 'Auto-synced from Whop (LT)' : 'Auto-synced from Whop',
           whop_payment_id: p.id,
@@ -283,6 +340,10 @@ export default async function handler(req, res) {
       breakdown: {
         newDealsHT: stats.newDealsHT,
         newDealsLT: stats.newDealsLT,
+      },
+      closerAttribution: {
+        attributed: stats.closersAttributed,
+        unmatched:  stats.closersUnmatched,
       },
       retainer: {
         newClientsCreated: stats.newClientsCreated,
