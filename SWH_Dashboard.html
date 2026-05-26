@@ -906,6 +906,12 @@ select.input-field option { background: var(--bg2); }
     </svg>
     Comparison
   </div>
+  <div class="nav-item" onclick="switchTab('pnl', this)">
+    <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M2 13l4-4 3 3 5-6"/><path d="M10 6h4v4"/>
+    </svg>
+    P&amp;L
+  </div>
 
   <div class="sidebar-section">Team</div>
   <div class="nav-item" onclick="switchTab('closers', this)">
@@ -1576,6 +1582,208 @@ select.input-field option { background: var(--bg2); }
 
   <div style="margin-top:14px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">
     <b style="color:var(--accent)">How this works:</b> All numbers are calendar-month totals. Calls come from <code>calls_with_status</code>. Sales come from <code>deals</code> split by <code>deal_type</code>. % change uses <code>(this − last) / last</code>. Up-arrow (green) = improvement for that metric; down-arrow (red) = decline. <i>Note: "this month" is partial until month-end — direct comparison can mislead in the first week.</i>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TAB: P&L
+══════════════════════════════════════ -->
+<div id="tab-pnl" class="tab-view">
+
+  <!-- Headline cards: Revenue / Costs / Net Profit / Margin -->
+  <div class="section-label">Bottom line — <span id="pnl-period-label">current period</span></div>
+  <div class="kpi-tier kpi-tier-4">
+    <div class="kpi-card accent">
+      <div class="kpi-label">Total Revenue</div>
+      <div class="kpi-value mono" id="pnl-revenue">$0</div>
+      <div class="kpi-meta">
+        <span class="kpi-sublabel" id="pnl-revenue-sub">HT + Retainer + Back-end + LT</span>
+      </div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Total Costs</div>
+      <div class="kpi-value mono" id="pnl-costs">$0</div>
+      <div class="kpi-meta">
+        <span class="kpi-sublabel" id="pnl-costs-sub">Ads + Salaries + Commissions + Subs</span>
+      </div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">Net Profit</div>
+      <div class="kpi-value mono" id="pnl-net">$0</div>
+      <div class="kpi-meta">
+        <span class="kpi-badge neutral" id="pnl-net-badge">—</span>
+      </div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Net Margin</div>
+      <div class="kpi-value mono" id="pnl-margin">0%</div>
+      <div class="kpi-meta">
+        <span class="kpi-sublabel">net / revenue</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Revenue breakdown -->
+  <div class="section-label">Revenue breakdown</div>
+  <div class="kpi-tier kpi-tier-5">
+    <div class="kpi-card accent">
+      <div class="kpi-label">New HT Sales</div>
+      <div class="kpi-value mono" id="pnl-r-newht">$0</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Retainer Payments</div>
+      <div class="kpi-value mono" id="pnl-r-retainer">$0</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Back-end Payments</div>
+      <div class="kpi-value mono" id="pnl-r-backend">$0</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Low-Ticket</div>
+      <div class="kpi-value mono" id="pnl-r-lt">$0</div>
+    </div>
+    <div class="kpi-card accent">
+      <div class="kpi-label">Total</div>
+      <div class="kpi-value mono" id="pnl-r-total">$0</div>
+    </div>
+  </div>
+
+  <!-- Costs breakdown -->
+  <div class="section-label">Cost breakdown</div>
+  <div class="kpi-tier kpi-tier-5">
+    <div class="kpi-card red">
+      <div class="kpi-label">Ad Spend</div>
+      <div class="kpi-value mono" id="pnl-c-ads">$0</div>
+      <div class="kpi-meta">
+        <span class="kpi-sublabel">Meta auto-sync</span>
+      </div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Fixed Salaries</div>
+      <div class="kpi-value mono" id="pnl-c-salaries">$0</div>
+      <div class="kpi-meta">
+        <span class="kpi-sublabel" id="pnl-c-salaries-sub">— pro-rata</span>
+      </div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Commissions</div>
+      <div class="kpi-value mono" id="pnl-c-commissions">$0</div>
+      <div class="kpi-meta">
+        <span class="kpi-sublabel">Sheet sync (AED → USD)</span>
+      </div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Subscriptions</div>
+      <div class="kpi-value mono" id="pnl-c-subs">$0</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Mehdi's 40% Cut</div>
+      <div class="kpi-value mono" id="pnl-c-mehdi">$0</div>
+      <div class="kpi-meta">
+        <span class="kpi-sublabel">of positive net</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expenses table — editable -->
+  <div class="section-label">Recurring expenses · editable</div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-size:12px;color:var(--t2);">Salaries, subscriptions, and overheads. Stored in USD per month.</div>
+      <div style="display:flex;gap:6px;">
+        <button class="period-btn" onclick="syncPayoutsFromSheet()" style="font-size:11px;">⟳ Sync Commissions</button>
+        <button class="period-btn active" onclick="openExpenseModal()" style="font-size:11px;">+ Add Expense</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);color:var(--t3);text-align:left;">
+            <th style="padding:8px 10px;">Name</th>
+            <th style="padding:8px 10px;">Category</th>
+            <th style="padding:8px 10px;text-align:right;">Cycle amount</th>
+            <th style="padding:8px 10px;text-align:right;">Monthly equiv</th>
+            <th style="padding:8px 10px;">Status</th>
+            <th style="padding:8px 10px;width:80px;"></th>
+          </tr>
+        </thead>
+        <tbody id="pnl-expenses-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Commission sync table -->
+  <div class="section-label">Commissions · synced from payout tracker</div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;">
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);color:var(--t3);text-align:left;">
+            <th style="padding:8px 10px;">Staff</th>
+            <th style="padding:8px 10px;">Month</th>
+            <th style="padding:8px 10px;text-align:right;">USD</th>
+            <th style="padding:8px 10px;">Source</th>
+            <th style="padding:8px 10px;">Last synced</th>
+          </tr>
+        </thead>
+        <tbody id="pnl-commissions-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="margin-top:14px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">
+    <b style="color:var(--accent)">How this works:</b>
+    Revenue = sum of <code>deals.usd</code> by <code>deal_type</code> for the selected period.
+    Ad spend = <code>meta_spend</code> table (auto-synced).
+    Salaries = monthly amount × (days in period / days in month) so it pro-rates correctly for 7d / MTD periods.
+    Commissions = sum of <code>payout_commissions</code> for months touching the period (synced nightly from the Google sheet).
+    Mehdi's cut = 40% of positive net (revenue − all other costs).
+    All-Time totals sum every month with deals or expenses on record.
+  </div>
+</div>
+
+<!-- Expense edit modal -->
+<div id="expense-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:24px;width:400px;max-width:90vw;">
+    <div style="font-size:14px;font-weight:600;margin-bottom:14px;" id="expense-modal-title">Add Expense</div>
+    <input id="expense-id" type="hidden">
+    <div style="margin-bottom:10px;">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px;">Name</label>
+      <input id="expense-name" type="text" placeholder="e.g. ClickFunnels"
+        style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px;">
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px;">Category</label>
+      <select id="expense-category" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px;">
+        <option value="subscription">Subscription</option>
+        <option value="salary">Salary (fixed)</option>
+        <option value="overhead">Overhead</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px;">Billing cycle</label>
+      <select id="expense-billing-cycle" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px;">
+        <option value="monthly">Monthly</option>
+        <option value="quarterly">Quarterly</option>
+        <option value="annual">Annual</option>
+        <option value="one_time">One-time</option>
+      </select>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px;" id="expense-amount-label">Amount (USD per cycle)</label>
+      <input id="expense-amount" type="number" step="0.01" placeholder="0.00"
+        style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px;">
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px;">Notes (optional)</label>
+      <input id="expense-notes" type="text"
+        style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px;">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="period-btn" onclick="closeExpenseModal()" style="font-size:12px;">Cancel</button>
+      <button class="period-btn active" onclick="saveExpense()" style="font-size:12px;">Save</button>
+    </div>
   </div>
 </div>
 
@@ -2453,6 +2661,7 @@ const PAGE_TITLES = {
   sales:     ['Sales & Revenue',       'HT sales · LT revenue · pipeline'],
   retainers: ['Retainers',             'Auto-synced retainer tracking · isolated from Executive metrics'],
   compare:   ['Monthly Comparison',    'This month vs last month · full funnel · % change'],
+  pnl:       ['Profit & Loss',         'Revenue − ad spend − salaries − commissions − overheads'],
   closers:   ['Closer Performance',    'Frankie vs Mehdi · live attribution'],
   lowticket: ['Low-Ticket',            '$27 course · GHL purchases'],
   'calls-log': ['Setters Daily Tracker',    'Log appointments · outreach · follow-ups'],
@@ -2472,7 +2681,7 @@ function switchTab(id,el) {
   const [title,sub]=PAGE_TITLES[id]||['Dashboard',''];
   document.getElementById('page-title').textContent=title;
   document.getElementById('page-sub').textContent=sub;
-  const showPeriod=['exec','calls','sales','closers','lowticket'].includes(id);
+  const showPeriod=['exec','calls','sales','closers','lowticket','pnl'].includes(id);
   document.getElementById('period-switcher').style.visibility=showPeriod?'visible':'hidden';
   if(id==='closers')    renderCloserCharts();
   if(id==='calls')      renderCallsTrend();
@@ -2484,6 +2693,7 @@ function switchTab(id,el) {
   if(id==='booked-calls')  renderBookedCalls();
   if(id==='retainers')     renderRetainers();
   if(id==='compare')       renderComparison();
+  if(id==='pnl')           renderPnl();
   if(id==='slack')      { renderSlack(computeMetrics(currentPeriod)); renderDailyReport(); }
 }
 
@@ -3115,6 +3325,8 @@ async function loadAndRender() {
     try { HT_ADS = await getHtSales(); } catch(e) { console.warn('ht_sales load failed:', e.message); HT_ADS = []; }
     // Fetch retainer payments (separate await — a failure here must not break the dashboard)
     try { RETAINER_STATUS = await getRetainerStatus(); } catch(e) { console.warn('retainer_status load failed:', e.message); RETAINER_STATUS = []; }
+    // Fetch P&L expenses + commissions (separate try — a failure here must not break the dashboard)
+    try { await loadPnlData(); } catch(e) { console.warn('pnl data load failed:', e.message); }
     // Background: pull any new leads from Sheets into followup_leads
     // Don't block initial render — kick off after, then refresh tracker silently
     syncSheetsToFollowUpTracker({ silent: true }).catch(()=>{});
@@ -3161,6 +3373,7 @@ function renderAll() {
   renderSalesDeals();   // Sales & Revenue tab — period-aware
   renderCloserCards();  // Closers tab cards — period-aware (chart redraws on tab open)
   renderSlack(d);
+  renderPnl();          // P&L tab — period-aware
 }
 
 // ═══════════════════════════════════════════
@@ -4418,6 +4631,359 @@ function renderComparison() {
   // --- BOTTOM LINE ---
   document.getElementById('cmp-total').innerHTML =
     bottomRow('Total cash collected', d1.totalCash, d0.totalCash, m(d1.totalCash), m(d0.totalCash));
+}
+
+
+// ═══════════════════════════════════════════
+// P&L TAB
+// ═══════════════════════════════════════════
+// State
+let PNL_EXPENSES = [];      // rows from public.expenses
+let PNL_COMMISSIONS = [];   // rows from public.payout_commissions
+
+const MEHDI_NET_CUT_PCT = 0.40;
+
+async function loadPnlData() {
+  try {
+    PNL_EXPENSES = await sbFetch('expenses?order=category.asc,name.asc');
+  } catch(e) {
+    console.warn('expenses table not ready:', e.message);
+    PNL_EXPENSES = [];
+  }
+  try {
+    PNL_COMMISSIONS = await sbFetch('payout_commissions?order=month.desc,staff_name.asc');
+  } catch(e) {
+    console.warn('payout_commissions table not ready:', e.message);
+    PNL_COMMISSIONS = [];
+  }
+}
+
+// Period date bounds matching the dashboard's currentPeriod.
+// Returns { start: Date, end: Date (exclusive), label: string, days: int }
+function pnlPeriodBounds(period) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (period === '7d') {
+    const start = new Date(today); start.setDate(start.getDate() - 6);
+    const end = new Date(today); end.setDate(end.getDate() + 1);
+    return { start, end, label: 'last 7 days', days: 7 };
+  }
+  if (period === 'mtd') {
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    const end = new Date(today); end.setDate(end.getDate() + 1);
+    const days = Math.ceil((end - start) / 86400000);
+    return { start, end, label: 'month to date', days };
+  }
+  if (period === 'lm') {
+    const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const end   = new Date(today.getFullYear(), today.getMonth(), 1);
+    const days = Math.ceil((end - start) / 86400000);
+    return { start, end, label: 'last month', days };
+  }
+  if (period === 'today') {
+    const start = new Date(today);
+    const end = new Date(today); end.setDate(end.getDate() + 1);
+    return { start, end, label: 'today', days: 1 };
+  }
+  // 'all'
+  const earliest = new Date(2025, 11, 1); // Dec 2025 — TCC inception
+  const end = new Date(today); end.setDate(end.getDate() + 1);
+  const days = Math.ceil((end - earliest) / 86400000);
+  return { start: earliest, end, label: 'all time', days };
+}
+
+// Salary pro-rata: monthly salary × (days in period / days in month they fall in).
+// For simplicity we treat each calendar month a salary applies and sum:
+//   total = sum over months in period (monthly_amount × overlap_days / month_days)
+function proRatedFixedCosts(monthlyTotalUsd, start, end) {
+  if (monthlyTotalUsd <= 0) return 0;
+  let total = 0;
+  let cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (cursor < end) {
+    const monthStart = new Date(cursor);
+    const monthEnd   = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    const overlapStart = monthStart < start ? start : monthStart;
+    const overlapEnd   = monthEnd > end ? end : monthEnd;
+    if (overlapEnd > overlapStart) {
+      const overlapDays = Math.ceil((overlapEnd - overlapStart) / 86400000);
+      const monthDays   = Math.ceil((monthEnd - monthStart) / 86400000);
+      total += monthlyTotalUsd * (overlapDays / monthDays);
+    }
+    cursor = monthEnd;
+  }
+  return total;
+}
+
+// Commissions for the period: sum payout_commissions rows whose month overlaps.
+// Each commission row represents a full month — we pro-rate the same way.
+function commissionsForPeriod(start, end) {
+  if (!PNL_COMMISSIONS.length) return 0;
+  let total = 0;
+  for (const row of PNL_COMMISSIONS) {
+    if (!row.month) continue;
+    const m = new Date(row.month + 'T00:00:00');
+    const monthStart = new Date(m.getFullYear(), m.getMonth(), 1);
+    const monthEnd   = new Date(m.getFullYear(), m.getMonth() + 1, 1);
+    const overlapStart = monthStart < start ? start : monthStart;
+    const overlapEnd   = monthEnd > end ? end : monthEnd;
+    if (overlapEnd > overlapStart) {
+      const overlapDays = Math.ceil((overlapEnd - overlapStart) / 86400000);
+      const monthDays   = Math.ceil((monthEnd - monthStart) / 86400000);
+      total += (Number(row.amount_usd) || 0) * (overlapDays / monthDays);
+    }
+  }
+  return total;
+}
+
+// Revenue for period from DB_DEALS.
+function revenueForPeriod(start, end) {
+  const ymd = (d) => d.toISOString().slice(0, 10);
+  const startStr = ymd(start), endStr = ymd(end);
+  const inRange = (DB_DEALS || []).filter(d =>
+    d.date && d.date >= startStr && d.date < endStr
+  );
+  const sum = (t) => inRange
+    .filter(d => String(d.deal_type || 'new_ht').toLowerCase() === t)
+    .reduce((s, r) => s + (Number(r.usd) || 0), 0);
+  return {
+    newHt:    sum('new_ht'),
+    retainer: sum('retainer'),
+    backEnd:  sum('back_end'),
+    lt:       sum('lt'),
+    total:    inRange.reduce((s, r) => s + (Number(r.usd) || 0), 0),
+  };
+}
+
+// Ad spend for period from META_SPEND.
+function adSpendForPeriod(start, end) {
+  if (!META_SPEND || !META_SPEND.length) return 0;
+  const ymd = (d) => d.toISOString().slice(0, 10);
+  const startStr = ymd(start), endStr = ymd(end);
+  return META_SPEND
+    .filter(r => r.spend_date && r.spend_date >= startStr && r.spend_date < endStr)
+    .reduce((s, r) => s + (Number(r.spend) || 0), 0);
+}
+
+function renderPnl() {
+  const tabEl = document.getElementById('tab-pnl');
+  if (!tabEl) return;
+
+  const { start, end, label, days } = pnlPeriodBounds(currentPeriod);
+  set('pnl-period-label', label);
+
+  // -- Revenue --
+  const rev = revenueForPeriod(start, end);
+  set('pnl-r-newht',    fmtFull(rev.newHt));
+  set('pnl-r-retainer', fmtFull(rev.retainer));
+  set('pnl-r-backend',  fmtFull(rev.backEnd));
+  set('pnl-r-lt',       fmtFull(rev.lt));
+  set('pnl-r-total',    fmtFull(rev.total));
+
+  // -- Costs: ads, salaries (pro-rata), commissions, subscriptions, Mehdi's cut --
+  const adSpend = adSpendForPeriod(start, end);
+
+  const fixedSalaries = PNL_EXPENSES
+    .filter(e => e.active && e.category === 'salary' && e.billing_cycle === 'monthly')
+    .reduce((s, e) => s + (Number(e.amount_usd) || 0), 0);
+  const salariesPeriod = proRatedFixedCosts(fixedSalaries, start, end);
+
+  const subscriptions = PNL_EXPENSES
+    .filter(e => e.active && (e.category === 'subscription' || e.category === 'overhead' || e.category === 'other'))
+    .reduce((s, e) => {
+      const amt = Number(e.amount_usd) || 0;
+      // Normalize to monthly equivalent
+      if (e.billing_cycle === 'monthly')   return s + amt;
+      if (e.billing_cycle === 'quarterly') return s + amt / 3;
+      if (e.billing_cycle === 'annual')    return s + amt / 12;
+      return s; // one_time excluded from recurring cost
+    }, 0);
+  const subsPeriod = proRatedFixedCosts(subscriptions, start, end);
+
+  const commissions = commissionsForPeriod(start, end);
+
+  // Net before Mehdi's cut
+  const netBeforeMehdi = rev.total - adSpend - salariesPeriod - subsPeriod - commissions;
+  const mehdiCut = netBeforeMehdi > 0 ? netBeforeMehdi * MEHDI_NET_CUT_PCT : 0;
+  const totalCosts = adSpend + salariesPeriod + subsPeriod + commissions + mehdiCut;
+  const netProfit = rev.total - totalCosts;
+  const margin = rev.total > 0 ? (netProfit / rev.total) : 0;
+
+  set('pnl-c-ads',         fmtFull(adSpend));
+  set('pnl-c-salaries',    fmtFull(salariesPeriod));
+  set('pnl-c-salaries-sub', label === 'all time' ? `${days} days` : `${days} day${days===1?'':'s'} pro-rata`);
+  set('pnl-c-commissions', fmtFull(commissions));
+  set('pnl-c-subs',        fmtFull(subsPeriod));
+  set('pnl-c-mehdi',       fmtFull(mehdiCut));
+
+  set('pnl-revenue',  fmtFull(rev.total));
+  set('pnl-costs',    fmtFull(totalCosts));
+  set('pnl-net',      fmtFull(netProfit));
+  set('pnl-margin',   (margin * 100).toFixed(1) + '%');
+
+  // Badge on Net Profit
+  const netBadge = document.getElementById('pnl-net-badge');
+  if (netBadge) {
+    if (netProfit > 0)      { netBadge.textContent = 'profit'; netBadge.className = 'kpi-badge up'; }
+    else if (netProfit < 0) { netBadge.textContent = 'loss';   netBadge.className = 'kpi-badge down'; }
+    else                    { netBadge.textContent = '—';      netBadge.className = 'kpi-badge neutral'; }
+  }
+
+  // -- Expenses table — grouped by billing cycle --
+  const tbody = document.getElementById('pnl-expenses-tbody');
+  if (tbody) {
+    if (!PNL_EXPENSES.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--t3);">No expenses yet. Run the migration SQL and click "+ Add Expense".</td></tr>`;
+    } else {
+      const cycleOrder = ['monthly', 'quarterly', 'annual', 'one_time'];
+      const cycleLabel = { monthly: 'Monthly', quarterly: 'Quarterly', annual: 'Annual', one_time: 'One-time' };
+      const monthlyEquiv = (e) => {
+        const amt = Number(e.amount_usd) || 0;
+        if (e.billing_cycle === 'monthly')   return amt;
+        if (e.billing_cycle === 'quarterly') return amt / 3;
+        if (e.billing_cycle === 'annual')    return amt / 12;
+        return 0;
+      };
+      let html = '';
+      for (const cycle of cycleOrder) {
+        const items = PNL_EXPENSES.filter(e => (e.billing_cycle || 'monthly') === cycle);
+        if (!items.length) continue;
+        const sectionTotal = items.reduce((s, e) => s + monthlyEquiv(e), 0);
+        html += `
+          <tr style="background:var(--bg3);">
+            <td colspan="6" style="padding:6px 10px;font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:0.5px;">
+              ${cycleLabel[cycle]} · ${items.length} item${items.length===1?'':'s'} · $${sectionTotal.toFixed(2)}/mo equiv
+            </td>
+          </tr>
+        `;
+        for (const e of items) {
+          html += `
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px 10px;color:var(--t1);">${escapeHtml(e.name)}</td>
+              <td style="padding:8px 10px;color:var(--t2);text-transform:capitalize;">${escapeHtml(e.category || '')}</td>
+              <td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);color:var(--t1);">$${(Number(e.amount_usd)||0).toFixed(2)}</td>
+              <td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);color:var(--t2);">${cycle === 'one_time' ? '—' : '$' + monthlyEquiv(e).toFixed(2)}</td>
+              <td style="padding:8px 10px;">
+                <span class="kpi-badge ${e.active ? 'up' : 'neutral'}">${e.active ? 'active' : 'inactive'}</span>
+              </td>
+              <td style="padding:8px 10px;">
+                <button class="period-btn" style="font-size:10px;padding:3px 8px;" onclick="editExpense('${e.id}')">Edit</button>
+                <button class="period-btn" style="font-size:10px;padding:3px 8px;" onclick="deleteExpense('${e.id}')">×</button>
+              </td>
+            </tr>
+          `;
+        }
+      }
+      tbody.innerHTML = html;
+    }
+  }
+
+  // -- Commissions table --
+  const ctbody = document.getElementById('pnl-commissions-tbody');
+  if (ctbody) {
+    if (!PNL_COMMISSIONS.length) {
+      ctbody.innerHTML = `<tr><td colspan="5" style="padding:14px;text-align:center;color:var(--t3);">No commissions synced yet. Click "⟳ Sync Commissions" to pull from the payout tracker.</td></tr>`;
+    } else {
+      ctbody.innerHTML = PNL_COMMISSIONS.map(c => `
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:8px 10px;color:var(--t1);">${escapeHtml(c.staff_name)}</td>
+          <td style="padding:8px 10px;color:var(--t2);">${(c.month || '').slice(0,7)}</td>
+          <td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);color:var(--t1);">$${(Number(c.amount_usd)||0).toFixed(2)}</td>
+          <td style="padding:8px 10px;color:var(--t3);font-size:11px;">${escapeHtml(c.source_sheet || '—')}</td>
+          <td style="padding:8px 10px;color:var(--t3);font-size:11px;">${c.synced_at ? new Date(c.synced_at).toLocaleDateString() : '—'}</td>
+        </tr>
+      `).join('');
+    }
+  }
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+// ── Expense CRUD ──────────────────────────────────────
+function openExpenseModal(expense) {
+  document.getElementById('expense-modal-title').textContent = expense ? 'Edit Expense' : 'Add Expense';
+  document.getElementById('expense-id').value             = expense ? expense.id : '';
+  document.getElementById('expense-name').value           = expense ? expense.name : '';
+  document.getElementById('expense-category').value       = expense ? expense.category : 'subscription';
+  document.getElementById('expense-billing-cycle').value  = expense ? (expense.billing_cycle || 'monthly') : 'monthly';
+  document.getElementById('expense-amount').value         = expense ? expense.amount_usd : '';
+  document.getElementById('expense-notes').value          = expense ? (expense.notes || '') : '';
+  document.getElementById('expense-modal').style.display = 'flex';
+}
+
+function closeExpenseModal() {
+  document.getElementById('expense-modal').style.display = 'none';
+}
+
+function editExpense(id) {
+  const e = PNL_EXPENSES.find(x => x.id === id);
+  if (e) openExpenseModal(e);
+}
+
+async function saveExpense() {
+  const id            = document.getElementById('expense-id').value;
+  const name          = document.getElementById('expense-name').value.trim();
+  const category      = document.getElementById('expense-category').value;
+  const billing_cycle = document.getElementById('expense-billing-cycle').value;
+  const amount        = parseFloat(document.getElementById('expense-amount').value);
+  const notes         = document.getElementById('expense-notes').value.trim();
+
+  if (!name) { showToast('Name required', 'error'); return; }
+  if (isNaN(amount) || amount < 0) { showToast('Valid amount required', 'error'); return; }
+
+  const row = {
+    name, category, amount_usd: amount, billing_cycle,
+    active: true, notes: notes || null, updated_at: new Date().toISOString(),
+  };
+
+  try {
+    if (id) {
+      await sbFetch(`expenses?id=eq.${id}`, {
+        method: 'PATCH', prefer: 'return=minimal', body: JSON.stringify(row),
+      });
+    } else {
+      await sbFetch('expenses', {
+        method: 'POST', prefer: 'return=minimal', body: JSON.stringify(row),
+      });
+    }
+    closeExpenseModal();
+    await loadPnlData();
+    renderPnl();
+    showToast(id ? '✓ Expense updated' : '✓ Expense added');
+  } catch(e) {
+    showToast('Save failed: ' + e.message, 'error');
+  }
+}
+
+async function deleteExpense(id) {
+  const e = PNL_EXPENSES.find(x => x.id === id);
+  if (!e) return;
+  if (!confirm(`Delete "${e.name}" ($${e.amount_usd}/mo)?`)) return;
+  try {
+    await sbFetch(`expenses?id=eq.${id}`, { method: 'DELETE', prefer: 'return=minimal' });
+    await loadPnlData();
+    renderPnl();
+    showToast('✓ Expense deleted');
+  } catch(err) {
+    showToast('Delete failed: ' + err.message, 'error');
+  }
+}
+
+async function syncPayoutsFromSheet() {
+  showToast('Syncing payouts from Google Sheet…');
+  try {
+    const r = await fetch('/api/payouts-sync');
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'Sync failed');
+    await loadPnlData();
+    renderPnl();
+    showToast(`✓ ${j.rowsUpserted} commission rows synced`);
+  } catch(e) {
+    showToast('Sync failed: ' + e.message, 'error');
+  }
 }
 
 
@@ -5759,6 +6325,7 @@ async function autoSync() {
       (async () => { try { META_SPEND = await getMetaSpend(); } catch(e) { /* ignore */ } })(),
       (async () => { try { HT_ADS = await getHtSales(); } catch(e) { /* ignore */ } })(),
       (async () => { try { RETAINER_STATUS = await getRetainerStatus(); } catch(e) { /* ignore */ } })(),
+      (async () => { try { await loadPnlData(); } catch(e) { /* ignore */ } })(),
     ]);
     renderAll();
     if (typeof renderFollowUpTracker === 'function') renderFollowUpTracker();
