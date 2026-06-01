@@ -1507,14 +1507,6 @@ select.input-field option { background: var(--bg2); }
     </div>
   </div>
 
-  <!-- ── Setup pending clients (banner if any) ── -->
-  <div id="ret-pending-section" style="margin-top:16px;display:none">
-    <div class="section-label" style="margin:0 0 10px;color:var(--amber)">⚠ Setup pending — enter retainer totals to unlock automation</div>
-    <div class="chart-card">
-      <div id="ret-pending-list"></div>
-    </div>
-  </div>
-
   <!-- ── Active retainers table ── -->
   <div class="section-label" style="margin:16px 0 10px">Active retainers · one row per client</div>
   <div class="chart-card">
@@ -1536,6 +1528,14 @@ select.input-field option { background: var(--bg2); }
         </thead>
         <tbody id="ret-tbody"></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- ── Setup pending clients (banner if any) — moved BELOW active retainers ── -->
+  <div id="ret-pending-section" style="margin-top:16px;display:none">
+    <div class="section-label" style="margin:0 0 10px;color:var(--amber)">⚠ Setup pending — enter retainer totals to unlock automation</div>
+    <div class="chart-card">
+      <div id="ret-pending-list"></div>
     </div>
   </div>
 
@@ -4348,7 +4348,7 @@ function renderRetainers() {
       pendingList.innerHTML = pendingClients.map(c => {
         const safeName = (c.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         return `
-          <div style="display:grid;grid-template-columns:1.4fr 0.9fr 1fr 1fr 1fr auto;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--border2)">
+          <div style="display:grid;grid-template-columns:1.4fr 0.9fr 1fr 1fr 1fr auto auto;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--border2)">
             <div>
               <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:3px">CLIENT</div>
               <div style="font-weight:700;color:var(--t1);font-size:13px">${c.name || '—'}</div>
@@ -4378,6 +4378,8 @@ function renderRetainers() {
             </div>
             <button onclick="saveRetainerSetup('${c.id}')"
               style="background:var(--accent);color:#04140d;border:none;border-radius:6px;padding:8px 14px;font-size:11px;font-weight:800;font-family:var(--font-mono);cursor:pointer;height:fit-content">Save</button>
+            <button onclick="deleteRetainerClient('${c.id}', '${safeName}')" title="Delete client and all payments"
+              style="background:var(--bg3);color:var(--red);border:1px solid var(--border2);border-radius:6px;padding:8px 12px;font-size:11px;font-weight:800;font-family:var(--font-mono);cursor:pointer;height:fit-content">×</button>
           </div>
         `;
       }).join('');
@@ -4429,6 +4431,8 @@ function renderRetainers() {
       <td>
         <button onclick="editRetainerSetup('${c.id}')" title="Edit setup amounts"
           style="background:var(--bg3);color:var(--t2);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;font-family:var(--font-mono);cursor:pointer">Edit</button>
+        <button onclick="deleteRetainerClient('${c.id}', '${(c.name || '').replace(/'/g, "\\'")}')" title="Delete client and all payments"
+          style="background:var(--bg3);color:var(--red);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;font-family:var(--font-mono);cursor:pointer;margin-left:4px">×</button>
       </td>
     </tr>`;
   }).join('');
@@ -4491,6 +4495,41 @@ async function editRetainerSetup(clientId) {
     showToast('✓ Setup updated');
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// Delete a retainer client AND all their payments. Two-step delete because
+// retainer_payments FK may not have ON DELETE CASCADE on every deployment.
+// Confirmation prompt requires explicit "DELETE" typed in to prevent accidents.
+async function deleteRetainerClient(clientId, clientName) {
+  const name = clientName || 'this client';
+  const typed = prompt(
+    `Permanently delete "${name}" and all their retainer payments?\n\n` +
+    `This cannot be undone. Whop will NOT re-create the client unless they make a new payment.\n\n` +
+    `Type DELETE to confirm:`
+  );
+  if (typed === null) return;
+  if (typed.trim().toUpperCase() !== 'DELETE') {
+    showToast('Delete cancelled — confirmation did not match', 'error');
+    return;
+  }
+  try {
+    // 1. Delete all retainer_payments rows for this client first.
+    //    Ignore "not found" — some clients have no payments yet.
+    try {
+      await sbFetch('retainer_payments?client_id=eq.' + clientId, { method: 'DELETE' });
+    } catch (e) {
+      console.warn('retainer_payments delete (non-fatal):', e.message);
+    }
+    // 2. Delete the client row.
+    await sbFetch('retainer_clients?id=eq.' + clientId, { method: 'DELETE' });
+
+    // 3. Refresh local state and re-render.
+    RETAINER_STATUS = await getRetainerStatus();
+    renderRetainers();
+    showToast(`✓ Deleted ${name}`);
+  } catch(e) {
+    showToast('Error deleting: ' + e.message, 'error');
   }
 }
 
