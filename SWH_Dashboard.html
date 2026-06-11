@@ -2456,15 +2456,23 @@ async function getRetainerStatus() {
   }
 }
 // ── Update setup fields on a retainer_clients row (totals + mark setup_complete) ──
+// `paid_override` is optional. Pass:
+//   undefined → don't touch the column
+//   null      → clear the override (revert to Whop-driven calc)
+//   number    → set manual override
 async function updateRetainerSetup(clientId, totals) {
+  const body = {
+    total_deal_value: totals.total_deal_value,
+    retainer_2_amount: totals.retainer_2_amount,
+    final_retainer_amount: totals.final_retainer_amount,
+    setup_complete: true,
+  };
+  if (totals.paid_override !== undefined) {
+    body.paid_override = totals.paid_override;
+  }
   return await sbFetch('retainer_clients?id=eq.' + clientId, {
     method: 'PATCH',
-    body: JSON.stringify({
-      total_deal_value: totals.total_deal_value,
-      retainer_2_amount: totals.retainer_2_amount,
-      final_retainer_amount: totals.final_retainer_amount,
-      setup_complete: true,
-    }),
+    body: JSON.stringify(body),
   });
 }
 // Sum Meta spend (USD) for a given dashboard period: 'all' | 'today' | '7d' | 'mtd' | 'lm'
@@ -2835,6 +2843,14 @@ function computeMetrics(period) {
   const noshows = _periodCalls.filter(b => b.effective_status === 'no_show').length;
   const pending = _periodCalls.filter(b => b.effective_status === 'pending').length;
   const slaBreached = _periodCalls.filter(b => b.sla_breached).length;
+  // Per-closer shows for THIS period (the unfiltered all-time count is wrong here).
+  // We pass these into buildMetrics so the Closers tab respects the period switcher.
+  const frankieShowsPeriod = _periodCalls.filter(b =>
+    b.closer === 'Frankie' && b.effective_status === 'showed'
+  ).length;
+  const mehdiShowsPeriod = _periodCalls.filter(b =>
+    b.closer === 'Mehdi' && b.effective_status === 'showed'
+  ).length;
   // Show-rate denominator excludes pending — outcome unknown ≠ no-show.
   const showBaseForPeriod = shows + noshows;
   const closes = pLog.reduce((s,l)=>s+(l.closes||0),0);
@@ -2851,14 +2867,14 @@ function computeMetrics(period) {
   const contractTotal = pDeals.reduce((s,d)=>s+(d.contract||0),0);
   const pipeline = deals.filter(d=>(!d.usd||d.usd===0)&&inPeriod(d.date)).reduce((s,d)=>s+(d.contract||0),0);
 
-  const periodMetrics = buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,pDeals,contractTotal,pipeline,deals);
+  const periodMetrics = buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,pDeals,contractTotal,pipeline,deals,frankieShowsPeriod,mehdiShowsPeriod);
   periodMetrics.showBase     = showBaseForPeriod;
   periodMetrics.pendingCalls = pending;
   periodMetrics.slaBreached  = slaBreached;
   return periodMetrics;
 }
 
-function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,dealsArr,contractTotal,pipeline,allDeals) {
+function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,htOrg,dealsArr,contractTotal,pipeline,allDeals,frankieShowsOverride,mehdiShowsOverride) {
   const frankieAll   = dealsArr.filter(d=>d.closer==='Frankie');
   const mehdiAll     = dealsArr.filter(d=>d.closer==='Mehdi');
   // Closer "close count" filters to new_ht only so close-rate math matches
@@ -2871,17 +2887,23 @@ function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,ht
   const mehdiDeals   = mehdiAll.filter(isNewHt);
   const frankieCash  = frankieAll.reduce((s,d)=>s+(d.usd||0),0);
   const mehdiCash    = mehdiAll.reduce((s,d)=>s+(d.usd||0),0);
-  // Closer "shows" count: pull from calls_with_status (the new single source
-  // of truth for call data), filtered to effective_status='showed' and the
-  // closer field matching. Old code pulled from DB_LOG (daily log) which was
-  // rarely filled in, causing absurd close rates like 1100%.
-  const _allCallsForCloserStats = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS) ? BOOKED_CALLS : [];
-  const frankieShows = _allCallsForCloserStats.filter(c =>
-    c.closer === 'Frankie' && c.effective_status === 'showed'
-  ).length;
-  const mehdiShows = _allCallsForCloserStats.filter(c =>
-    c.closer === 'Mehdi' && c.effective_status === 'showed'
-  ).length;
+  // Closer "shows" count.
+  // If override params are provided (period branch already filtered the calls
+  // for us), use them. Otherwise fall back to the entire BOOKED_CALLS array,
+  // which is correct for the All Time branch.
+  let frankieShows, mehdiShows;
+  if (typeof frankieShowsOverride === 'number' && typeof mehdiShowsOverride === 'number') {
+    frankieShows = frankieShowsOverride;
+    mehdiShows   = mehdiShowsOverride;
+  } else {
+    const _allCallsForCloserStats = (typeof BOOKED_CALLS !== 'undefined' && BOOKED_CALLS) ? BOOKED_CALLS : [];
+    frankieShows = _allCallsForCloserStats.filter(c =>
+      c.closer === 'Frankie' && c.effective_status === 'showed'
+    ).length;
+    mehdiShows = _allCallsForCloserStats.filter(c =>
+      c.closer === 'Mehdi' && c.effective_status === 'showed'
+    ).length;
+  }
   const log = DB_LOG;
   const adsBooked    = log.reduce((s,l)=>s+((l.source||'').toLowerCase().includes('ads')?(l.booked||0):0),0);
   const totalCash    = htCash + lt;
@@ -4294,6 +4316,20 @@ function retInstallmentPill(status, days) {
 function renderRetainers() {
   const rows = (typeof RETAINER_STATUS !== 'undefined' && RETAINER_STATUS) ? RETAINER_STATUS : [];
 
+  // Helper: effective paid amount for a client. Use manual override when set,
+  // otherwise fall back to Whop-synced paid_total.
+  const effectivePaid = (c) => {
+    const ovr = c.paid_override;
+    if (ovr !== null && ovr !== undefined && ovr !== '') {
+      return parseFloat(ovr) || 0;
+    }
+    return parseFloat(c.paid_total) || 0;
+  };
+  const effectiveOutstanding = (c) => {
+    const total = parseFloat(c.total_deal_value) || 0;
+    return Math.max(total - effectivePaid(c), 0);
+  };
+
   // ── Compute KPIs across all clients ──
   let out30 = 0, out60 = 0, outstanding = 0, collected = 0, totalContract = 0;
   let overdueAmt = 0, overdueCount = 0;
@@ -4301,9 +4337,9 @@ function renderRetainers() {
   let setupCompleteCount = 0;
 
   rows.forEach(c => {
-    collected     += parseFloat(c.paid_total) || 0;
+    collected     += effectivePaid(c);
     totalContract += parseFloat(c.total_deal_value) || 0;
-    outstanding   += parseFloat(c.outstanding) || 0;
+    outstanding   += effectiveOutstanding(c);
 
     if (!c.setup_complete) {
       setupPendingCount++;
@@ -4311,13 +4347,19 @@ function renderRetainers() {
     }
     setupCompleteCount++;
 
-    // Per-installment overdue / forecast
+    // If a manual paid override is set, bypass per-installment forecast
+    // (we don't know how the override breaks down by due date).
+    const hasOverride = c.paid_override !== null && c.paid_override !== undefined && c.paid_override !== '';
+    if (hasOverride) return;
+
+    // Per-installment overdue / forecast (Whop-driven clients only)
     [
       { amt: c.retainer_2_amount, paid: c.paid_retainer_2, due: c.retainer_2_due_date, status: c.retainer_2_status },
       { amt: c.final_retainer_amount, paid: c.paid_final, due: c.final_retainer_due_date, status: c.final_retainer_status },
     ].forEach(inst => {
       if (inst.status === 'paid') return;
       const owe = Math.max((parseFloat(inst.amt) || 0) - (parseFloat(inst.paid) || 0), 0);
+      if (owe <= 0) return;
       const days = retDaysFromNow(inst.due);
       if (days < 0)  { overdueAmt += owe; overdueCount++; }
       if (days <= 30) out30 += owe;
@@ -4406,27 +4448,40 @@ function renderRetainers() {
 
   tbody.innerHTML = activeClients.map(c => {
     const total       = parseFloat(c.total_deal_value) || 0;
-    const paid        = parseFloat(c.paid_total) || 0;
-    const owe         = parseFloat(c.outstanding) || 0;
-    const isPaidUp    = !c.next_due_date;
+    const hasOverride = c.paid_override !== null && c.paid_override !== undefined && c.paid_override !== '';
+    const paid        = effectivePaid(c);
+    const owe         = effectiveOutstanding(c);
+    const isPaidUp    = owe <= 0.01;
     const flagBadge   = c.has_flagged_payment ? ' <span class="pill" style="background:var(--redd);color:var(--red);font-size:9px">⚠ flag</span>' : '';
+    const manualBadge = hasOverride ? ' <span class="pill" style="background:var(--bg3);color:var(--t3);font-size:9px" title="Paid amount manually overridden">manual</span>' : '';
     const nextDueCell = isPaidUp
       ? '<span style="color:var(--accent);font-weight:700">Paid in full</span>'
-      : `<span style="font-family:var(--font-mono);font-weight:700;color:var(--t1)">${retFmtDate(c.next_due_date)}</span>
-         <span style="font-family:var(--font-mono);color:var(--t3);font-size:10px;margin-left:5px">$${(parseFloat(c.next_due_amount)||0).toLocaleString()}</span>`;
+      : hasOverride
+        ? `<span style="font-family:var(--font-mono);color:var(--amber);font-weight:700">$${owe.toLocaleString()}</span>
+           <span style="font-family:var(--font-mono);color:var(--t3);font-size:10px;margin-left:5px">manual</span>`
+        : `<span style="font-family:var(--font-mono);font-weight:700;color:var(--t1)">${retFmtDate(c.next_due_date)}</span>
+           <span style="font-family:var(--font-mono);color:var(--t3);font-size:10px;margin-left:5px">$${(parseFloat(c.next_due_amount)||0).toLocaleString()}</span>`;
+
+    // Installment pills: dim/hide for clients with paid_override (info no longer reliable)
+    const instCell = (status, days, amount) => {
+      const amt = parseFloat(amount) || 0;
+      if (amt === 0) return '<span style="color:var(--t3);font-size:10px">—</span>';
+      if (hasOverride) return '<span style="color:var(--t3);font-size:10px">—</span>';
+      return retInstallmentPill(status, days);
+    };
 
     return `<tr>
       <td>
-        <div style="font-weight:700;color:var(--t1)">${c.name || '—'}${flagBadge}</div>
+        <div style="font-weight:700;color:var(--t1)">${c.name || '—'}${flagBadge}${manualBadge}</div>
         <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">${c.email || ''}</div>
       </td>
       <td style="font-family:var(--font-mono);color:var(--t2)">${retFmtDate(c.deposit_date)}</td>
       <td style="font-family:var(--font-mono);font-weight:700">$${total.toLocaleString()}</td>
-      <td style="font-family:var(--font-mono);color:var(--accent);font-weight:700">$${paid.toLocaleString()}</td>
-      <td style="font-family:var(--font-mono);color:${owe>0?'var(--amber)':'var(--t3)'};font-weight:700">$${owe.toLocaleString()}</td>
-      <td>${retInstallmentPill(c.deposit_status, retDaysFromNow(c.deposit_date))}</td>
-      <td>${retInstallmentPill(c.retainer_2_status, retDaysFromNow(c.retainer_2_due_date))}</td>
-      <td>${retInstallmentPill(c.final_retainer_status, retDaysFromNow(c.final_retainer_due_date))}</td>
+      <td style="font-family:var(--font-mono);color:var(--accent);font-weight:700">$${paid.toLocaleString(undefined, {maximumFractionDigits:2})}</td>
+      <td style="font-family:var(--font-mono);color:${owe>0?'var(--amber)':'var(--t3)'};font-weight:700">$${owe.toLocaleString(undefined, {maximumFractionDigits:2})}</td>
+      <td>${hasOverride ? '<span style="color:var(--t3);font-size:10px">—</span>' : retInstallmentPill(c.deposit_status, retDaysFromNow(c.deposit_date))}</td>
+      <td>${instCell(c.retainer_2_status, retDaysFromNow(c.retainer_2_due_date), c.retainer_2_amount)}</td>
+      <td>${instCell(c.final_retainer_status, retDaysFromNow(c.final_retainer_due_date), c.final_retainer_amount)}</td>
       <td>${nextDueCell}</td>
       <td>
         <button onclick="editRetainerSetup('${c.id}')" title="Edit setup amounts"
@@ -4472,23 +4527,60 @@ async function editRetainerSetup(clientId) {
   if (!c) return;
   const total = prompt('Total Deal Value (USD)', c.total_deal_value || '');
   if (total === null) return;
-  const r2 = prompt('Retainer 2 amount (USD)', c.retainer_2_amount || '');
+  const r2 = prompt('Retainer 2 amount (USD) — enter 0 if no Retainer 2', c.retainer_2_amount || '');
   if (r2 === null) return;
-  const finalAmt = prompt('Final Retainer amount (USD)', c.final_retainer_amount || '');
+  const finalAmt = prompt('Final Retainer amount (USD) — enter 0 if no Final', c.final_retainer_amount || '');
   if (finalAmt === null) return;
+
+  const currentOverride = (c.paid_override !== null && c.paid_override !== undefined && c.paid_override !== '')
+    ? String(c.paid_override)
+    : '';
+  const overrideInput = prompt(
+    'Total Paid OVERRIDE (USD)\n\n' +
+    'Use this when Whop didn\'t capture all payments (e.g. wire transfer, manual invoice).\n' +
+    'Leave BLANK to use Whop-synced amount.\n' +
+    'Type "clear" to remove an existing override.',
+    currentOverride
+  );
+  if (overrideInput === null) return;
 
   const t  = parseFloat(total);
   const r  = parseFloat(r2);
   const fa = parseFloat(finalAmt);
   if (isNaN(t) || t <= 0 || isNaN(r) || r < 0 || isNaN(fa) || fa < 0) {
-    showToast('Invalid values', 'error');
+    showToast('Invalid values for deal/retainer amounts', 'error');
     return;
   }
+
+  // Resolve override input:
+  //   "" or blank   → don't touch column (preserve current behavior)
+  //   "clear"       → set NULL (revert to Whop-driven)
+  //   number        → set value
+  //   anything else → error
+  let paidOverride; // undefined = don't touch
+  const trimmed = (overrideInput || '').trim();
+  if (trimmed === '') {
+    // Special case: if there WAS a current override and the user blanked it out,
+    // also treat as clear. If there wasn't, leave untouched.
+    if (currentOverride !== '') paidOverride = null;
+    else paidOverride = undefined;
+  } else if (trimmed.toLowerCase() === 'clear') {
+    paidOverride = null;
+  } else {
+    const o = parseFloat(trimmed);
+    if (isNaN(o) || o < 0) {
+      showToast('Invalid paid override value', 'error');
+      return;
+    }
+    paidOverride = o;
+  }
+
   try {
     await updateRetainerSetup(clientId, {
       total_deal_value: t,
       retainer_2_amount: r,
       final_retainer_amount: fa,
+      paid_override: paidOverride,
     });
     RETAINER_STATUS = await getRetainerStatus();
     renderRetainers();
