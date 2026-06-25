@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">4tx
 <title>SWH — Ads Command Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1458,89 +1458,138 @@ select.input-field option { background: var(--bg2); }
      TAB: RETAINERS
 ══════════════════════════════════════ -->
 <div id="tab-retainers" class="tab-view">
-  <div class="section-label">Retainer tracking · auto-synced from Whop · isolated from Executive metrics</div>
+  <div class="section-label">Retainers · manual entry · 1 to many installments per client</div>
 
-  <!-- Forecast KPI row -->
+  <!-- ── KPI row: 4 headline cards ── -->
   <div class="kpi-tier kpi-tier-4">
-    <div class="kpi-card accent">
-      <div class="kpi-label">Outstanding — Next 30 Days</div>
-      <div class="kpi-value mono" id="ret-30">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">unpaid installments due ≤30d</span></div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Total Contracted</div>
+      <div class="kpi-value mono" id="ret-contracted">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">sum of all installments · active clients</span></div>
     </div>
     <div class="kpi-card accent">
-      <div class="kpi-label">Outstanding — Next 60 Days</div>
-      <div class="kpi-value mono" id="ret-60">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">cumulative unpaid due ≤60d</span></div>
-    </div>
-    <div class="kpi-card amber">
       <div class="kpi-label">Total Outstanding</div>
       <div class="kpi-value mono" id="ret-outstanding">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">all unpaid · across active clients</span></div>
+      <div class="kpi-meta"><span class="kpi-sublabel">unpaid installments</span></div>
     </div>
     <div class="kpi-card red">
       <div class="kpi-label">Overdue</div>
       <div class="kpi-value mono" id="ret-overdue">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel" id="ret-overdue-sub">0 past due date</span></div>
-    </div>
-  </div>
-
-  <div class="kpi-tier kpi-tier-4" style="margin-top:10px">
-    <div class="kpi-card accent">
-      <div class="kpi-label">Collected To Date</div>
-      <div class="kpi-value mono" id="ret-collected">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">all retainer payments paid</span></div>
-    </div>
-    <div class="kpi-card blue">
-      <div class="kpi-label">Total Contract Value</div>
-      <div class="kpi-value mono" id="ret-scheduled">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">sum of total_deal_value across clients</span></div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="ret-overdue-sub">0 past due</span></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Active Clients</div>
       <div class="kpi-value" id="ret-active">0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel" id="ret-clients-sub">0 setup complete</span></div>
-    </div>
-    <div class="kpi-card amber">
-      <div class="kpi-label">Setup Pending</div>
-      <div class="kpi-value" id="ret-pending">0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">need totals entered</span></div>
+      <div class="kpi-meta"><span class="kpi-sublabel" id="ret-paused-sub">0 paused</span></div>
     </div>
   </div>
 
-  <!-- ── Active retainers table ── -->
-  <div class="section-label" style="margin:16px 0 10px">Active retainers · one row per client</div>
+  <!-- ── Expected Revenue by Month table ── -->
+  <div class="section-label" style="margin:16px 0 10px">Expected revenue by month</div>
   <div class="chart-card">
     <div class="deals-table-wrap">
-      <table class="deals-table" id="ret-table">
+      <table class="deals-table" id="ret-month-table">
         <thead>
           <tr>
-            <th>Client</th>
-            <th>Deposit Date</th>
-            <th>Total Deal</th>
+            <th>Month</th>
+            <th>Installments</th>
+            <th>Expected</th>
             <th>Paid</th>
             <th>Outstanding</th>
-            <th>Deposit</th>
-            <th>Retainer 2</th>
-            <th>Final</th>
-            <th>Next Due</th>
-            <th></th>
+            <th>Overdue</th>
           </tr>
         </thead>
-        <tbody id="ret-tbody"></tbody>
+        <tbody id="ret-month-tbody"></tbody>
       </table>
     </div>
   </div>
 
-  <!-- ── Setup pending clients (banner if any) — moved BELOW active retainers ── -->
-  <div id="ret-pending-section" style="margin-top:16px;display:none">
-    <div class="section-label" style="margin:0 0 10px;color:var(--amber)">⚠ Setup pending — enter retainer totals to unlock automation</div>
-    <div class="chart-card">
-      <div id="ret-pending-list"></div>
-    </div>
+  <!-- ── Active clients section header with "Add Client" button ── -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 10px">
+    <div class="section-label" style="margin:0">Clients · expand each to manage installments</div>
+    <button onclick="openNewClientModal()" class="period-btn active" style="font-size:11px">+ Add Client</button>
   </div>
 
-  <div style="margin-top:10px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">
-    <b style="color:var(--accent)">How this works:</b> Whop sync auto-creates a client row on first payment (deposit). Enter <b>Total Deal Value</b>, <b>Retainer 2</b>, and <b>Final Retainer</b> amounts once to enable automation. Subsequent Whop payments auto-allocate to the next unpaid installment in sequence. Due dates calculated as deposit + 30d / + 60d. <b style="color:var(--accent)">This tab does not feed any Executive Dashboard metric.</b>
+  <!-- Client cards container -->
+  <div id="ret-clients-list"></div>
+
+  <div style="margin-top:14px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">
+    <b style="color:var(--accent)">How this works:</b> Manual entry only. Whop no longer auto-creates retainer rows since payments now route to Mercury bank. Add a client → add as many installments as needed (any cadence, any amounts) → check the paid box when each one comes in. Currency is USD throughout (GBP clients have the original amount in installment notes).
+  </div>
+</div>
+
+<!-- ─── Retainer modals ─── -->
+
+<!-- New client / Edit client -->
+<div id="ret-client-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:24px;width:440px;max-width:92vw">
+    <div style="font-size:14px;font-weight:600;margin-bottom:14px" id="ret-client-modal-title">Add Client</div>
+    <input id="ret-client-id" type="hidden">
+    <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Client name</label>
+      <input id="ret-client-name" type="text" placeholder="e.g. John Smith"
+        style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Email (optional)</label>
+      <input id="ret-client-email" type="email" placeholder="client@example.com"
+        style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Total deal value (USD)</label>
+      <input id="ret-client-total" type="number" step="0.01" placeholder="10000"
+        style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Notes / status (optional)</label>
+      <textarea id="ret-client-notes" rows="3" placeholder="e.g. paused, GBP client, awaiting wire confirmation"
+        style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
+    </div>
+    <div style="margin-bottom:14px;display:flex;align-items:center;gap:8px">
+      <input id="ret-client-paused" type="checkbox" style="width:14px;height:14px;cursor:pointer">
+      <label for="ret-client-paused" style="font-size:12px;color:var(--t2);cursor:pointer">Pause this client (excluded from totals)</label>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="period-btn" onclick="closeRetClientModal()" style="font-size:12px">Cancel</button>
+      <button class="period-btn active" onclick="saveRetClient()" style="font-size:12px">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit installment -->
+<div id="ret-inst-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:24px;width:420px;max-width:92vw">
+    <div style="font-size:14px;font-weight:600;margin-bottom:14px" id="ret-inst-modal-title">Add Installment</div>
+    <input id="ret-inst-id" type="hidden">
+    <input id="ret-inst-client-id" type="hidden">
+    <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Amount (USD)</label>
+      <input id="ret-inst-amount" type="number" step="0.01" placeholder="3000"
+        style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Due date (leave blank if unknown)</label>
+      <input id="ret-inst-due" type="date"
+        style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
+    </div>
+    <div style="margin-bottom:10px;display:flex;align-items:center;gap:8px">
+      <input id="ret-inst-paid" type="checkbox" style="width:14px;height:14px;cursor:pointer" onchange="document.getElementById('ret-inst-paid-date-wrap').style.display = this.checked ? 'block' : 'none'">
+      <label for="ret-inst-paid" style="font-size:12px;color:var(--t2);cursor:pointer">Mark as paid</label>
+    </div>
+    <div id="ret-inst-paid-date-wrap" style="margin-bottom:10px;display:none">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Paid date</label>
+      <input id="ret-inst-paid-date" type="date"
+        style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Notes (optional)</label>
+      <input id="ret-inst-notes" type="text" placeholder="e.g. £2,000 @ $1.27"
+        style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="period-btn" onclick="closeRetInstModal()" style="font-size:12px">Cancel</button>
+      <button class="period-btn active" onclick="saveRetInstallment()" style="font-size:12px">Save</button>
+    </div>
   </div>
 </div>
 
@@ -2446,34 +2495,24 @@ async function getHtSales() {
     return [];
   }
 }
-// ── Retainer system: read from retainer_status VIEW (one row per client, computed) ──
-async function getRetainerStatus() {
+// ── Retainer system: NEW flexible installments model (manual entry only) ──
+// retainer_summary VIEW has one row per client with aggregated totals.
+// retainer_installments table has one row per installment.
+async function getRetainerSummary() {
   try {
-    return await sbFetch('retainer_status?order=deposit_date.desc');
+    return await sbFetch('retainer_summary?order=name.asc');
   } catch (e) {
-    console.log('retainer_status view not ready:', e.message);
+    console.log('retainer_summary view not ready:', e.message);
     return [];
   }
 }
-// ── Update setup fields on a retainer_clients row (totals + mark setup_complete) ──
-// `paid_override` is optional. Pass:
-//   undefined → don't touch the column
-//   null      → clear the override (revert to Whop-driven calc)
-//   number    → set manual override
-async function updateRetainerSetup(clientId, totals) {
-  const body = {
-    total_deal_value: totals.total_deal_value,
-    retainer_2_amount: totals.retainer_2_amount,
-    final_retainer_amount: totals.final_retainer_amount,
-    setup_complete: true,
-  };
-  if (totals.paid_override !== undefined) {
-    body.paid_override = totals.paid_override;
+async function getRetainerInstallments() {
+  try {
+    return await sbFetch('retainer_installments?order=client_id.asc,installment_number.asc');
+  } catch (e) {
+    console.log('retainer_installments table not ready:', e.message);
+    return [];
   }
-  return await sbFetch('retainer_clients?id=eq.' + clientId, {
-    method: 'PATCH',
-    body: JSON.stringify(body),
-  });
 }
 // Sum Meta spend (USD) for a given dashboard period: 'all' | 'today' | '7d' | 'mtd' | 'lm'
 function getMetaSpendForPeriod(period) {
@@ -2605,7 +2644,8 @@ let DB_DEALS = [];
 let DB_LOG   = [];
 let META_SPEND = [];   // rows from meta_spend table: {spend_date, spend, ...} — automated Meta ad spend
 let HT_ADS = [];       // rows from ht_sales table: {customer_name, amount_gross, ...} — automated Whop high-ticket ads sales
-let RETAINER_STATUS = []; // rows from retainer_status view — one row per client with computed installments
+let RETAINER_SUMMARY = [];      // rows from retainer_summary view — one row per client with aggregated totals
+let RETAINER_INSTALLMENTS = []; // rows from retainer_installments table — one row per installment
 let loading  = false;
 
 // ═══════════════════════════════════════════
@@ -3346,7 +3386,13 @@ async function loadAndRender() {
     // Fetch automated Whop high-ticket ads sales (separate await — a failure here must not break the dashboard)
     try { HT_ADS = await getHtSales(); } catch(e) { console.warn('ht_sales load failed:', e.message); HT_ADS = []; }
     // Fetch retainer payments (separate await — a failure here must not break the dashboard)
-    try { RETAINER_STATUS = await getRetainerStatus(); } catch(e) { console.warn('retainer_status load failed:', e.message); RETAINER_STATUS = []; }
+    try {
+      RETAINER_SUMMARY      = await getRetainerSummary();
+      RETAINER_INSTALLMENTS = await getRetainerInstallments();
+    } catch(e) {
+      console.warn('retainer load failed:', e.message);
+      RETAINER_SUMMARY = []; RETAINER_INSTALLMENTS = [];
+    }
     // Fetch P&L expenses + commissions (separate try — a failure here must not break the dashboard)
     try { await loadPnlData(); } catch(e) { console.warn('pnl data load failed:', e.message); }
     // Background: pull any new leads from Sheets into followup_leads
@@ -4280,348 +4326,487 @@ async function syncWhop() {
 
 
 // ═══════════════════════════════════════════
-// RETAINERS TAB — auto-synced via Whop, isolated from Executive
+// RETAINERS TAB — manual entry, 1-N installments per client
 // ═══════════════════════════════════════════
-// Data model: TWO Supabase tables (see retainers_migration.sql):
-//   - retainer_clients   : one row per client (name, email, deposit_date, totals, setup_complete)
-//   - retainer_payments  : one row per Whop payment (allocated_to: deposit|retainer_2|final_retainer|unallocated)
-// We read from the retainer_status VIEW which joins these and computes:
-//   paid_deposit, paid_retainer_2, paid_final, outstanding,
-//   deposit_status, retainer_2_status, final_retainer_status,
-//   next_due_date, next_due_amount, retainer_2_due_date, final_retainer_due_date
+// Data model (see retainer_rebuild.sql):
+//   - retainer_clients      : one row per client (name, email, totals, is_paused, client_notes)
+//   - retainer_installments : one row per installment (amount, due_date, paid, paid_date, notes)
+//   - retainer_summary VIEW : aggregates installments per client for fast dashboard reads
+//
+// This tab is fully manual. Whop sync no longer touches retainers since payments
+// route to Mercury bank account. Add clients, add installments, tick paid box.
 // This tab does NOT feed any Executive metric — those still read from `deals`.
 
+// ── Helpers ──
+function retFmt$(n) {
+  const v = parseFloat(n) || 0;
+  return '$' + v.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
+}
 function retFmtDate(d) {
   if (!d) return '—';
   const dt = (d instanceof Date) ? d : new Date(d);
-  if (isNaN(dt)) return '—';
+  if (isNaN(dt.getTime())) return '—';
   return dt.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
 }
+function retFmtMonth(d) {
+  if (!d) return '—';
+  const dt = (d instanceof Date) ? d : new Date(d);
+  if (isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+}
 function retDaysFromNow(dateStr) {
-  if (!dateStr) return Infinity;
-  const d = new Date(dateStr);
-  if (isNaN(d)) return Infinity;
-  d.setHours(0,0,0,0);
-  const now = new Date(); now.setHours(0,0,0,0);
-  return Math.round((d - now) / 86400000);
+  if (!dateStr) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(dateStr); d.setHours(0,0,0,0);
+  return Math.round((d - today) / 86400000);
 }
-function retInstallmentPill(status, days) {
-  if (status === 'paid')          return '<span class="pill" style="background:var(--accentd);color:var(--accent)">Paid</span>';
-  if (status === 'overdue')       return `<span class="pill" style="background:var(--redd);color:var(--red)">Overdue ${Math.abs(days)}d</span>`;
-  if (status === 'setup_pending') return '<span class="pill" style="background:var(--bg3);color:var(--t3)">Setup —</span>';
-  if (days <= 30)                 return `<span class="pill" style="background:var(--amberd);color:var(--amber)">Due ${days}d</span>`;
-  return `<span class="pill" style="background:var(--bg3);color:var(--t2)">Due ${days}d</span>`;
+function retEscapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
 }
 
+// ── Main render ──
 function renderRetainers() {
-  const rows = (typeof RETAINER_STATUS !== 'undefined' && RETAINER_STATUS) ? RETAINER_STATUS : [];
+  const clients = RETAINER_SUMMARY || [];
+  const installments = RETAINER_INSTALLMENTS || [];
 
-  // Helper: effective paid amount for a client. Use manual override when set,
-  // otherwise fall back to Whop-synced paid_total.
-  const effectivePaid = (c) => {
-    const ovr = c.paid_override;
-    if (ovr !== null && ovr !== undefined && ovr !== '') {
-      return parseFloat(ovr) || 0;
+  // Active = not paused. Used for headline KPIs.
+  const activeClients = clients.filter(c => !c.is_paused);
+  const pausedCount   = clients.length - activeClients.length;
+
+  // ── Headline KPIs ──
+  const totalContracted  = activeClients.reduce((s,c) => s + (parseFloat(c.total_contracted)  || 0), 0);
+  const totalOutstanding = activeClients.reduce((s,c) => s + (parseFloat(c.total_outstanding) || 0), 0);
+  const totalOverdue     = activeClients.reduce((s,c) => s + (parseFloat(c.overdue_amount)    || 0), 0);
+  const overdueInstCount = activeClients.reduce((s,c) => s + (parseInt(c.overdue_count)       || 0), 0);
+
+  set('ret-contracted',     retFmt$(totalContracted));
+  set('ret-outstanding',    retFmt$(totalOutstanding));
+  set('ret-overdue',        retFmt$(totalOverdue));
+  set('ret-overdue-sub',    `${overdueInstCount} installment${overdueInstCount===1?'':'s'} past due`);
+  set('ret-active',         activeClients.length);
+  set('ret-paused-sub',     `${pausedCount} paused`);
+
+  // ── Expected revenue by month ──
+  // Group all installments (across active clients only) by YYYY-MM key.
+  const activeClientIds = new Set(activeClients.map(c => c.id));
+  const monthBuckets = {}; // 'YYYY-MM' → {expected, paid, outstanding, overdue, count}
+
+  installments.forEach(inst => {
+    if (!activeClientIds.has(inst.client_id)) return;
+    if (!inst.due_date) return; // undated installments excluded from month rollup
+    const key = inst.due_date.slice(0, 7); // YYYY-MM
+    if (!monthBuckets[key]) {
+      monthBuckets[key] = { expected:0, paid:0, outstanding:0, overdue:0, count:0 };
     }
-    return parseFloat(c.paid_total) || 0;
-  };
-  const effectiveOutstanding = (c) => {
-    const total = parseFloat(c.total_deal_value) || 0;
-    return Math.max(total - effectivePaid(c), 0);
-  };
-
-  // ── Compute KPIs across all clients ──
-  let out30 = 0, out60 = 0, outstanding = 0, collected = 0, totalContract = 0;
-  let overdueAmt = 0, overdueCount = 0;
-  let setupPendingCount = 0;
-  let setupCompleteCount = 0;
-
-  rows.forEach(c => {
-    collected     += effectivePaid(c);
-    totalContract += parseFloat(c.total_deal_value) || 0;
-    outstanding   += effectiveOutstanding(c);
-
-    if (!c.setup_complete) {
-      setupPendingCount++;
-      return;
+    const amt = parseFloat(inst.amount_usd) || 0;
+    monthBuckets[key].expected += amt;
+    monthBuckets[key].count++;
+    if (inst.paid) {
+      monthBuckets[key].paid += amt;
+    } else {
+      monthBuckets[key].outstanding += amt;
+      if (retDaysFromNow(inst.due_date) < 0) {
+        monthBuckets[key].overdue += amt;
+      }
     }
-    setupCompleteCount++;
-
-    // If a manual paid override is set, bypass per-installment forecast
-    // (we don't know how the override breaks down by due date).
-    const hasOverride = c.paid_override !== null && c.paid_override !== undefined && c.paid_override !== '';
-    if (hasOverride) return;
-
-    // Per-installment overdue / forecast (Whop-driven clients only)
-    [
-      { amt: c.retainer_2_amount, paid: c.paid_retainer_2, due: c.retainer_2_due_date, status: c.retainer_2_status },
-      { amt: c.final_retainer_amount, paid: c.paid_final, due: c.final_retainer_due_date, status: c.final_retainer_status },
-    ].forEach(inst => {
-      if (inst.status === 'paid') return;
-      const owe = Math.max((parseFloat(inst.amt) || 0) - (parseFloat(inst.paid) || 0), 0);
-      if (owe <= 0) return;
-      const days = retDaysFromNow(inst.due);
-      if (days < 0)  { overdueAmt += owe; overdueCount++; }
-      if (days <= 30) out30 += owe;
-      if (days <= 60) out60 += owe;
-    });
   });
 
-  set('ret-30',          fmtFull(out30));
-  set('ret-60',          fmtFull(out60));
-  set('ret-outstanding', fmtFull(outstanding));
-  set('ret-overdue',     fmtFull(overdueAmt));
-  set('ret-overdue-sub', overdueCount + ' past due date');
-  set('ret-collected',   fmtFull(collected));
-  set('ret-scheduled',   fmtFull(totalContract));
-  set('ret-active',      setupCompleteCount);
-  set('ret-clients-sub', setupCompleteCount + ' setup complete');
-  set('ret-pending',     setupPendingCount);
+  // Total of undated installments (shown as a separate row at the bottom)
+  let undatedExpected = 0, undatedPaid = 0, undatedCount = 0;
+  installments.forEach(inst => {
+    if (!activeClientIds.has(inst.client_id)) return;
+    if (inst.due_date) return;
+    const amt = parseFloat(inst.amount_usd) || 0;
+    undatedExpected += amt;
+    if (inst.paid) undatedPaid += amt;
+    undatedCount++;
+  });
 
-  // ── Setup-pending banner ──
-  const pendingSection = document.getElementById('ret-pending-section');
-  const pendingList    = document.getElementById('ret-pending-list');
-  const pendingClients = rows.filter(c => !c.setup_complete);
-  if (pendingSection && pendingList) {
-    if (pendingClients.length === 0) {
-      pendingSection.style.display = 'none';
+  const monthKeys = Object.keys(monthBuckets).sort();
+  const monthTbody = document.getElementById('ret-month-tbody');
+  if (monthTbody) {
+    if (!monthKeys.length && undatedCount === 0) {
+      monthTbody.innerHTML = '<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--t3)">No installments scheduled.</td></tr>';
     } else {
-      pendingSection.style.display = 'block';
-      pendingList.innerHTML = pendingClients.map(c => {
-        const safeName = (c.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        return `
-          <div style="display:grid;grid-template-columns:1.4fr 0.9fr 1fr 1fr 1fr auto auto;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--border2)">
-            <div>
-              <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:3px">CLIENT</div>
-              <div style="font-weight:700;color:var(--t1);font-size:13px">${c.name || '—'}</div>
-              <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px">
-                Deposit ${retFmtDate(c.deposit_date)} · $${(parseFloat(c.paid_deposit)||0).toLocaleString()} paid
-              </div>
-            </div>
-            <div>
-              <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:3px">TOTAL DEAL</div>
-              <input type="number" id="setup-total-${c.id}" placeholder="12000"
-                style="width:100%;background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;color:var(--t1);font-family:var(--font-mono);font-size:12px">
-            </div>
-            <div>
-              <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:3px">RETAINER 2</div>
-              <input type="number" id="setup-r2-${c.id}" placeholder="4000"
-                style="width:100%;background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;color:var(--t1);font-family:var(--font-mono);font-size:12px">
-            </div>
-            <div>
-              <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-bottom:3px">FINAL RETAINER</div>
-              <input type="number" id="setup-final-${c.id}" placeholder="4000"
-                style="width:100%;background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;color:var(--t1);font-family:var(--font-mono);font-size:12px">
-            </div>
-            <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);line-height:1.5">
-              Due dates auto-calc:<br>
-              R2: ${retFmtDate(c.retainer_2_due_date)}<br>
-              Final: ${retFmtDate(c.final_retainer_due_date)}
-            </div>
-            <button onclick="saveRetainerSetup('${c.id}')"
-              style="background:var(--accent);color:#04140d;border:none;border-radius:6px;padding:8px 14px;font-size:11px;font-weight:800;font-family:var(--font-mono);cursor:pointer;height:fit-content">Save</button>
-            <button onclick="deleteRetainerClient('${c.id}', '${safeName}')" title="Delete client and all payments"
-              style="background:var(--bg3);color:var(--red);border:1px solid var(--border2);border-radius:6px;padding:8px 12px;font-size:11px;font-weight:800;font-family:var(--font-mono);cursor:pointer;height:fit-content">×</button>
-          </div>
-        `;
+      let html = monthKeys.map(k => {
+        const b = monthBuckets[k];
+        const monthLabel = retFmtMonth(k + '-01');
+        return `<tr>
+          <td style="font-weight:700;color:var(--t1)">${monthLabel}</td>
+          <td style="color:var(--t2);font-family:var(--font-mono)">${b.count}</td>
+          <td style="font-family:var(--font-mono);font-weight:700">${retFmt$(b.expected)}</td>
+          <td style="font-family:var(--font-mono);color:var(--accent)">${retFmt$(b.paid)}</td>
+          <td style="font-family:var(--font-mono);color:${b.outstanding>0?'var(--amber)':'var(--t3)'}">${retFmt$(b.outstanding)}</td>
+          <td style="font-family:var(--font-mono);color:${b.overdue>0?'var(--red)':'var(--t3)'}">${b.overdue>0?retFmt$(b.overdue):'—'}</td>
+        </tr>`;
       }).join('');
+      if (undatedCount > 0) {
+        html += `<tr>
+          <td style="color:var(--t3);font-style:italic">Undated</td>
+          <td style="color:var(--t3);font-family:var(--font-mono)">${undatedCount}</td>
+          <td style="font-family:var(--font-mono);color:var(--t3)">${retFmt$(undatedExpected)}</td>
+          <td style="font-family:var(--font-mono);color:var(--t3)">${retFmt$(undatedPaid)}</td>
+          <td style="font-family:var(--font-mono);color:var(--t3)">${retFmt$(undatedExpected - undatedPaid)}</td>
+          <td style="color:var(--t3)">—</td>
+        </tr>`;
+      }
+      monthTbody.innerHTML = html;
     }
   }
 
-  // ── Active retainers table ──
-  const tbody = document.getElementById('ret-tbody');
-  if (!tbody) return;
-
-  const activeClients = rows.filter(c => c.setup_complete);
-
-  if (activeClients.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:24px">No active retainers yet — clients will appear here once Whop sync creates them and setup is complete.</td></tr>';
+  // ── Client cards list ──
+  const list = document.getElementById('ret-clients-list');
+  if (!list) return;
+  if (!clients.length) {
+    list.innerHTML = '<div class="chart-card" style="padding:20px;text-align:center;color:var(--t3)">No clients yet. Click <b>+ Add Client</b> to get started.</div>';
     return;
   }
 
-  // Sort by next due date (soonest first, completed clients at bottom)
-  activeClients.sort((a, b) => {
-    const da = a.next_due_date ? retDaysFromNow(a.next_due_date) : Infinity;
-    const db = b.next_due_date ? retDaysFromNow(b.next_due_date) : Infinity;
+  // Sort: active (by next due ASC, nulls last), then paused at the bottom.
+  const sortedClients = clients.slice().sort((a,b) => {
+    if (a.is_paused !== b.is_paused) return a.is_paused ? 1 : -1;
+    const da = a.next_due_date ? new Date(a.next_due_date).getTime() : Infinity;
+    const db = b.next_due_date ? new Date(b.next_due_date).getTime() : Infinity;
     return da - db;
   });
 
-  tbody.innerHTML = activeClients.map(c => {
-    const total       = parseFloat(c.total_deal_value) || 0;
-    const hasOverride = c.paid_override !== null && c.paid_override !== undefined && c.paid_override !== '';
-    const paid        = effectivePaid(c);
-    const owe         = effectiveOutstanding(c);
-    const isPaidUp    = owe <= 0.01;
-    const flagBadge   = c.has_flagged_payment ? ' <span class="pill" style="background:var(--redd);color:var(--red);font-size:9px">⚠ flag</span>' : '';
-    const manualBadge = hasOverride ? ' <span class="pill" style="background:var(--bg3);color:var(--t3);font-size:9px" title="Paid amount manually overridden">manual</span>' : '';
-    const nextDueCell = isPaidUp
-      ? '<span style="color:var(--accent);font-weight:700">Paid in full</span>'
-      : hasOverride
-        ? `<span style="font-family:var(--font-mono);color:var(--amber);font-weight:700">$${owe.toLocaleString()}</span>
-           <span style="font-family:var(--font-mono);color:var(--t3);font-size:10px;margin-left:5px">manual</span>`
-        : `<span style="font-family:var(--font-mono);font-weight:700;color:var(--t1)">${retFmtDate(c.next_due_date)}</span>
-           <span style="font-family:var(--font-mono);color:var(--t3);font-size:10px;margin-left:5px">$${(parseFloat(c.next_due_amount)||0).toLocaleString()}</span>`;
-
-    // Installment pills: dim/hide for clients with paid_override (info no longer reliable)
-    const instCell = (status, days, amount) => {
-      const amt = parseFloat(amount) || 0;
-      if (amt === 0) return '<span style="color:var(--t3);font-size:10px">—</span>';
-      if (hasOverride) return '<span style="color:var(--t3);font-size:10px">—</span>';
-      return retInstallmentPill(status, days);
-    };
-
-    return `<tr>
-      <td>
-        <div style="font-weight:700;color:var(--t1)">${c.name || '—'}${flagBadge}${manualBadge}</div>
-        <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">${c.email || ''}</div>
-      </td>
-      <td style="font-family:var(--font-mono);color:var(--t2)">${retFmtDate(c.deposit_date)}</td>
-      <td style="font-family:var(--font-mono);font-weight:700">$${total.toLocaleString()}</td>
-      <td style="font-family:var(--font-mono);color:var(--accent);font-weight:700">$${paid.toLocaleString(undefined, {maximumFractionDigits:2})}</td>
-      <td style="font-family:var(--font-mono);color:${owe>0?'var(--amber)':'var(--t3)'};font-weight:700">$${owe.toLocaleString(undefined, {maximumFractionDigits:2})}</td>
-      <td>${hasOverride ? '<span style="color:var(--t3);font-size:10px">—</span>' : retInstallmentPill(c.deposit_status, retDaysFromNow(c.deposit_date))}</td>
-      <td>${instCell(c.retainer_2_status, retDaysFromNow(c.retainer_2_due_date), c.retainer_2_amount)}</td>
-      <td>${instCell(c.final_retainer_status, retDaysFromNow(c.final_retainer_due_date), c.final_retainer_amount)}</td>
-      <td>${nextDueCell}</td>
-      <td>
-        <button onclick="editRetainerSetup('${c.id}')" title="Edit setup amounts"
-          style="background:var(--bg3);color:var(--t2);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;font-family:var(--font-mono);cursor:pointer">Edit</button>
-        <button onclick="deleteRetainerClient('${c.id}', '${(c.name || '').replace(/'/g, "\\'")}')" title="Delete client and all payments"
-          style="background:var(--bg3);color:var(--red);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;font-size:10px;font-weight:700;font-family:var(--font-mono);cursor:pointer;margin-left:4px">×</button>
-      </td>
-    </tr>`;
-  }).join('');
+  list.innerHTML = sortedClients.map(c => renderRetClientCard(c, installments)).join('');
 }
 
-// Save retainer setup totals — one-time form submission per client.
-async function saveRetainerSetup(clientId) {
-  const totalEl = document.getElementById('setup-total-' + clientId);
-  const r2El    = document.getElementById('setup-r2-' + clientId);
-  const finalEl = document.getElementById('setup-final-' + clientId);
-  const total   = totalEl && totalEl.value !== '' ? parseFloat(totalEl.value) : NaN;
-  const r2      = r2El    && r2El.value    !== '' ? parseFloat(r2El.value)    : NaN;
-  const finalAmt= finalEl && finalEl.value !== '' ? parseFloat(finalEl.value) : NaN;
+function renderRetClientCard(c, allInstallments) {
+  const clientInsts = allInstallments
+    .filter(i => i.client_id === c.id)
+    .sort((a,b) => (a.installment_number||0) - (b.installment_number||0));
 
-  if (isNaN(total) || total <= 0)      { showToast('Enter Total Deal Value', 'error'); return; }
-  if (isNaN(r2) || r2 < 0)             { showToast('Enter Retainer 2 amount', 'error'); return; }
-  if (isNaN(finalAmt) || finalAmt < 0) { showToast('Enter Final Retainer amount', 'error'); return; }
+  const total       = parseFloat(c.total_contracted)  || 0;
+  const paid        = parseFloat(c.total_paid)        || 0;
+  const outstanding = parseFloat(c.total_outstanding) || 0;
+  const overdueAmt  = parseFloat(c.overdue_amount)    || 0;
+  const overdueCnt  = parseInt(c.overdue_count)       || 0;
+  const isPaused    = !!c.is_paused;
+  const pct         = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
 
-  try {
-    await updateRetainerSetup(clientId, {
-      total_deal_value: total,
-      retainer_2_amount: r2,
-      final_retainer_amount: finalAmt,
-    });
-    RETAINER_STATUS = await getRetainerStatus();
-    renderRetainers();
-    showToast('✓ Setup saved — future Whop payments will auto-allocate');
-  } catch(e) {
-    showToast('Error saving setup: ' + e.message, 'error');
-  }
-}
-
-// Edit setup amounts after they've been entered (e.g. correction).
-async function editRetainerSetup(clientId) {
-  const rows = (typeof RETAINER_STATUS !== 'undefined' && RETAINER_STATUS) ? RETAINER_STATUS : [];
-  const c = rows.find(r => r.id === clientId);
-  if (!c) return;
-  const total = prompt('Total Deal Value (USD)', c.total_deal_value || '');
-  if (total === null) return;
-  const r2 = prompt('Retainer 2 amount (USD) — enter 0 if no Retainer 2', c.retainer_2_amount || '');
-  if (r2 === null) return;
-  const finalAmt = prompt('Final Retainer amount (USD) — enter 0 if no Final', c.final_retainer_amount || '');
-  if (finalAmt === null) return;
-
-  const currentOverride = (c.paid_override !== null && c.paid_override !== undefined && c.paid_override !== '')
-    ? String(c.paid_override)
+  const pausedBadge  = isPaused ? '<span class="pill" style="background:var(--bg3);color:var(--t3);margin-left:8px;font-size:10px">paused</span>' : '';
+  const overdueBadge = overdueCnt > 0
+    ? `<span class="pill" style="background:var(--redd);color:var(--red);margin-left:8px;font-size:10px">${overdueCnt} overdue · ${retFmt$(overdueAmt)}</span>`
     : '';
-  const overrideInput = prompt(
-    'Total Paid OVERRIDE (USD)\n\n' +
-    'Use this when Whop didn\'t capture all payments (e.g. wire transfer, manual invoice).\n' +
-    'Leave BLANK to use Whop-synced amount.\n' +
-    'Type "clear" to remove an existing override.',
-    currentOverride
-  );
-  if (overrideInput === null) return;
+  const notesBadge   = c.client_notes
+    ? `<span class="pill" style="background:var(--bg3);color:var(--amber);margin-left:8px;font-size:10px" title="${retEscapeHtml(c.client_notes)}">⚑ note</span>`
+    : '';
 
-  const t  = parseFloat(total);
-  const r  = parseFloat(r2);
-  const fa = parseFloat(finalAmt);
-  if (isNaN(t) || t <= 0 || isNaN(r) || r < 0 || isNaN(fa) || fa < 0) {
-    showToast('Invalid values for deal/retainer amounts', 'error');
-    return;
+  const nextDueText = c.next_due_date
+    ? `Next: ${retFmtDate(c.next_due_date)}`
+    : (outstanding > 0 ? 'Next: <i>no date set</i>' : 'Fully paid');
+
+  // Installment rows
+  const instRows = clientInsts.length
+    ? clientInsts.map(inst => {
+        const amt  = parseFloat(inst.amount_usd) || 0;
+        const days = inst.due_date ? retDaysFromNow(inst.due_date) : null;
+        let statusPill;
+        if (inst.paid) {
+          statusPill = `<span class="pill" style="background:rgba(46,213,115,0.15);color:var(--accent);font-size:10px">✓ paid</span>`;
+        } else if (!inst.due_date) {
+          statusPill = `<span class="pill" style="background:var(--bg3);color:var(--t3);font-size:10px">no date</span>`;
+        } else if (days < 0) {
+          statusPill = `<span class="pill" style="background:var(--redd);color:var(--red);font-size:10px">overdue ${-days}d</span>`;
+        } else if (days <= 7) {
+          statusPill = `<span class="pill" style="background:rgba(255,183,66,0.15);color:var(--amber);font-size:10px">due in ${days}d</span>`;
+        } else {
+          statusPill = `<span class="pill" style="background:var(--bg3);color:var(--t2);font-size:10px">in ${days}d</span>`;
+        }
+        const notesHtml = inst.notes
+          ? `<div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px">${retEscapeHtml(inst.notes)}</div>`
+          : '';
+        return `
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:6px 8px;width:30px">
+            <input type="checkbox" ${inst.paid?'checked':''} onchange="toggleInstallmentPaid('${inst.id}', this.checked)"
+              style="width:14px;height:14px;cursor:pointer" title="Mark paid / unpaid">
+          </td>
+          <td style="padding:6px 8px;color:var(--t2);font-family:var(--font-mono);font-size:11px">#${inst.installment_number}</td>
+          <td style="padding:6px 8px;font-family:var(--font-mono);font-weight:700;color:var(--t1)">${retFmt$(amt)}</td>
+          <td style="padding:6px 8px;color:var(--t2);font-family:var(--font-mono);font-size:11px">${retFmtDate(inst.due_date)}</td>
+          <td style="padding:6px 8px">${statusPill}${notesHtml}</td>
+          <td style="padding:6px 8px;text-align:right">
+            <button onclick="openEditInstallmentModal('${inst.id}')" title="Edit installment"
+              style="background:var(--bg3);color:var(--t2);border:1px solid var(--border2);border-radius:5px;padding:3px 7px;font-size:10px;font-family:var(--font-mono);cursor:pointer">Edit</button>
+            <button onclick="deleteRetInstallment('${inst.id}', '${(inst.installment_number||'')}')" title="Delete installment"
+              style="background:var(--bg3);color:var(--red);border:1px solid var(--border2);border-radius:5px;padding:3px 7px;font-size:10px;font-family:var(--font-mono);cursor:pointer;margin-left:3px">×</button>
+          </td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="6" style="padding:10px;color:var(--t3);text-align:center;font-size:11px">No installments yet. Click "+ Add Installment".</td></tr>';
+
+  return `
+  <div class="chart-card" style="margin-bottom:10px;${isPaused?'opacity:0.6':''}">
+    <!-- Header row -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:4px 4px 12px;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:260px">
+        <div style="font-weight:700;color:var(--t1);font-size:14px">
+          ${retEscapeHtml(c.name)}${pausedBadge}${overdueBadge}${notesBadge}
+        </div>
+        <div style="font-size:11px;color:var(--t3);font-family:var(--font-mono);margin-top:3px">
+          ${c.email ? retEscapeHtml(c.email) + ' · ' : ''}${c.installments_paid}/${c.installment_count} installments paid · ${nextDueText}
+        </div>
+        ${c.client_notes ? `<div style="font-size:11px;color:var(--amber);margin-top:5px;font-style:italic">${retEscapeHtml(c.client_notes)}</div>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div style="text-align:right">
+          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">CONTRACTED</div>
+          <div style="font-weight:700;color:var(--t1);font-family:var(--font-mono);font-size:13px">${retFmt$(total)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">PAID</div>
+          <div style="font-weight:700;color:var(--accent);font-family:var(--font-mono);font-size:13px">${retFmt$(paid)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">OUTSTANDING</div>
+          <div style="font-weight:700;color:${outstanding>0?'var(--amber)':'var(--t3)'};font-family:var(--font-mono);font-size:13px">${retFmt$(outstanding)}</div>
+        </div>
+        <div style="display:flex;gap:4px">
+          <button onclick="openEditClientModal('${c.id}')" title="Edit client"
+            style="background:var(--bg3);color:var(--t2);border:1px solid var(--border2);border-radius:6px;padding:5px 9px;font-size:11px;font-family:var(--font-mono);cursor:pointer">Edit</button>
+          <button onclick="openAddInstallmentModal('${c.id}')" title="Add installment"
+            style="background:var(--accent);color:#04140d;border:none;border-radius:6px;padding:5px 9px;font-size:11px;font-weight:700;font-family:var(--font-mono);cursor:pointer">+ Installment</button>
+          <button onclick="deleteRetClient('${c.id}', '${retEscapeHtml(c.name).replace(/'/g,"\\'")}')" title="Delete client"
+            style="background:var(--bg3);color:var(--red);border:1px solid var(--border2);border-radius:6px;padding:5px 9px;font-size:11px;font-family:var(--font-mono);cursor:pointer">×</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div style="height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-bottom:10px">
+      <div style="height:100%;width:${pct}%;background:var(--accent);transition:width 0.3s"></div>
+    </div>
+
+    <!-- Installments table -->
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <tbody>${instRows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ── CLIENT CRUD ──
+function openNewClientModal() {
+  document.getElementById('ret-client-modal-title').textContent = 'Add Client';
+  document.getElementById('ret-client-id').value     = '';
+  document.getElementById('ret-client-name').value   = '';
+  document.getElementById('ret-client-email').value  = '';
+  document.getElementById('ret-client-total').value  = '';
+  document.getElementById('ret-client-notes').value  = '';
+  document.getElementById('ret-client-paused').checked = false;
+  document.getElementById('ret-client-modal').style.display = 'flex';
+}
+
+function openEditClientModal(clientId) {
+  const c = (RETAINER_SUMMARY || []).find(x => x.id === clientId);
+  if (!c) { showToast('Client not found', 'error'); return; }
+  document.getElementById('ret-client-modal-title').textContent = 'Edit Client';
+  document.getElementById('ret-client-id').value      = c.id;
+  document.getElementById('ret-client-name').value    = c.name || '';
+  document.getElementById('ret-client-email').value   = c.email || '';
+  // total_contracted is derived (sum of installments) — show it but editing it on the client row
+  // doesn't change installment amounts. We keep the field for record/notes only.
+  document.getElementById('ret-client-total').value   = c.total_contracted || '';
+  document.getElementById('ret-client-notes').value   = c.client_notes || '';
+  document.getElementById('ret-client-paused').checked = !!c.is_paused;
+  document.getElementById('ret-client-modal').style.display = 'flex';
+}
+
+function closeRetClientModal() {
+  document.getElementById('ret-client-modal').style.display = 'none';
+}
+
+async function saveRetClient() {
+  const id        = document.getElementById('ret-client-id').value;
+  const name      = document.getElementById('ret-client-name').value.trim();
+  const email     = document.getElementById('ret-client-email').value.trim();
+  const totalRaw  = document.getElementById('ret-client-total').value;
+  const notes     = document.getElementById('ret-client-notes').value.trim();
+  const isPaused  = document.getElementById('ret-client-paused').checked;
+
+  if (!name) { showToast('Client name required', 'error'); return; }
+  const total = totalRaw === '' ? null : parseFloat(totalRaw);
+  if (total !== null && (isNaN(total) || total < 0)) {
+    showToast('Invalid total value', 'error'); return;
   }
 
-  // Resolve override input:
-  //   "" or blank   → don't touch column (preserve current behavior)
-  //   "clear"       → set NULL (revert to Whop-driven)
-  //   number        → set value
-  //   anything else → error
-  let paidOverride; // undefined = don't touch
-  const trimmed = (overrideInput || '').trim();
-  if (trimmed === '') {
-    // Special case: if there WAS a current override and the user blanked it out,
-    // also treat as clear. If there wasn't, leave untouched.
-    if (currentOverride !== '') paidOverride = null;
-    else paidOverride = undefined;
-  } else if (trimmed.toLowerCase() === 'clear') {
-    paidOverride = null;
-  } else {
-    const o = parseFloat(trimmed);
-    if (isNaN(o) || o < 0) {
-      showToast('Invalid paid override value', 'error');
-      return;
-    }
-    paidOverride = o;
-  }
+  const row = {
+    name,
+    email: email || null,
+    total_deal_value: total,
+    client_notes: notes || null,
+    is_paused: isPaused,
+    setup_complete: true,
+    updated_at: new Date().toISOString(),
+  };
 
   try {
-    await updateRetainerSetup(clientId, {
-      total_deal_value: t,
-      retainer_2_amount: r,
-      final_retainer_amount: fa,
-      paid_override: paidOverride,
-    });
-    RETAINER_STATUS = await getRetainerStatus();
-    renderRetainers();
-    showToast('✓ Setup updated');
+    if (id) {
+      await sbFetch('retainer_clients?id=eq.' + id, {
+        method: 'PATCH', prefer: 'return=minimal', body: JSON.stringify(row),
+      });
+    } else {
+      await sbFetch('retainer_clients', {
+        method: 'POST', prefer: 'return=minimal', body: JSON.stringify(row),
+      });
+    }
+    closeRetClientModal();
+    await reloadRetainerData();
+    showToast(id ? '✓ Client updated' : '✓ Client added — now add installments');
   } catch(e) {
-    showToast('Error: ' + e.message, 'error');
+    showToast('Save failed: ' + e.message, 'error');
   }
 }
 
-// Delete a retainer client AND all their payments. Two-step delete because
-// retainer_payments FK may not have ON DELETE CASCADE on every deployment.
-// Confirmation prompt requires explicit "DELETE" typed in to prevent accidents.
-async function deleteRetainerClient(clientId, clientName) {
-  const name = clientName || 'this client';
+async function deleteRetClient(clientId, clientName) {
+  const name  = clientName || 'this client';
   const typed = prompt(
-    `Permanently delete "${name}" and all their retainer payments?\n\n` +
-    `This cannot be undone. Whop will NOT re-create the client unless they make a new payment.\n\n` +
-    `Type DELETE to confirm:`
+    `Permanently delete "${name}" and ALL their installments?\n\n` +
+    `This cannot be undone.\n\nType DELETE to confirm:`
   );
   if (typed === null) return;
   if (typed.trim().toUpperCase() !== 'DELETE') {
-    showToast('Delete cancelled — confirmation did not match', 'error');
+    showToast('Delete cancelled', 'error');
     return;
   }
   try {
-    // 1. Delete all retainer_payments rows for this client first.
-    //    Ignore "not found" — some clients have no payments yet.
-    try {
-      await sbFetch('retainer_payments?client_id=eq.' + clientId, { method: 'DELETE' });
-    } catch (e) {
-      console.warn('retainer_payments delete (non-fatal):', e.message);
-    }
-    // 2. Delete the client row.
+    // ON DELETE CASCADE handles installments. We also clear retainer_payments
+    // for safety in case any historical Whop rows remain.
+    try { await sbFetch('retainer_payments?client_id=eq.' + clientId, { method: 'DELETE' }); } catch(e) {}
     await sbFetch('retainer_clients?id=eq.' + clientId, { method: 'DELETE' });
-
-    // 3. Refresh local state and re-render.
-    RETAINER_STATUS = await getRetainerStatus();
-    renderRetainers();
+    await reloadRetainerData();
     showToast(`✓ Deleted ${name}`);
   } catch(e) {
-    showToast('Error deleting: ' + e.message, 'error');
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// ── INSTALLMENT CRUD ──
+function openAddInstallmentModal(clientId) {
+  const insts = (RETAINER_INSTALLMENTS || []).filter(i => i.client_id === clientId);
+  const nextNum = insts.length ? Math.max(...insts.map(i => i.installment_number || 0)) + 1 : 1;
+
+  document.getElementById('ret-inst-modal-title').textContent = 'Add Installment #' + nextNum;
+  document.getElementById('ret-inst-id').value         = '';
+  document.getElementById('ret-inst-client-id').value  = clientId;
+  document.getElementById('ret-inst-amount').value     = '';
+  document.getElementById('ret-inst-due').value        = '';
+  document.getElementById('ret-inst-paid').checked     = false;
+  document.getElementById('ret-inst-paid-date').value  = '';
+  document.getElementById('ret-inst-paid-date-wrap').style.display = 'none';
+  document.getElementById('ret-inst-notes').value      = '';
+  document.getElementById('ret-inst-modal').style.display = 'flex';
+}
+
+function openEditInstallmentModal(instId) {
+  const inst = (RETAINER_INSTALLMENTS || []).find(i => i.id === instId);
+  if (!inst) { showToast('Installment not found', 'error'); return; }
+  document.getElementById('ret-inst-modal-title').textContent = 'Edit Installment #' + inst.installment_number;
+  document.getElementById('ret-inst-id').value         = inst.id;
+  document.getElementById('ret-inst-client-id').value  = inst.client_id;
+  document.getElementById('ret-inst-amount').value     = inst.amount_usd || '';
+  document.getElementById('ret-inst-due').value        = inst.due_date || '';
+  document.getElementById('ret-inst-paid').checked     = !!inst.paid;
+  document.getElementById('ret-inst-paid-date').value  = inst.paid_date || '';
+  document.getElementById('ret-inst-paid-date-wrap').style.display = inst.paid ? 'block' : 'none';
+  document.getElementById('ret-inst-notes').value      = inst.notes || '';
+  document.getElementById('ret-inst-modal').style.display = 'flex';
+}
+
+function closeRetInstModal() {
+  document.getElementById('ret-inst-modal').style.display = 'none';
+}
+
+async function saveRetInstallment() {
+  const id       = document.getElementById('ret-inst-id').value;
+  const clientId = document.getElementById('ret-inst-client-id').value;
+  const amount   = parseFloat(document.getElementById('ret-inst-amount').value);
+  const dueDate  = document.getElementById('ret-inst-due').value || null;
+  const paid     = document.getElementById('ret-inst-paid').checked;
+  const paidDate = document.getElementById('ret-inst-paid-date').value || null;
+  const notes    = document.getElementById('ret-inst-notes').value.trim();
+
+  if (isNaN(amount) || amount < 0) { showToast('Valid amount required', 'error'); return; }
+
+  // For NEW installments only, calculate the next installment_number client-side.
+  const row = {
+    client_id: clientId,
+    amount_usd: amount,
+    due_date: dueDate,
+    paid,
+    paid_date: paid ? (paidDate || new Date().toISOString().slice(0,10)) : null,
+    notes: notes || null,
+    updated_at: new Date().toISOString(),
+  };
+  if (!id) {
+    const existing = (RETAINER_INSTALLMENTS || []).filter(i => i.client_id === clientId);
+    row.installment_number = existing.length
+      ? Math.max(...existing.map(i => i.installment_number || 0)) + 1
+      : 1;
+  }
+
+  try {
+    if (id) {
+      await sbFetch('retainer_installments?id=eq.' + id, {
+        method: 'PATCH', prefer: 'return=minimal', body: JSON.stringify(row),
+      });
+    } else {
+      await sbFetch('retainer_installments', {
+        method: 'POST', prefer: 'return=minimal', body: JSON.stringify(row),
+      });
+    }
+    closeRetInstModal();
+    await reloadRetainerData();
+    showToast(id ? '✓ Installment updated' : '✓ Installment added');
+  } catch(e) {
+    showToast('Save failed: ' + e.message, 'error');
+  }
+}
+
+async function deleteRetInstallment(instId, instNum) {
+  if (!confirm(`Delete installment #${instNum}?\n\nThis cannot be undone.`)) return;
+  try {
+    await sbFetch('retainer_installments?id=eq.' + instId, { method: 'DELETE' });
+    await reloadRetainerData();
+    showToast('✓ Installment deleted');
+  } catch(e) {
+    showToast('Delete failed: ' + e.message, 'error');
+  }
+}
+
+// Quick toggle from the checkbox column in the client card.
+async function toggleInstallmentPaid(instId, isPaid) {
+  try {
+    await sbFetch('retainer_installments?id=eq.' + instId, {
+      method: 'PATCH', prefer: 'return=minimal',
+      body: JSON.stringify({
+        paid: isPaid,
+        paid_date: isPaid ? new Date().toISOString().slice(0,10) : null,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    await reloadRetainerData();
+    // No toast — checkbox feedback is the toast.
+  } catch(e) {
+    showToast('Update failed: ' + e.message, 'error');
+    // Revert the checkbox visually on failure
+    await reloadRetainerData();
+  }
+}
+
+async function reloadRetainerData() {
+  try {
+    RETAINER_SUMMARY      = await getRetainerSummary();
+    RETAINER_INSTALLMENTS = await getRetainerInstallments();
+    renderRetainers();
+  } catch(e) {
+    console.warn('retainer reload failed:', e.message);
   }
 }
 
@@ -6455,7 +6640,8 @@ async function autoSync() {
       (async () => { try { BOOKED_CALLS = await getBookedCalls(); } catch(e) { /* ignore */ } })(),
       (async () => { try { META_SPEND = await getMetaSpend(); } catch(e) { /* ignore */ } })(),
       (async () => { try { HT_ADS = await getHtSales(); } catch(e) { /* ignore */ } })(),
-      (async () => { try { RETAINER_STATUS = await getRetainerStatus(); } catch(e) { /* ignore */ } })(),
+      (async () => { try { RETAINER_SUMMARY      = await getRetainerSummary(); }      catch(e) { /* ignore */ } })(),
+      (async () => { try { RETAINER_INSTALLMENTS = await getRetainerInstallments(); } catch(e) { /* ignore */ } })(),
       (async () => { try { await loadPnlData(); } catch(e) { /* ignore */ } })(),
     ]);
     renderAll();
