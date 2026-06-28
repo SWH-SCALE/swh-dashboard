@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">4tx
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SWH — Ads Command Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1460,17 +1460,22 @@ select.input-field option { background: var(--bg2); }
 <div id="tab-retainers" class="tab-view">
   <div class="section-label">Retainers · manual entry · 1 to many installments per client</div>
 
-  <!-- ── KPI row: 4 headline cards ── -->
-  <div class="kpi-tier kpi-tier-4">
+  <!-- ── KPI row: 5 headline cards ── -->
+  <div class="kpi-tier kpi-tier-5">
     <div class="kpi-card blue">
       <div class="kpi-label">Total Contracted</div>
       <div class="kpi-value mono" id="ret-contracted">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">sum of all installments · active clients</span></div>
+      <div class="kpi-meta"><span class="kpi-sublabel">sum of contracts · active clients</span></div>
     </div>
     <div class="kpi-card accent">
+      <div class="kpi-label">Total Paid</div>
+      <div class="kpi-value mono" id="ret-paid">$0</div>
+      <div class="kpi-meta"><span class="kpi-sublabel">prior + installments paid</span></div>
+    </div>
+    <div class="kpi-card amber">
       <div class="kpi-label">Total Outstanding</div>
       <div class="kpi-value mono" id="ret-outstanding">$0</div>
-      <div class="kpi-meta"><span class="kpi-sublabel">unpaid installments</span></div>
+      <div class="kpi-meta"><span class="kpi-sublabel">money still owed</span></div>
     </div>
     <div class="kpi-card red">
       <div class="kpi-label">Overdue</div>
@@ -1504,17 +1509,27 @@ select.input-field option { background: var(--bg2); }
     </div>
   </div>
 
-  <!-- ── Active clients section header with "Add Client" button ── -->
+  <!-- ── Active retainers section ── -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 10px">
-    <div class="section-label" style="margin:0">Clients · expand each to manage installments</div>
-    <button onclick="openNewClientModal()" class="period-btn active" style="font-size:11px">+ Add Client</button>
+    <div class="section-label" style="margin:0">Active retainers · current clients with installment schedules</div>
+    <button onclick="openNewClientModal('active')" class="period-btn active" style="font-size:11px">+ Add Active Client</button>
   </div>
-
-  <!-- Client cards container -->
   <div id="ret-clients-list"></div>
 
+  <!-- ── Closed retainers section ── -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:24px 0 10px">
+    <div class="section-label" style="margin:0">
+      Closed retainers · <span id="ret-closed-count">0</span> clients · <span id="ret-closed-total" style="color:var(--accent)">$0</span> paid to business
+    </div>
+    <button onclick="openNewClientModal('closed')" class="period-btn" style="font-size:11px">+ Add Closed Client</button>
+  </div>
+  <div id="ret-closed-list"></div>
+
   <div style="margin-top:14px;padding:10px;background:var(--bg4);border-radius:7px;font-size:11px;color:var(--t2)">
-    <b style="color:var(--accent)">How this works:</b> Manual entry only. Whop no longer auto-creates retainer rows since payments now route to Mercury bank. Add a client → add as many installments as needed (any cadence, any amounts) → check the paid box when each one comes in. Currency is USD throughout (GBP clients have the original amount in installment notes).
+    <b style="color:var(--accent)">How this works:</b>
+    <b>Active retainers</b> = current clients with installment schedules (the 14 seeded). KPIs at top reflect these only.
+    <b>Closed retainers</b> = historical clients (left programme, finished, etc.) — name + how much they paid. No installments tracked. Use this to log lifetime revenue from past clients.
+    All numbers are isolated to this tab — nothing else in the dashboard is affected.
   </div>
 </div>
 
@@ -1536,14 +1551,29 @@ select.input-field option { background: var(--bg2); }
         style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
     </div>
     <div style="margin-bottom:10px">
-      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Total deal value (USD)</label>
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Total deal value (USD) · default 10000</label>
       <input id="ret-client-total" type="number" step="0.01" placeholder="10000"
         style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Already paid (USD) · before/outside installments</label>
+      <input id="ret-client-prior-paid" type="number" step="0.01" placeholder="0"
+        style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
+      <div style="font-size:10px;color:var(--t3);margin-top:3px;line-height:1.4">
+        e.g. if deal is $10k and remaining installments are $4k → enter $6,000. For clients without an installment schedule, enter however much they've paid total.
+      </div>
     </div>
     <div style="margin-bottom:10px">
       <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Notes / status (optional)</label>
       <textarea id="ret-client-notes" rows="3" placeholder="e.g. paused, GBP client, awaiting wire confirmation"
         style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Section</label>
+      <select id="ret-client-section" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
+        <option value="active">Active retainer · current client with installments</option>
+        <option value="closed">Closed retainer · historical · just track amount paid</option>
+      </select>
     </div>
     <div style="margin-bottom:14px;display:flex;align-items:center;gap:8px">
       <input id="ret-client-paused" type="checkbox" style="width:14px;height:14px;cursor:pointer">
@@ -2646,6 +2676,7 @@ let META_SPEND = [];   // rows from meta_spend table: {spend_date, spend, ...} �
 let HT_ADS = [];       // rows from ht_sales table: {customer_name, amount_gross, ...} — automated Whop high-ticket ads sales
 let RETAINER_SUMMARY = [];      // rows from retainer_summary view — one row per client with aggregated totals
 let RETAINER_INSTALLMENTS = []; // rows from retainer_installments table — one row per installment
+let EXPANDED_CLIENTS = new Set(); // client IDs whose card is currently expanded (in-memory, not persisted)
 let loading  = false;
 
 // ═══════════════════════════════════════════
@@ -4371,17 +4402,23 @@ function renderRetainers() {
   const clients = RETAINER_SUMMARY || [];
   const installments = RETAINER_INSTALLMENTS || [];
 
-  // Active = not paused. Used for headline KPIs.
-  const activeClients = clients.filter(c => !c.is_paused);
-  const pausedCount   = clients.length - activeClients.length;
+  // Split clients into three buckets:
+  //   activeClients  = !paused && !closed → drive KPIs + Expected Revenue + Active section
+  //   closedClients  = !paused &&  closed → drive Closed section only (lifetime revenue logging)
+  //   paused (counted in sublabel)
+  const activeClients = clients.filter(c => !c.is_paused && !c.is_closed);
+  const closedClients = clients.filter(c => !c.is_paused &&  c.is_closed);
+  const pausedCount   = clients.filter(c =>  c.is_paused).length;
 
-  // ── Headline KPIs ──
+  // ── Headline KPIs (active retainers ONLY — closed don't affect these) ──
   const totalContracted  = activeClients.reduce((s,c) => s + (parseFloat(c.total_contracted)  || 0), 0);
+  const totalPaid        = activeClients.reduce((s,c) => s + (parseFloat(c.total_paid)        || 0), 0);
   const totalOutstanding = activeClients.reduce((s,c) => s + (parseFloat(c.total_outstanding) || 0), 0);
   const totalOverdue     = activeClients.reduce((s,c) => s + (parseFloat(c.overdue_amount)    || 0), 0);
   const overdueInstCount = activeClients.reduce((s,c) => s + (parseInt(c.overdue_count)       || 0), 0);
 
   set('ret-contracted',     retFmt$(totalContracted));
+  set('ret-paid',           retFmt$(totalPaid));
   set('ret-outstanding',    retFmt$(totalOutstanding));
   set('ret-overdue',        retFmt$(totalOverdue));
   set('ret-overdue-sub',    `${overdueInstCount} installment${overdueInstCount===1?'':'s'} past due`);
@@ -4456,150 +4493,261 @@ function renderRetainers() {
     }
   }
 
-  // ── Client cards list ──
+  // ── Active client cards (cards with installments) ──
   const list = document.getElementById('ret-clients-list');
-  if (!list) return;
-  if (!clients.length) {
-    list.innerHTML = '<div class="chart-card" style="padding:20px;text-align:center;color:var(--t3)">No clients yet. Click <b>+ Add Client</b> to get started.</div>';
-    return;
+  if (list) {
+    if (!activeClients.length) {
+      list.innerHTML = '<div class="chart-card" style="padding:20px;text-align:center;color:var(--t3)">No active retainers yet. Click <b>+ Add Active Client</b> above.</div>';
+    } else {
+      // Sort: by next due date ASC (nulls last)
+      const sortedActive = activeClients.slice().sort((a,b) => {
+        const da = a.next_due_date ? new Date(a.next_due_date).getTime() : Infinity;
+        const db = b.next_due_date ? new Date(b.next_due_date).getTime() : Infinity;
+        return da - db;
+      });
+      list.innerHTML = sortedActive.map(c => renderRetClientCard(c, installments)).join('');
+    }
   }
 
-  // Sort: active (by next due ASC, nulls last), then paused at the bottom.
-  const sortedClients = clients.slice().sort((a,b) => {
-    if (a.is_paused !== b.is_paused) return a.is_paused ? 1 : -1;
-    const da = a.next_due_date ? new Date(a.next_due_date).getTime() : Infinity;
-    const db = b.next_due_date ? new Date(b.next_due_date).getTime() : Infinity;
-    return da - db;
-  });
+  // ── Closed retainers table (simple, dense, name + paid amount) ──
+  const closedList = document.getElementById('ret-closed-list');
+  if (closedList) {
+    if (!closedClients.length) {
+      closedList.innerHTML = '<div class="chart-card" style="padding:16px;text-align:center;color:var(--t3);font-size:12px">No closed retainers yet. Click <b>+ Add Closed Client</b> above to start logging historical clients (name + amount they paid).</div>';
+    } else {
+      const sortedClosed = closedClients.slice().sort((a,b) => (a.name||'').localeCompare(b.name||''));
+      closedList.innerHTML = renderClosedRetainersTable(sortedClosed);
+    }
+  }
 
-  list.innerHTML = sortedClients.map(c => renderRetClientCard(c, installments)).join('');
+  // Closed section header totals
+  const closedTotalPaid = closedClients.reduce((s,c) => s + (parseFloat(c.total_paid) || 0), 0);
+  set('ret-closed-total', retFmt$(closedTotalPaid));
+  set('ret-closed-count', closedClients.length);
+}
+
+// Compact table renderer for closed retainers — no installment tracking,
+// just name + total paid + optional notes. Built for density (could be 30+ rows).
+function renderClosedRetainersTable(clients) {
+  return `
+    <div class="chart-card" style="padding:0;overflow:hidden">
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:var(--bg3);color:var(--t3);text-align:left;font-size:10px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.5px">
+              <th style="padding:8px 14px">Client</th>
+              <th style="padding:8px 14px;text-align:right">Paid to business</th>
+              <th style="padding:8px 14px">Notes</th>
+              <th style="padding:8px 14px;width:90px;text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${clients.map(c => {
+              const paid = parseFloat(c.total_paid) || 0;
+              const escName = retEscapeHtml(c.name);
+              const escNameForDelete = escName.replace(/'/g, "\\'");
+              const notesHtml = c.client_notes
+                ? `<span style="color:var(--t2);font-style:italic">${retEscapeHtml(c.client_notes)}</span>`
+                : `<span style="color:var(--t3)">—</span>`;
+              return `
+                <tr style="border-top:1px solid var(--border)">
+                  <td style="padding:8px 14px;color:var(--t1);font-weight:600">${escName}</td>
+                  <td style="padding:8px 14px;text-align:right;font-family:var(--font-mono);color:var(--accent);font-weight:700">${retFmt$(paid)}</td>
+                  <td style="padding:8px 14px;font-size:11px">${notesHtml}</td>
+                  <td style="padding:8px 14px;text-align:right">
+                    <button onclick="openEditClientModal('${c.id}')" title="Edit client"
+                      style="background:var(--bg3);color:var(--t2);border:1px solid var(--border2);border-radius:5px;padding:3px 8px;font-size:10px;font-family:var(--font-mono);cursor:pointer">Edit</button>
+                    <button onclick="deleteRetClient('${c.id}', '${escNameForDelete}')" title="Delete client"
+                      style="background:var(--bg3);color:var(--red);border:1px solid var(--border2);border-radius:5px;padding:3px 8px;font-size:10px;font-family:var(--font-mono);cursor:pointer;margin-left:3px">×</button>
+                  </td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// Toggle a client card's expanded state. Called from the card header onclick.
+// Bails out if the click was on a button (so Edit/+Inst/× don't accidentally collapse).
+function toggleClientCard(clientId, event) {
+  if (event && event.target.closest('button, input, label')) return;
+  if (EXPANDED_CLIENTS.has(clientId)) {
+    EXPANDED_CLIENTS.delete(clientId);
+  } else {
+    EXPANDED_CLIENTS.add(clientId);
+  }
+  renderRetainers();
+}
+
+// Renders a single installment row (used inside expanded cards).
+function renderInstallmentRow(inst) {
+  const amt  = parseFloat(inst.amount_usd) || 0;
+  const days = inst.due_date ? retDaysFromNow(inst.due_date) : null;
+  let statusPill;
+  if (inst.paid) {
+    statusPill = `<span class="pill" style="background:rgba(46,213,115,0.15);color:var(--accent);font-size:10px">✓ paid</span>`;
+  } else if (!inst.due_date) {
+    statusPill = `<span class="pill" style="background:var(--bg3);color:var(--t3);font-size:10px">no date</span>`;
+  } else if (days < 0) {
+    statusPill = `<span class="pill" style="background:var(--redd);color:var(--red);font-size:10px">overdue ${-days}d</span>`;
+  } else if (days <= 7) {
+    statusPill = `<span class="pill" style="background:rgba(255,183,66,0.15);color:var(--amber);font-size:10px">due in ${days}d</span>`;
+  } else {
+    statusPill = `<span class="pill" style="background:var(--bg3);color:var(--t2);font-size:10px">in ${days}d</span>`;
+  }
+  const notesHtml = inst.notes
+    ? `<div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px">${retEscapeHtml(inst.notes)}</div>`
+    : '';
+  return `
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:6px 8px;width:30px">
+        <input type="checkbox" ${inst.paid?'checked':''} onchange="toggleInstallmentPaid('${inst.id}', this.checked)"
+          style="width:14px;height:14px;cursor:pointer" title="Mark paid / unpaid">
+      </td>
+      <td style="padding:6px 8px;color:var(--t2);font-family:var(--font-mono);font-size:11px">#${inst.installment_number}</td>
+      <td style="padding:6px 8px;font-family:var(--font-mono);font-weight:700;color:var(--t1)">${retFmt$(amt)}</td>
+      <td style="padding:6px 8px;color:var(--t2);font-family:var(--font-mono);font-size:11px">${retFmtDate(inst.due_date)}</td>
+      <td style="padding:6px 8px">${statusPill}${notesHtml}</td>
+      <td style="padding:6px 8px;text-align:right">
+        <button onclick="openEditInstallmentModal('${inst.id}')" title="Edit installment"
+          style="background:var(--bg3);color:var(--t2);border:1px solid var(--border2);border-radius:5px;padding:3px 7px;font-size:10px;font-family:var(--font-mono);cursor:pointer">Edit</button>
+        <button onclick="deleteRetInstallment('${inst.id}', '${(inst.installment_number||'')}')" title="Delete installment"
+          style="background:var(--bg3);color:var(--red);border:1px solid var(--border2);border-radius:5px;padding:3px 7px;font-size:10px;font-family:var(--font-mono);cursor:pointer;margin-left:3px">×</button>
+      </td>
+    </tr>`;
 }
 
 function renderRetClientCard(c, allInstallments) {
+  const isExpanded  = EXPANDED_CLIENTS.has(c.id);
   const clientInsts = allInstallments
     .filter(i => i.client_id === c.id)
     .sort((a,b) => (a.installment_number||0) - (b.installment_number||0));
 
-  const total       = parseFloat(c.total_contracted)  || 0;
-  const paid        = parseFloat(c.total_paid)        || 0;
-  const outstanding = parseFloat(c.total_outstanding) || 0;
-  const overdueAmt  = parseFloat(c.overdue_amount)    || 0;
-  const overdueCnt  = parseInt(c.overdue_count)       || 0;
-  const isPaused    = !!c.is_paused;
-  const pct         = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
+  // Totals (from view; all pre-computed)
+  const total           = parseFloat(c.total_contracted)  || 0;
+  const paid            = parseFloat(c.total_paid)        || 0;
+  const outstanding     = parseFloat(c.total_outstanding) || 0;
+  const overdueAmt      = parseFloat(c.overdue_amount)    || 0;
+  const overdueCnt      = parseInt(c.overdue_count)       || 0;
+  const installmentCount  = parseInt(c.installment_count)   || 0;
+  const installmentsPaid  = parseInt(c.installments_paid)   || 0;
+  const isPaused        = !!c.is_paused;
+  const hasNotes        = !!(c.client_notes && c.client_notes.trim().length);
+  const expandable      = installmentCount > 0 || hasNotes;
+  const isPaidUp        = outstanding <= 0.01;
 
-  const pausedBadge  = isPaused ? '<span class="pill" style="background:var(--bg3);color:var(--t3);margin-left:8px;font-size:10px">paused</span>' : '';
+  // Badges
+  const pausedBadge  = isPaused ? '<span class="pill" style="background:var(--bg3);color:var(--t3);margin-left:6px;font-size:10px">paused</span>' : '';
   const overdueBadge = overdueCnt > 0
-    ? `<span class="pill" style="background:var(--redd);color:var(--red);margin-left:8px;font-size:10px">${overdueCnt} overdue · ${retFmt$(overdueAmt)}</span>`
+    ? `<span class="pill" style="background:var(--redd);color:var(--red);margin-left:6px;font-size:10px">${overdueCnt} overdue · ${retFmt$(overdueAmt)}</span>`
     : '';
-  const notesBadge   = c.client_notes
-    ? `<span class="pill" style="background:var(--bg3);color:var(--amber);margin-left:8px;font-size:10px" title="${retEscapeHtml(c.client_notes)}">⚑ note</span>`
+  const notesBadge   = hasNotes
+    ? `<span class="pill" style="background:var(--bg3);color:var(--amber);margin-left:6px;font-size:10px" title="${retEscapeHtml(c.client_notes)}">⚑ note</span>`
+    : '';
+  const paidUpBadge = isPaidUp && total > 0
+    ? '<span class="pill" style="background:rgba(46,213,115,0.15);color:var(--accent);margin-left:6px;font-size:10px">✓ paid in full</span>'
     : '';
 
-  const nextDueText = c.next_due_date
-    ? `Next: ${retFmtDate(c.next_due_date)}`
-    : (outstanding > 0 ? 'Next: <i>no date set</i>' : 'Fully paid');
+  // Second-line subtext
+  let subtext;
+  if (installmentCount > 0) {
+    const next = c.next_due_date
+      ? `Next: ${retFmtDate(c.next_due_date)}${c.next_due_amount ? ' · ' + retFmt$(parseFloat(c.next_due_amount)) : ''}`
+      : (outstanding > 0.01 ? 'No date set' : 'All installments paid');
+    subtext = `${installmentsPaid}/${installmentCount} installments paid · ${next}`;
+  } else if (paid > 0) {
+    subtext = `No installment schedule · ${retFmt$(paid)} paid · ${retFmt$(outstanding)} outstanding`;
+  } else {
+    subtext = 'No installments yet — click "+ Inst" to add one, or "Edit" to set already-paid amount';
+  }
 
-  // Installment rows
-  const instRows = clientInsts.length
-    ? clientInsts.map(inst => {
-        const amt  = parseFloat(inst.amount_usd) || 0;
-        const days = inst.due_date ? retDaysFromNow(inst.due_date) : null;
-        let statusPill;
-        if (inst.paid) {
-          statusPill = `<span class="pill" style="background:rgba(46,213,115,0.15);color:var(--accent);font-size:10px">✓ paid</span>`;
-        } else if (!inst.due_date) {
-          statusPill = `<span class="pill" style="background:var(--bg3);color:var(--t3);font-size:10px">no date</span>`;
-        } else if (days < 0) {
-          statusPill = `<span class="pill" style="background:var(--redd);color:var(--red);font-size:10px">overdue ${-days}d</span>`;
-        } else if (days <= 7) {
-          statusPill = `<span class="pill" style="background:rgba(255,183,66,0.15);color:var(--amber);font-size:10px">due in ${days}d</span>`;
-        } else {
-          statusPill = `<span class="pill" style="background:var(--bg3);color:var(--t2);font-size:10px">in ${days}d</span>`;
-        }
-        const notesHtml = inst.notes
-          ? `<div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px">${retEscapeHtml(inst.notes)}</div>`
-          : '';
-        return `
-        <tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:6px 8px;width:30px">
-            <input type="checkbox" ${inst.paid?'checked':''} onchange="toggleInstallmentPaid('${inst.id}', this.checked)"
-              style="width:14px;height:14px;cursor:pointer" title="Mark paid / unpaid">
-          </td>
-          <td style="padding:6px 8px;color:var(--t2);font-family:var(--font-mono);font-size:11px">#${inst.installment_number}</td>
-          <td style="padding:6px 8px;font-family:var(--font-mono);font-weight:700;color:var(--t1)">${retFmt$(amt)}</td>
-          <td style="padding:6px 8px;color:var(--t2);font-family:var(--font-mono);font-size:11px">${retFmtDate(inst.due_date)}</td>
-          <td style="padding:6px 8px">${statusPill}${notesHtml}</td>
-          <td style="padding:6px 8px;text-align:right">
-            <button onclick="openEditInstallmentModal('${inst.id}')" title="Edit installment"
-              style="background:var(--bg3);color:var(--t2);border:1px solid var(--border2);border-radius:5px;padding:3px 7px;font-size:10px;font-family:var(--font-mono);cursor:pointer">Edit</button>
-            <button onclick="deleteRetInstallment('${inst.id}', '${(inst.installment_number||'')}')" title="Delete installment"
-              style="background:var(--bg3);color:var(--red);border:1px solid var(--border2);border-radius:5px;padding:3px 7px;font-size:10px;font-family:var(--font-mono);cursor:pointer;margin-left:3px">×</button>
-          </td>
-        </tr>`;
-      }).join('')
-    : '<tr><td colspan="6" style="padding:10px;color:var(--t3);text-align:center;font-size:11px">No installments yet. Click "+ Add Installment".</td></tr>';
+  const chevron = expandable ? (isExpanded ? '▼' : '▶') : '';
+  const cursor  = expandable ? 'cursor:pointer' : 'cursor:default';
+  const hoverBg = expandable ? 'onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'transparent\'"' : '';
 
-  return `
-  <div class="chart-card" style="margin-bottom:10px;${isPaused?'opacity:0.6':''}">
-    <!-- Header row -->
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:4px 4px 12px;gap:12px;flex-wrap:wrap">
-      <div style="flex:1;min-width:260px">
+  // Header — always rendered
+  const escName = retEscapeHtml(c.name);
+  const escNameForDelete = escName.replace(/'/g, "\\'");
+
+  const header = `
+    <div onclick="toggleClientCard('${c.id}', event)" ${hoverBg}
+      style="${cursor};padding:12px 14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;transition:background 0.1s">
+      <div style="font-size:13px;color:var(--t3);width:12px;text-align:center;font-family:var(--font-mono);user-select:none">${chevron}</div>
+
+      <div style="flex:1;min-width:200px">
         <div style="font-weight:700;color:var(--t1);font-size:14px">
-          ${retEscapeHtml(c.name)}${pausedBadge}${overdueBadge}${notesBadge}
+          ${escName}${pausedBadge}${overdueBadge}${notesBadge}${paidUpBadge}
         </div>
         <div style="font-size:11px;color:var(--t3);font-family:var(--font-mono);margin-top:3px">
-          ${c.email ? retEscapeHtml(c.email) + ' · ' : ''}${c.installments_paid}/${c.installment_count} installments paid · ${nextDueText}
+          ${subtext}
         </div>
-        ${c.client_notes ? `<div style="font-size:11px;color:var(--amber);margin-top:5px;font-style:italic">${retEscapeHtml(c.client_notes)}</div>` : ''}
       </div>
-      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-        <div style="text-align:right">
-          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">CONTRACTED</div>
+
+      <div style="display:flex;gap:14px;align-items:center">
+        <div style="text-align:right;min-width:75px">
+          <div style="font-size:9px;color:var(--t3);font-family:var(--font-mono)">CONTRACTED</div>
           <div style="font-weight:700;color:var(--t1);font-family:var(--font-mono);font-size:13px">${retFmt$(total)}</div>
         </div>
-        <div style="text-align:right">
-          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">PAID</div>
+        <div style="text-align:right;min-width:75px">
+          <div style="font-size:9px;color:var(--t3);font-family:var(--font-mono)">PAID</div>
           <div style="font-weight:700;color:var(--accent);font-family:var(--font-mono);font-size:13px">${retFmt$(paid)}</div>
         </div>
-        <div style="text-align:right">
-          <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono)">OUTSTANDING</div>
-          <div style="font-weight:700;color:${outstanding>0?'var(--amber)':'var(--t3)'};font-family:var(--font-mono);font-size:13px">${retFmt$(outstanding)}</div>
-        </div>
-        <div style="display:flex;gap:4px">
-          <button onclick="openEditClientModal('${c.id}')" title="Edit client"
-            style="background:var(--bg3);color:var(--t2);border:1px solid var(--border2);border-radius:6px;padding:5px 9px;font-size:11px;font-family:var(--font-mono);cursor:pointer">Edit</button>
-          <button onclick="openAddInstallmentModal('${c.id}')" title="Add installment"
-            style="background:var(--accent);color:#04140d;border:none;border-radius:6px;padding:5px 9px;font-size:11px;font-weight:700;font-family:var(--font-mono);cursor:pointer">+ Installment</button>
-          <button onclick="deleteRetClient('${c.id}', '${retEscapeHtml(c.name).replace(/'/g,"\\'")}')" title="Delete client"
-            style="background:var(--bg3);color:var(--red);border:1px solid var(--border2);border-radius:6px;padding:5px 9px;font-size:11px;font-family:var(--font-mono);cursor:pointer">×</button>
+        <div style="text-align:right;min-width:90px">
+          <div style="font-size:9px;color:var(--t3);font-family:var(--font-mono)">OUTSTANDING</div>
+          <div style="font-weight:700;color:${outstanding>0.01?'var(--amber)':'var(--t3)'};font-family:var(--font-mono);font-size:13px">${retFmt$(outstanding)}</div>
         </div>
       </div>
-    </div>
 
-    <!-- Progress bar -->
-    <div style="height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-bottom:10px">
-      <div style="height:100%;width:${pct}%;background:var(--accent);transition:width 0.3s"></div>
-    </div>
+      <div style="display:flex;gap:4px">
+        <button onclick="event.stopPropagation();openEditClientModal('${c.id}')" title="Edit client"
+          style="background:var(--bg3);color:var(--t2);border:1px solid var(--border2);border-radius:6px;padding:5px 9px;font-size:11px;font-family:var(--font-mono);cursor:pointer">Edit</button>
+        <button onclick="event.stopPropagation();openAddInstallmentModal('${c.id}')" title="Add installment"
+          style="background:var(--accent);color:#04140d;border:none;border-radius:6px;padding:5px 9px;font-size:11px;font-weight:700;font-family:var(--font-mono);cursor:pointer">+ Inst</button>
+        <button onclick="event.stopPropagation();deleteRetClient('${c.id}', '${escNameForDelete}')" title="Delete client"
+          style="background:var(--bg3);color:var(--red);border:1px solid var(--border2);border-radius:6px;padding:5px 9px;font-size:11px;font-family:var(--font-mono);cursor:pointer">×</button>
+      </div>
+    </div>`;
 
-    <!-- Installments table -->
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <tbody>${instRows}</tbody>
-      </table>
-    </div>
-  </div>`;
+  // Expanded content — only rendered when isExpanded
+  let expandedContent = '';
+  if (isExpanded) {
+    const notesHtml = hasNotes
+      ? `<div style="padding:8px 14px;font-size:12px;color:var(--amber);font-style:italic;border-top:1px solid var(--border)">⚑ ${retEscapeHtml(c.client_notes)}</div>`
+      : '';
+    const instHtml = clientInsts.length
+      ? `<div style="overflow-x:auto;padding:0 14px 10px;border-top:${hasNotes?'none':'1px solid var(--border)'}">
+           <table style="width:100%;border-collapse:collapse;font-size:12px">
+             <tbody>${clientInsts.map(renderInstallmentRow).join('')}</tbody>
+           </table>
+         </div>`
+      : '';
+    expandedContent = notesHtml + instHtml;
+  }
+
+  return `
+    <div class="chart-card" style="margin-bottom:6px;padding:0;${isPaused?'opacity:0.6':''}">
+      ${header}
+      ${expandedContent}
+    </div>`;
 }
 
 // ── CLIENT CRUD ──
-function openNewClientModal() {
-  document.getElementById('ret-client-modal-title').textContent = 'Add Client';
-  document.getElementById('ret-client-id').value     = '';
-  document.getElementById('ret-client-name').value   = '';
-  document.getElementById('ret-client-email').value  = '';
-  document.getElementById('ret-client-total').value  = '';
-  document.getElementById('ret-client-notes').value  = '';
-  document.getElementById('ret-client-paused').checked = false;
+function openNewClientModal(defaultSection) {
+  // defaultSection is 'active' or 'closed' — depending on which "+ Add" button was clicked.
+  const section = (defaultSection === 'closed') ? 'closed' : 'active';
+  document.getElementById('ret-client-modal-title').textContent =
+    section === 'closed' ? 'Add Closed Client' : 'Add Active Client';
+  document.getElementById('ret-client-id').value         = '';
+  document.getElementById('ret-client-name').value       = '';
+  document.getElementById('ret-client-email').value      = '';
+  // For closed: default total to 0 (user usually just enters paid amount)
+  // For active: default to standard $10k contract
+  document.getElementById('ret-client-total').value      = section === 'closed' ? '0' : '10000';
+  document.getElementById('ret-client-prior-paid').value = '0';
+  document.getElementById('ret-client-notes').value      = '';
+  document.getElementById('ret-client-section').value    = section;
+  document.getElementById('ret-client-paused').checked   = false;
   document.getElementById('ret-client-modal').style.display = 'flex';
 }
 
@@ -4607,14 +4755,14 @@ function openEditClientModal(clientId) {
   const c = (RETAINER_SUMMARY || []).find(x => x.id === clientId);
   if (!c) { showToast('Client not found', 'error'); return; }
   document.getElementById('ret-client-modal-title').textContent = 'Edit Client';
-  document.getElementById('ret-client-id').value      = c.id;
-  document.getElementById('ret-client-name').value    = c.name || '';
-  document.getElementById('ret-client-email').value   = c.email || '';
-  // total_contracted is derived (sum of installments) — show it but editing it on the client row
-  // doesn't change installment amounts. We keep the field for record/notes only.
-  document.getElementById('ret-client-total').value   = c.total_contracted || '';
-  document.getElementById('ret-client-notes').value   = c.client_notes || '';
-  document.getElementById('ret-client-paused').checked = !!c.is_paused;
+  document.getElementById('ret-client-id').value         = c.id;
+  document.getElementById('ret-client-name').value       = c.name || '';
+  document.getElementById('ret-client-email').value      = c.email || '';
+  document.getElementById('ret-client-total').value      = c.total_contracted   != null ? c.total_contracted   : '';
+  document.getElementById('ret-client-prior-paid').value = c.prior_paid_amount != null ? c.prior_paid_amount : '0';
+  document.getElementById('ret-client-notes').value      = c.client_notes || '';
+  document.getElementById('ret-client-section').value    = c.is_closed ? 'closed' : 'active';
+  document.getElementById('ret-client-paused').checked   = !!c.is_paused;
   document.getElementById('ret-client-modal').style.display = 'flex';
 }
 
@@ -4623,25 +4771,33 @@ function closeRetClientModal() {
 }
 
 async function saveRetClient() {
-  const id        = document.getElementById('ret-client-id').value;
-  const name      = document.getElementById('ret-client-name').value.trim();
-  const email     = document.getElementById('ret-client-email').value.trim();
-  const totalRaw  = document.getElementById('ret-client-total').value;
-  const notes     = document.getElementById('ret-client-notes').value.trim();
-  const isPaused  = document.getElementById('ret-client-paused').checked;
+  const id          = document.getElementById('ret-client-id').value;
+  const name        = document.getElementById('ret-client-name').value.trim();
+  const email       = document.getElementById('ret-client-email').value.trim();
+  const totalRaw    = document.getElementById('ret-client-total').value;
+  const priorRaw    = document.getElementById('ret-client-prior-paid').value;
+  const notes       = document.getElementById('ret-client-notes').value.trim();
+  const section     = document.getElementById('ret-client-section').value;
+  const isPaused    = document.getElementById('ret-client-paused').checked;
 
   if (!name) { showToast('Client name required', 'error'); return; }
-  const total = totalRaw === '' ? null : parseFloat(totalRaw);
-  if (total !== null && (isNaN(total) || total < 0)) {
+  const total = totalRaw === '' ? 0 : parseFloat(totalRaw);
+  if (isNaN(total) || total < 0) {
     showToast('Invalid total value', 'error'); return;
+  }
+  const priorPaid = priorRaw === '' ? 0 : parseFloat(priorRaw);
+  if (isNaN(priorPaid) || priorPaid < 0) {
+    showToast('Invalid "already paid" value', 'error'); return;
   }
 
   const row = {
     name,
     email: email || null,
     total_deal_value: total,
+    prior_paid_amount: priorPaid,
     client_notes: notes || null,
     is_paused: isPaused,
+    is_closed: section === 'closed',
     setup_complete: true,
     updated_at: new Date().toISOString(),
   };
@@ -4658,7 +4814,10 @@ async function saveRetClient() {
     }
     closeRetClientModal();
     await reloadRetainerData();
-    showToast(id ? '✓ Client updated' : '✓ Client added — now add installments');
+    const msg = id
+      ? '✓ Client updated'
+      : (section === 'closed' ? '✓ Closed client logged' : '✓ Active client added — now add installments');
+    showToast(msg);
   } catch(e) {
     showToast('Save failed: ' + e.message, 'error');
   }
