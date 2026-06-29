@@ -2714,6 +2714,46 @@ const JUNE_LEAD_BACKFILL = [
 ];
 
 // ═══════════════════════════════════════════
+// JUNE 2026 LT PURCHASE BACKFILL
+// ═══════════════════════════════════════════
+// Recovered from GHL workflow "Turn Content Into Client | 2026 | Purchases"
+// enrollment history (enrollment = $27 payment). These 81 purchases came in
+// Jun 1–29 2026 but never reached the Purchases sheet because the Google Sheets
+// action was failing (same auth outage). Counted ADDITIVELY on top of the live
+// Purchases sheet + followup_leads, so new purchases from the now-fixed workflow
+// ADD to this total with no double-counting. Ages out (0 outside June 2026).
+// (Excludes the "rabia begum" reconnect-test purchase, which did write to the sheet.)
+// DO NOT paste these into the Purchases sheet, or they will be counted twice.
+const JUNE_LT_BACKFILL = [
+  '2026-06-28','2026-06-28','2026-06-28',
+  '2026-06-27','2026-06-27',
+  '2026-06-26','2026-06-26','2026-06-26','2026-06-26',
+  '2026-06-25',
+  '2026-06-24','2026-06-24','2026-06-24','2026-06-24',
+  '2026-06-23','2026-06-23',
+  '2026-06-22','2026-06-22',
+  '2026-06-20',
+  '2026-06-19',
+  '2026-06-18','2026-06-18',
+  '2026-06-17','2026-06-17',
+  '2026-06-16','2026-06-16','2026-06-16','2026-06-16',
+  '2026-06-15','2026-06-15',
+  '2026-06-14','2026-06-14',
+  '2026-06-13','2026-06-13','2026-06-13',
+  '2026-06-11','2026-06-11','2026-06-11','2026-06-11',
+  '2026-06-10',
+  '2026-06-09','2026-06-09','2026-06-09','2026-06-09','2026-06-09','2026-06-09','2026-06-09',
+  '2026-06-08','2026-06-08',
+  '2026-06-07','2026-06-07','2026-06-07',
+  '2026-06-06','2026-06-06',
+  '2026-06-05','2026-06-05','2026-06-05','2026-06-05','2026-06-05','2026-06-05',
+  '2026-06-04','2026-06-04','2026-06-04','2026-06-04','2026-06-04',
+  '2026-06-03','2026-06-03','2026-06-03','2026-06-03','2026-06-03','2026-06-03','2026-06-03','2026-06-03','2026-06-03','2026-06-03',
+  '2026-06-02','2026-06-02','2026-06-02',
+  '2026-06-01','2026-06-01','2026-06-01'
+];
+
+// ═══════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════
 let currentPeriod = 'all';
@@ -2909,7 +2949,7 @@ function computeMetrics(period) {
       showsClampedAT,
       noshowsClampedAT,
       Math.max(dbCloses, ALL_TIME.closes),
-      Math.max(dbLt, sheetLtRevenue, ALL_TIME.lt),
+      Math.max(dbLt, sheetLtRevenue, ALL_TIME.lt) + (typeof JUNE_LT_BACKFILL !== 'undefined' ? JUNE_LT_BACKFILL.length * 27 : 0),
       htCash, htAds, htOrg,
       deals.filter(d=>d.usd>0), contractTotal, pipeline, deals
     );
@@ -3193,8 +3233,14 @@ function getLTForPeriod(period) {
   const fromFu = (typeof FU_LEADS !== 'undefined' && FU_LEADS)
     ? FU_LEADS.filter(l => l.stage === 'TCC Purchased' && inP(l.date)).length
     : 0;
-  const count = Math.max(fromSheet, fromFu);
-  console.log('LT for period', period, ':', count, 'purchases (sheet:', fromSheet, 'fu:', fromFu, ')');
+  // Source 3: June 2026 purchase backfill (GHL log recovery) — ADDITIVE: these
+  // purchases exist only here (never written to the sheet), so add on top of
+  // sheet/FU without double-counting. Ages out (0 outside June 2026).
+  const fromBackfill = (typeof JUNE_LT_BACKFILL !== 'undefined' && JUNE_LT_BACKFILL)
+    ? JUNE_LT_BACKFILL.filter(d => inP(d)).length
+    : 0;
+  const count = Math.max(fromSheet, fromFu) + fromBackfill;
+  console.log('LT for period', period, ':', count, 'purchases (sheet:', fromSheet, 'fu:', fromFu, 'backfill:', fromBackfill, ')');
   return count * 27;
 }
 
