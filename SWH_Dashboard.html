@@ -3415,7 +3415,7 @@ async function syncSheetsToFollowUpTracker(opts={}) {
 async function loadAndRender() {
   showLoading(true);
   try {
-    [DB_DEALS, DB_LOG, CALL_OUTCOMES, FU_LEADS] = await Promise.all([getDeals(), getLog(), syncLTFromSheets().then(()=>Promise.resolve([])), getCallOutcomes(), syncLeadsFromSheets().then(()=>Promise.resolve([])), getFollowUpLeads()]);
+    [DB_DEALS, DB_LOG, , CALL_OUTCOMES, , FU_LEADS] = await Promise.all([getDeals(), getLog(), syncLTFromSheets(), getCallOutcomes(), syncLeadsFromSheets(), getFollowUpLeads()]);
     // Fetch Calendly booked calls (separate await so a failure here doesn't break the dashboard)
     try { BOOKED_CALLS = await getBookedCalls(); } catch(e) { console.warn('calls load failed:', e.message); BOOKED_CALLS = []; }
     // Fetch automated Meta ad spend (separate await — a failure here must not break the dashboard)
