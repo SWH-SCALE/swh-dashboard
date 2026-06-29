@@ -2672,6 +2672,48 @@ const ALL_TIME = {
 };
 
 // ═══════════════════════════════════════════
+// JUNE 2026 LEAD BACKFILL
+// ═══════════════════════════════════════════
+// Recovered from GHL workflow "TCC New Lead/Incomplete Checkout" execution logs.
+// These 107 leads came in Jun 1–29 2026 but never reached the Leads sheet because
+// the Google Sheets action was failing (auth had expired). They exist ONLY here —
+// they were never written to the sheet — so they are counted ADDITIVELY on top of
+// the live sheet + followup_leads sources. New leads from the now-fixed workflow
+// write to the sheet and ADD to this total, with no double-counting.
+// (Excludes the "zanib syed" staff test row, which did write to the sheet.)
+// DO NOT paste these into the Leads sheet, or they will be counted twice.
+const JUNE_LEAD_BACKFILL = [
+  '2026-06-29','2026-06-29',
+  '2026-06-28','2026-06-28','2026-06-28','2026-06-28','2026-06-28',
+  '2026-06-27','2026-06-27',
+  '2026-06-26','2026-06-26','2026-06-26','2026-06-26',
+  '2026-06-25',
+  '2026-06-24','2026-06-24','2026-06-24','2026-06-24',
+  '2026-06-23','2026-06-23','2026-06-23',
+  '2026-06-22','2026-06-22','2026-06-22',
+  '2026-06-21',
+  '2026-06-20','2026-06-20','2026-06-20',
+  '2026-06-19',
+  '2026-06-18','2026-06-18',
+  '2026-06-17','2026-06-17','2026-06-17','2026-06-17',
+  '2026-06-16','2026-06-16','2026-06-16','2026-06-16',
+  '2026-06-15','2026-06-15','2026-06-15','2026-06-15',
+  '2026-06-14','2026-06-14','2026-06-14','2026-06-14',
+  '2026-06-13','2026-06-13','2026-06-13','2026-06-13','2026-06-13',
+  '2026-06-11','2026-06-11','2026-06-11','2026-06-11','2026-06-11',
+  '2026-06-10','2026-06-10',
+  '2026-06-09','2026-06-09','2026-06-09','2026-06-09','2026-06-09','2026-06-09','2026-06-09','2026-06-09',
+  '2026-06-08','2026-06-08','2026-06-08',
+  '2026-06-07','2026-06-07','2026-06-07','2026-06-07','2026-06-07','2026-06-07',
+  '2026-06-06','2026-06-06',
+  '2026-06-05','2026-06-05','2026-06-05','2026-06-05','2026-06-05','2026-06-05','2026-06-05','2026-06-05','2026-06-05',
+  '2026-06-04','2026-06-04','2026-06-04','2026-06-04','2026-06-04',
+  '2026-06-03','2026-06-03','2026-06-03','2026-06-03','2026-06-03','2026-06-03','2026-06-03','2026-06-03','2026-06-03',
+  '2026-06-02','2026-06-02','2026-06-02','2026-06-02',
+  '2026-06-01','2026-06-01'
+];
+
+// ═══════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════
 let currentPeriod = 'all';
@@ -2862,7 +2904,7 @@ function computeMetrics(period) {
     // Use DB values if they exist and are bigger, otherwise use ALL_TIME verified totals
     const allTimeMetrics = buildMetrics(
       spendAuthoritative,
-      Math.max(dbLeads, sheetLeads, fuTotal, ALL_TIME.leads),
+      Math.max(dbLeads, sheetLeads, fuTotal, ALL_TIME.leads) + (typeof JUNE_LEAD_BACKFILL !== 'undefined' ? JUNE_LEAD_BACKFILL.length : 0),
       bookedAuthoritative,
       showsClampedAT,
       noshowsClampedAT,
@@ -3077,7 +3119,13 @@ function getLeadsForPeriod(period) {
   const fromFu = (typeof FU_LEADS !== 'undefined' && FU_LEADS)
     ? FU_LEADS.filter(l => inP(l.date)).length
     : 0;
-  return Math.max(fromSheet, fromFu);
+  // Source 3: June 2026 backfill (GHL log recovery) — ADDITIVE: these leads exist
+  // only here (never written to the sheet), so add them on top of sheet/FU without
+  // double-counting. Naturally ages out (0 outside June 2026).
+  const fromBackfill = (typeof JUNE_LEAD_BACKFILL !== 'undefined' && JUNE_LEAD_BACKFILL)
+    ? JUNE_LEAD_BACKFILL.filter(d => inP(d)).length
+    : 0;
+  return Math.max(fromSheet, fromFu) + fromBackfill;
 }
 
 async function syncLTFromSheets() {
