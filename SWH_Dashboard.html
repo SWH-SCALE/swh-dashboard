@@ -1569,6 +1569,12 @@ select.input-field option { background: var(--bg2); }
         style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
     </div>
     <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Contract URL (optional)</label>
+      <input id="ret-client-contract-url" type="url" placeholder="https://app.pandadoc.com/document/..."
+        style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
+      <div style="font-size:10px;color:var(--t3);margin-top:3px">PandaDoc share link or any URL. Shows as a "📄 Contract" button on the client card.</div>
+    </div>
+    <div style="margin-bottom:10px">
       <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Section</label>
       <select id="ret-client-section" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
         <option value="active">Active retainer · current client with installments</option>
@@ -4555,6 +4561,8 @@ function renderClosedRetainersTable(clients) {
                   <td style="padding:8px 14px;text-align:right;font-family:var(--font-mono);color:var(--accent);font-weight:700">${retFmt$(paid)}</td>
                   <td style="padding:8px 14px;font-size:11px">${notesHtml}</td>
                   <td style="padding:8px 14px;text-align:right">
+                    ${c.contract_url ? `<a href="${retEscapeHtml(c.contract_url)}" target="_blank" rel="noopener" title="Open contract"
+                      style="background:var(--bg3);color:var(--accent);border:1px solid var(--border2);border-radius:5px;padding:3px 6px;font-size:10px;font-family:var(--font-mono);cursor:pointer;text-decoration:none;display:inline-block;margin-right:3px">📄</a>` : ''}
                     <button onclick="openEditClientModal('${c.id}')" title="Edit client"
                       style="background:var(--bg3);color:var(--t2);border:1px solid var(--border2);border-radius:5px;padding:3px 8px;font-size:10px;font-family:var(--font-mono);cursor:pointer">Edit</button>
                     <button onclick="deleteRetClient('${c.id}', '${escNameForDelete}')" title="Delete client"
@@ -4700,6 +4708,8 @@ function renderRetClientCard(c, allInstallments) {
       </div>
 
       <div style="display:flex;gap:4px">
+        ${c.contract_url ? `<a href="${retEscapeHtml(c.contract_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open contract"
+          style="background:var(--bg3);color:var(--accent);border:1px solid var(--border2);border-radius:6px;padding:5px 9px;font-size:11px;font-family:var(--font-mono);cursor:pointer;text-decoration:none;display:inline-block">📄 Contract</a>` : ''}
         <button onclick="event.stopPropagation();openEditClientModal('${c.id}')" title="Edit client"
           style="background:var(--bg3);color:var(--t2);border:1px solid var(--border2);border-radius:6px;padding:5px 9px;font-size:11px;font-family:var(--font-mono);cursor:pointer">Edit</button>
         <button onclick="event.stopPropagation();openAddInstallmentModal('${c.id}')" title="Add installment"
@@ -4738,16 +4748,17 @@ function openNewClientModal(defaultSection) {
   const section = (defaultSection === 'closed') ? 'closed' : 'active';
   document.getElementById('ret-client-modal-title').textContent =
     section === 'closed' ? 'Add Closed Client' : 'Add Active Client';
-  document.getElementById('ret-client-id').value         = '';
-  document.getElementById('ret-client-name').value       = '';
-  document.getElementById('ret-client-email').value      = '';
+  document.getElementById('ret-client-id').value           = '';
+  document.getElementById('ret-client-name').value         = '';
+  document.getElementById('ret-client-email').value        = '';
   // For closed: default total to 0 (user usually just enters paid amount)
   // For active: default to standard $10k contract
-  document.getElementById('ret-client-total').value      = section === 'closed' ? '0' : '10000';
-  document.getElementById('ret-client-prior-paid').value = '0';
-  document.getElementById('ret-client-notes').value      = '';
-  document.getElementById('ret-client-section').value    = section;
-  document.getElementById('ret-client-paused').checked   = false;
+  document.getElementById('ret-client-total').value        = section === 'closed' ? '0' : '10000';
+  document.getElementById('ret-client-prior-paid').value   = '0';
+  document.getElementById('ret-client-notes').value        = '';
+  document.getElementById('ret-client-contract-url').value = '';
+  document.getElementById('ret-client-section').value      = section;
+  document.getElementById('ret-client-paused').checked     = false;
   document.getElementById('ret-client-modal').style.display = 'flex';
 }
 
@@ -4755,14 +4766,15 @@ function openEditClientModal(clientId) {
   const c = (RETAINER_SUMMARY || []).find(x => x.id === clientId);
   if (!c) { showToast('Client not found', 'error'); return; }
   document.getElementById('ret-client-modal-title').textContent = 'Edit Client';
-  document.getElementById('ret-client-id').value         = c.id;
-  document.getElementById('ret-client-name').value       = c.name || '';
-  document.getElementById('ret-client-email').value      = c.email || '';
-  document.getElementById('ret-client-total').value      = c.total_contracted   != null ? c.total_contracted   : '';
-  document.getElementById('ret-client-prior-paid').value = c.prior_paid_amount != null ? c.prior_paid_amount : '0';
-  document.getElementById('ret-client-notes').value      = c.client_notes || '';
-  document.getElementById('ret-client-section').value    = c.is_closed ? 'closed' : 'active';
-  document.getElementById('ret-client-paused').checked   = !!c.is_paused;
+  document.getElementById('ret-client-id').value           = c.id;
+  document.getElementById('ret-client-name').value         = c.name || '';
+  document.getElementById('ret-client-email').value        = c.email || '';
+  document.getElementById('ret-client-total').value        = c.total_contracted   != null ? c.total_contracted   : '';
+  document.getElementById('ret-client-prior-paid').value   = c.prior_paid_amount != null ? c.prior_paid_amount : '0';
+  document.getElementById('ret-client-notes').value        = c.client_notes || '';
+  document.getElementById('ret-client-contract-url').value = c.contract_url || '';
+  document.getElementById('ret-client-section').value      = c.is_closed ? 'closed' : 'active';
+  document.getElementById('ret-client-paused').checked     = !!c.is_paused;
   document.getElementById('ret-client-modal').style.display = 'flex';
 }
 
@@ -4777,6 +4789,7 @@ async function saveRetClient() {
   const totalRaw    = document.getElementById('ret-client-total').value;
   const priorRaw    = document.getElementById('ret-client-prior-paid').value;
   const notes       = document.getElementById('ret-client-notes').value.trim();
+  const contractUrl = document.getElementById('ret-client-contract-url').value.trim();
   const section     = document.getElementById('ret-client-section').value;
   const isPaused    = document.getElementById('ret-client-paused').checked;
 
@@ -4789,6 +4802,10 @@ async function saveRetClient() {
   if (isNaN(priorPaid) || priorPaid < 0) {
     showToast('Invalid "already paid" value', 'error'); return;
   }
+  // Basic URL sanity check — must start with http(s) if provided
+  if (contractUrl && !/^https?:\/\//i.test(contractUrl)) {
+    showToast('Contract URL must start with http:// or https://', 'error'); return;
+  }
 
   const row = {
     name,
@@ -4796,6 +4813,7 @@ async function saveRetClient() {
     total_deal_value: total,
     prior_paid_amount: priorPaid,
     client_notes: notes || null,
+    contract_url: contractUrl || null,
     is_paused: isPaused,
     is_closed: section === 'closed',
     setup_complete: true,
