@@ -237,6 +237,7 @@ body {
 }
 .kpi-tier-5 { grid-template-columns: repeat(5, 1fr); }
 .kpi-tier-6 { grid-template-columns: repeat(6, 1fr); }
+.kpi-tier-7 { grid-template-columns: repeat(7, 1fr); }
 .kpi-tier-4 { grid-template-columns: repeat(4, 1fr); }
 
 .kpi-card {
@@ -842,6 +843,7 @@ select.input-field option { background: var(--bg2); }
 @media (max-width: 1100px) {
   .kpi-tier-5 { grid-template-columns: repeat(3, 1fr); }
   .kpi-tier-6 { grid-template-columns: repeat(3, 1fr); }
+  .kpi-tier-7 { grid-template-columns: repeat(3, 1fr); }
   .chart-row-3 { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 820px) {
@@ -1018,7 +1020,7 @@ select.input-field option { background: var(--bg2); }
 <div id="tab-exec" class="tab-view active">
 
   <div class="section-label">Ad spend + acquisition</div>
-  <div class="kpi-tier kpi-tier-6">
+  <div class="kpi-tier kpi-tier-7">
     <div class="kpi-card accent">
       <div class="kpi-label">Ad Spend (USD)</div>
       <div class="kpi-value mono" id="k-spend">$0</div>
@@ -1039,6 +1041,13 @@ select.input-field option { background: var(--bg2); }
       <div class="kpi-value" id="k-lt-count">0</div>
       <div class="kpi-meta">
         <span class="kpi-badge neutral" id="k-lt-conv">— of leads</span>
+      </div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">OTO Upsells ($97)</div>
+      <div class="kpi-value" id="k-oto-count">0</div>
+      <div class="kpi-meta">
+        <span class="kpi-badge neutral" id="k-oto-rev">—</span>
       </div>
     </div>
     <div class="kpi-card amber">
@@ -1065,7 +1074,7 @@ select.input-field option { background: var(--bg2); }
   </div>
 
   <div class="section-label">Conversion + revenue</div>
-  <div class="kpi-tier kpi-tier-6">
+  <div class="kpi-tier kpi-tier-7">
     <div class="kpi-card accent">
       <div class="kpi-label">Show-Up Rate</div>
       <div class="kpi-value mono" id="k-showup">0%</div>
@@ -1093,6 +1102,13 @@ select.input-field option { background: var(--bg2); }
       <div class="kpi-value mono" id="k-cash">$0</div>
       <div class="kpi-meta">
         <span class="kpi-badge up" id="k-cash-split">0 deals</span>
+      </div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Revenue Per Lead</div>
+      <div class="kpi-value mono" id="k-rpl">$0</div>
+      <div class="kpi-meta">
+        <span class="kpi-badge neutral" id="k-rpl-meta">cash / leads</span>
       </div>
     </div>
     <div class="kpi-card amber">
@@ -3105,6 +3121,31 @@ let LT_PURCHASES = []; // array of {date, amount} from sheet
 let LEADS_FROM_SHEET = 0;
 let LEADS_DATA = []; // array of {date} from leads sheet
 
+let OTO_FROM_SHEET = 0;
+let OTO_PURCHASES = []; // array of {date, amount} from OTO sheet tab
+// ═══════════════════════════════════════════
+// JUNE 2026 OTO ($97) BACKFILL
+// ═══════════════════════════════════════════
+// Recovered from GHL workflow "OTO to Slack Notification" enrollment history
+// (enrollment = $97 OTO upgrade). These 10 upsells came in Jun 1–29 2026 but were
+// never written to any sheet — that workflow only pinged Slack; the Create
+// Spreadsheet Row → OTO tab was added afterwards. Counted ADDITIVELY on top of the
+// live OTO sheet tab, so new OTOs from the now-live step ADD to this with no
+// double-counting. Ages out (0 outside June 2026).
+// (Excludes the "andrea" workflow-test purchase, which wrote to the OTO tab.)
+// DO NOT paste these into the OTO sheet tab, or they will be counted twice.
+const JUNE_OTO_BACKFILL = [
+  '2026-06-28','2026-06-28',
+  '2026-06-24',
+  '2026-06-23',
+  '2026-06-12',
+  '2026-06-09',
+  '2026-06-07',
+  '2026-06-04',
+  '2026-06-03',
+  '2026-06-02'
+];
+
 async function syncLeadsFromSheets() {
   try {
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Leads`;
@@ -3207,6 +3248,37 @@ async function syncLTFromSheets() {
   }
 }
 
+// Sync OTO ($97) upgrades from the OTO sheet tab
+async function syncOTOFromSheets() {
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=OTO`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Sheet fetch failed');
+    const text = await res.text();
+    const rows = text.trim().split('\n');
+    OTO_PURCHASES = [];
+    for (let i = 1; i < rows.length; i++) {
+      const cols = rows[i].split(',').map(c => c.replace(/^"|"$/g,'').trim());
+      if (!cols[0] || cols[0] === 'Date') continue;
+      const d = new Date(cols[0]);
+      if (!isNaN(d)) {
+        OTO_PURCHASES.push({ date: d.toISOString().split('T')[0], amount: 97 });
+      }
+    }
+    OTO_FROM_SHEET = OTO_PURCHASES.length;
+    console.log('OTO from Sheets:', OTO_FROM_SHEET, 'upgrades');
+    try { localStorage.setItem('swh_oto_purchases', JSON.stringify(OTO_PURCHASES)); } catch(e) {}
+    return OTO_FROM_SHEET;
+  } catch(e) {
+    console.log('OTO sync skipped:', e.message);
+    try {
+      const cached = localStorage.getItem('swh_oto_purchases');
+      if (cached) { OTO_PURCHASES = JSON.parse(cached); OTO_FROM_SHEET = OTO_PURCHASES.length; }
+    } catch(e2) {}
+    return OTO_FROM_SHEET;
+  }
+}
+
 // Get LT revenue for a specific period
 function getLTForPeriod(period) {
   const today = new Date();
@@ -3242,6 +3314,34 @@ function getLTForPeriod(period) {
   const count = Math.max(fromSheet, fromFu) + fromBackfill;
   console.log('LT for period', period, ':', count, 'purchases (sheet:', fromSheet, 'fu:', fromFu, 'backfill:', fromBackfill, ')');
   return count * 27;
+}
+
+// Get OTO ($97) upgrade COUNT for a specific period
+function getOTOForPeriod(period) {
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  function inP(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (period === 'today') {
+      const spendLog = DB_LOG.filter(l => (l.spend||0) > 0);
+      const mostRecent = spendLog.length
+        ? spendLog.sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date
+        : (DB_LOG.length ? DB_LOG.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0].date : todayStr);
+      return dateStr === mostRecent;
+    }
+    if (period === '7d') { const c=new Date(today); c.setDate(c.getDate()-7); return d>=c; }
+    if (period === 'mtd') return d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth();
+    if (period === 'lm') { const l=new Date(today); l.setMonth(l.getMonth()-1); return d.getFullYear()===l.getFullYear()&&d.getMonth()===l.getMonth(); }
+    return true;
+  }
+  // Source 1: live OTO sheet tab
+  const fromSheet = (typeof OTO_PURCHASES !== 'undefined' && OTO_PURCHASES) ? OTO_PURCHASES.filter(p => inP(p.date)).length : 0;
+  // Source 2: June 2026 backfill (GHL log recovery) — ADDITIVE, ages out after June
+  const fromBackfill = (typeof JUNE_OTO_BACKFILL !== 'undefined' && JUNE_OTO_BACKFILL) ? JUNE_OTO_BACKFILL.filter(d => inP(d)).length : 0;
+  const count = fromSheet + fromBackfill;
+  console.log('OTO for period', period, ':', count, '(sheet:', fromSheet, 'backfill:', fromBackfill, ')');
+  return count;
 }
 
 // ── Sheets → Follow-Up Tracker sync ───────────────────
@@ -3509,7 +3609,7 @@ async function syncSheetsToFollowUpTracker(opts={}) {
 async function loadAndRender() {
   showLoading(true);
   try {
-    [DB_DEALS, DB_LOG, , CALL_OUTCOMES, , FU_LEADS] = await Promise.all([getDeals(), getLog(), syncLTFromSheets(), getCallOutcomes(), syncLeadsFromSheets(), getFollowUpLeads()]);
+    [DB_DEALS, DB_LOG, , CALL_OUTCOMES, , FU_LEADS] = await Promise.all([getDeals(), getLog(), syncLTFromSheets(), getCallOutcomes(), syncLeadsFromSheets(), getFollowUpLeads(), syncOTOFromSheets()]);
     // Fetch Calendly booked calls (separate await so a failure here doesn't break the dashboard)
     try { BOOKED_CALLS = await getBookedCalls(); } catch(e) { console.warn('calls load failed:', e.message); BOOKED_CALLS = []; }
     // Fetch automated Meta ad spend (separate await — a failure here must not break the dashboard)
@@ -3602,6 +3702,19 @@ function renderExec(d) {
   set('k-lt-count', ltCount);
   set('k-lt-conv', d.leads > 0 ? (ltConv + '% of leads') : '— of leads');
   badge('k-lt-conv', ltCount > 0 && ltConv >= 30 ? 'up' : ltCount > 0 ? 'warn' : 'neutral');
+
+  // OTO ($97) upsells — count + revenue, attach-rate vs LT buyers
+  const otoCount = getOTOForPeriod(currentPeriod);
+  const otoRev = otoCount * 97;
+  const otoAttach = ltCount > 0 ? Math.round((otoCount / ltCount) * 100) : 0;
+  set('k-oto-count', otoCount);
+  set('k-oto-rev', otoCount > 0 ? (fmtFull(otoRev) + (ltCount > 0 ? ' · ' + otoAttach + '% of LT' : '')) : '—');
+  badge('k-oto-rev', otoCount > 0 ? 'up' : 'neutral');
+
+  // Revenue Per Lead — total cash collected / leads
+  const rpl = d.leads ? d.cash / d.leads : 0;
+  set('k-rpl', d.leads ? fmtFull(rpl) : '—');
+  badge('k-rpl-meta', 'neutral');
 
   set('k-cpl', d.leads?fmtFull(cpl):'—');
   set('k-cpl-flag', cpl>0?(cpl<=S.tgt_cpl?'✓ under $'+S.tgt_cpl:'target $'+S.tgt_cpl):'—');
