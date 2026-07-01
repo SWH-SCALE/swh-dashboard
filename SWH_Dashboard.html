@@ -1724,6 +1724,23 @@ select.input-field option { background: var(--bg2); }
     </div>
   </div>
 
+  <!-- Cascading net view -->
+  <div class="section-label">Net profit — layered view</div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+      <button class="period-btn" id="pnl-stage-saas" onclick="setPnlNetStage('saas')" style="font-size:11px;">After SaaS</button>
+      <button class="period-btn" id="pnl-stage-payroll" onclick="setPnlNetStage('payroll')" style="font-size:11px;">After payroll</button>
+      <button class="period-btn" id="pnl-stage-commissions" onclick="setPnlNetStage('commissions')" style="font-size:11px;">After commissions</button>
+      <button class="period-btn active" id="pnl-stage-everything" onclick="setPnlNetStage('everything')" style="font-size:11px;">Net after everything</button>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+      <div class="kpi-value mono" id="pnl-stage-value" style="font-size:28px;">$0</div>
+      <div id="pnl-stage-caption" style="font-size:12px;color:var(--t2);"></div>
+    </div>
+    <div id="pnl-stage-waterfall" style="font-size:12px;"></div>
+    <div style="margin-top:10px;font-size:11px;color:var(--t3);">Ad spend is subtracted in every layer (it's the hard cost of acquisition). Each button peels one more operating cost so you can see where margin leaks.</div>
+  </div>
+
   <!-- Revenue breakdown -->
   <div class="section-label">Revenue breakdown</div>
   <div class="kpi-tier kpi-tier-5">
@@ -1770,7 +1787,7 @@ select.input-field option { background: var(--bg2); }
       <div class="kpi-label">Commissions</div>
       <div class="kpi-value mono" id="pnl-c-commissions">$0</div>
       <div class="kpi-meta">
-        <span class="kpi-sublabel">Sheet sync (AED → USD)</span>
+        <span class="kpi-sublabel">Manual entry (+ synced)</span>
       </div>
     </div>
     <div class="kpi-card red">
@@ -1813,6 +1830,64 @@ select.input-field option { background: var(--bg2); }
     </div>
   </div>
 
+  <!-- Commissions · manual entry -->
+  <div class="section-label">Commissions · manual entry</div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div style="font-size:12px;color:var(--t2);max-width:520px;">Type each person's commission for the month, then Save. Stored in Supabase and fed into Net Profit. A manual value overrides any synced value for the same person and month.</div>
+      <label style="font-size:12px;color:var(--t2);display:flex;align-items:center;gap:6px;">Month
+        <input type="month" id="pnl-comm-month" onchange="renderPnlCommissionInputs()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--t1);padding:5px 8px;font-size:12px;">
+      </label>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);color:var(--t3);text-align:left;">
+            <th style="padding:8px 10px;">Person</th>
+            <th style="padding:8px 10px;text-align:right;">Commission (USD)</th>
+            <th style="padding:8px 10px;text-align:right;">Videos × $45</th>
+            <th style="padding:8px 10px;text-align:right;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px 10px;color:var(--t1);">Frankie</td>
+            <td style="padding:8px 10px;text-align:right;"><input type="number" min="0" step="0.01" id="pnl-comm-frankie" placeholder="0" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--t1);padding:5px 8px;font-size:12px;width:120px;text-align:right;"></td>
+            <td style="padding:8px 10px;text-align:right;color:var(--t3);">—</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--t3);">= commission</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px 10px;color:var(--t1);">Salim</td>
+            <td style="padding:8px 10px;text-align:right;"><input type="number" min="0" step="0.01" id="pnl-comm-salim" placeholder="0" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--t1);padding:5px 8px;font-size:12px;width:120px;text-align:right;"></td>
+            <td style="padding:8px 10px;text-align:right;color:var(--t3);">—</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--t3);">= commission</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px 10px;color:var(--t1);">Salima</td>
+            <td style="padding:8px 10px;text-align:right;"><input type="number" min="0" step="0.01" id="pnl-comm-salima" placeholder="0" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--t1);padding:5px 8px;font-size:12px;width:120px;text-align:right;"></td>
+            <td style="padding:8px 10px;text-align:right;color:var(--t3);">—</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--t3);">= commission</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px 10px;color:var(--t1);">Zain</td>
+            <td style="padding:8px 10px;text-align:right;"><input type="number" min="0" step="0.01" id="pnl-comm-zain" placeholder="0" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--t1);padding:5px 8px;font-size:12px;width:120px;text-align:right;"></td>
+            <td style="padding:8px 10px;text-align:right;color:var(--t3);">—</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--t3);">= commission</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px 10px;color:var(--t1);">Marc</td>
+            <td style="padding:8px 10px;text-align:right;"><input type="number" min="0" step="0.01" id="pnl-comm-marc" oninput="updateMarcTotal()" placeholder="0" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--t1);padding:5px 8px;font-size:12px;width:120px;text-align:right;"></td>
+            <td style="padding:8px 10px;text-align:right;"><input type="number" min="0" step="1" id="pnl-comm-marc-videos" oninput="updateMarcTotal()" placeholder="0" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--t1);padding:5px 8px;font-size:12px;width:90px;text-align:right;"></td>
+            <td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);color:var(--t1);font-weight:700;" id="pnl-comm-marc-total">$0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+      <button class="period-btn active" onclick="savePnlCommissions()" style="font-size:12px;">Save commissions</button>
+    </div>
+  </div>
+
   <!-- Commission sync table -->
   <div class="section-label">Commissions · synced from payout tracker</div>
   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;">
@@ -1837,7 +1912,7 @@ select.input-field option { background: var(--bg2); }
     Revenue = sum of <code>deals.usd</code> by <code>deal_type</code> for the selected period.
     Ad spend = <code>meta_spend</code> table (auto-synced).
     Salaries = monthly amount × (days in period / days in month) so it pro-rates correctly for 7d / MTD periods.
-    Commissions = sum of <code>payout_commissions</code> for months touching the period (synced nightly from the Google sheet).
+    Commissions = manual monthly entries (Frankie, Salim, Salima, Zain, Marc) merged with any synced <code>payout_commissions</code>, deduped by person + month with manual taking precedence. Marc = base + videos × $45.
     Mehdi's cut = 40% of positive net (revenue − all other costs).
     All-Time totals sum every month with deals or expenses on record.
   </div>
@@ -2856,7 +2931,19 @@ const PAGE_TITLES = {
   settings:  ['Settings',              'Targets · rates · thresholds'],
 };
 
+// P&L access gate — session-only; re-locks on every refresh. Passcode is checked
+// client-side, so this stops casual/team access, not a determined DevTools user.
+let PNL_UNLOCKED = false;
 function switchTab(id,el) {
+  // Passcode gate for the P&L tab
+  if (id === 'pnl' && !PNL_UNLOCKED) {
+    const code = prompt('Enter passcode to view P&L');
+    if (code !== '1206') {
+      if (code !== null) alert('Incorrect passcode.');
+      return; // abort — do not switch tabs
+    }
+    PNL_UNLOCKED = true;
+  }
   document.querySelectorAll('.tab-view').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
@@ -5338,10 +5425,16 @@ function renderComparison() {
 // P&L TAB
 // ═══════════════════════════════════════════
 // State
-let PNL_EXPENSES = [];      // rows from public.expenses
-let PNL_COMMISSIONS = [];   // rows from public.payout_commissions
+let PNL_EXPENSES = [];        // rows from public.expenses
+let PNL_COMMISSIONS = [];     // rows from public.payout_commissions (synced — read only)
+let MANUAL_COMMISSIONS = [];  // rows from public.manual_commissions (typed in dashboard)
 
 const MEHDI_NET_CUT_PCT = 0.40;
+const MARC_VIDEO_RATE = 45;   // $ per video
+const COMMISSION_PEOPLE = ['Frankie', 'Salim', 'Salima', 'Zain', 'Marc'];
+
+// Cascading net view: 'saas' | 'payroll' | 'commissions' | 'everything'
+let PNL_NET_STAGE = 'everything';
 
 async function loadPnlData() {
   try {
@@ -5355,6 +5448,12 @@ async function loadPnlData() {
   } catch(e) {
     console.warn('payout_commissions table not ready:', e.message);
     PNL_COMMISSIONS = [];
+  }
+  try {
+    MANUAL_COMMISSIONS = await sbFetch('manual_commissions?order=month.desc,staff_name.asc');
+  } catch(e) {
+    console.warn('manual_commissions table not ready:', e.message);
+    MANUAL_COMMISSIONS = [];
   }
 }
 
@@ -5414,14 +5513,25 @@ function proRatedFixedCosts(monthlyTotalUsd, start, end) {
   return total;
 }
 
-// Commissions for the period: sum payout_commissions rows whose month overlaps.
-// Each commission row represents a full month — we pro-rate the same way.
+// Commissions for the period. Merges manual_commissions (typed in the dashboard)
+// with any synced payout_commissions, keyed by staff_name|YYYY-MM. Manual entries
+// take precedence, so a manual value overrides a synced one for the same person+month
+// and the two can never double-count. Each row is a full month, pro-rated by overlap.
 function commissionsForPeriod(start, end) {
-  if (!PNL_COMMISSIONS.length) return 0;
+  const map = {}; // key "staff|YYYY-MM" -> { month, amount }
+  const add = (rows) => {
+    for (const row of (rows || [])) {
+      if (!row.month) continue;
+      const key = (row.staff_name || '') + '|' + String(row.month).slice(0, 7);
+      map[key] = { month: String(row.month).slice(0, 10), amount: Number(row.amount_usd) || 0 };
+    }
+  };
+  add(PNL_COMMISSIONS);    // synced first
+  add(MANUAL_COMMISSIONS); // manual overrides
+
   let total = 0;
-  for (const row of PNL_COMMISSIONS) {
-    if (!row.month) continue;
-    const m = new Date(row.month + 'T00:00:00');
+  for (const key in map) {
+    const m = new Date(map[key].month + 'T00:00:00');
     const monthStart = new Date(m.getFullYear(), m.getMonth(), 1);
     const monthEnd   = new Date(m.getFullYear(), m.getMonth() + 1, 1);
     const overlapStart = monthStart < start ? start : monthStart;
@@ -5429,7 +5539,7 @@ function commissionsForPeriod(start, end) {
     if (overlapEnd > overlapStart) {
       const overlapDays = Math.ceil((overlapEnd - overlapStart) / 86400000);
       const monthDays   = Math.ceil((monthEnd - monthStart) / 86400000);
-      total += (Number(row.amount_usd) || 0) * (overlapDays / monthDays);
+      total += map[key].amount * (overlapDays / monthDays);
     }
   }
   return total;
@@ -5507,6 +5617,18 @@ function renderPnl() {
   const totalCosts = adSpend + salariesPeriod + subsPeriod + commissions + mehdiCut;
   const netProfit = rev.total - totalCosts;
   const margin = rev.total > 0 ? (netProfit / rev.total) : 0;
+
+  // -- Cascading net view: peel one cost layer at a time --
+  // Ad spend is the baseline in every layer (hard cost of acquisition);
+  // each subsequent view subtracts one more operating cost.
+  const afterSaaS        = rev.total - adSpend - subsPeriod;
+  const afterPayroll     = afterSaaS - salariesPeriod;
+  const afterCommissions = afterPayroll - commissions;
+  const afterEverything  = afterCommissions - mehdiCut;
+  renderPnlNetStage({
+    revenue: rev.total, adSpend, subsPeriod, salariesPeriod, commissions, mehdiCut,
+    afterSaaS, afterPayroll, afterCommissions, afterEverything,
+  });
 
   set('pnl-c-ads',         fmtFull(adSpend));
   set('pnl-c-salaries',    fmtFull(salariesPeriod));
@@ -5594,12 +5716,129 @@ function renderPnl() {
       `).join('');
     }
   }
+
+  renderPnlCommissionInputs();
 }
 
 function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
+}
+
+// ── Cascading net view ────────────────────────────────
+function setPnlNetStage(stage) {
+  PNL_NET_STAGE = stage;
+  renderPnl();
+}
+
+function renderPnlNetStage(v) {
+  const money = (n) => (n < 0 ? '−' : '') + fmtFull(Math.abs(n));
+  const stages = {
+    saas:        { val: v.afterSaaS,        cap: 'Revenue − Ad Spend − SaaS' },
+    payroll:     { val: v.afterPayroll,     cap: 'Revenue − Ad Spend − SaaS − Payroll' },
+    commissions: { val: v.afterCommissions, cap: 'Revenue − Ad Spend − SaaS − Payroll − Commissions' },
+    everything:  { val: v.afterEverything,  cap: 'Revenue − Ad Spend − SaaS − Payroll − Commissions − Mehdi 40%' },
+  };
+  const cur = stages[PNL_NET_STAGE] || stages.everything;
+
+  ['saas','payroll','commissions','everything'].forEach(s => {
+    const b = document.getElementById('pnl-stage-' + s);
+    if (b) b.classList.toggle('active', s === PNL_NET_STAGE);
+  });
+
+  const valEl = document.getElementById('pnl-stage-value');
+  if (valEl) {
+    valEl.textContent = money(cur.val);
+    valEl.style.color = cur.val >= 0 ? 'var(--accent)' : 'var(--red)';
+  }
+  set('pnl-stage-caption', cur.cap);
+
+  const line = (lbl, amt) =>
+    `<div style="display:flex;justify-content:space-between;padding:4px 0;color:var(--t2);"><span>${lbl}</span><span style="font-family:var(--font-mono);">${money(amt)}</span></div>`;
+  const sub = (lbl, amt, active) =>
+    `<div style="display:flex;justify-content:space-between;padding:6px 0;margin:2px 0;border-top:1px solid var(--border);font-weight:700;color:${active ? 'var(--accent)' : 'var(--t1)'};"><span>${lbl}</span><span style="font-family:var(--font-mono);">${money(amt)}</span></div>`;
+
+  const wf = [];
+  wf.push(line('Revenue', v.revenue));
+  wf.push(line('− Ad spend', -v.adSpend));
+  wf.push(line('− SaaS', -v.subsPeriod));
+  wf.push(sub('= After SaaS', v.afterSaaS, PNL_NET_STAGE === 'saas'));
+  if (['payroll','commissions','everything'].includes(PNL_NET_STAGE)) {
+    wf.push(line('− Payroll (fixed salaries)', -v.salariesPeriod));
+    wf.push(sub('= After payroll', v.afterPayroll, PNL_NET_STAGE === 'payroll'));
+  }
+  if (['commissions','everything'].includes(PNL_NET_STAGE)) {
+    wf.push(line('− Commissions', -v.commissions));
+    wf.push(sub('= After commissions', v.afterCommissions, PNL_NET_STAGE === 'commissions'));
+  }
+  if (PNL_NET_STAGE === 'everything') {
+    wf.push(line("− Mehdi's 40% cut", -v.mehdiCut));
+    wf.push(sub('= Net after everything', v.afterEverything, true));
+  }
+  const wfEl = document.getElementById('pnl-stage-waterfall');
+  if (wfEl) wfEl.innerHTML = wf.join('');
+}
+
+// ── Manual commission entry ───────────────────────────
+function updateMarcTotal() {
+  const base = parseFloat((document.getElementById('pnl-comm-marc') || {}).value) || 0;
+  const vids = parseInt((document.getElementById('pnl-comm-marc-videos') || {}).value) || 0;
+  const el = document.getElementById('pnl-comm-marc-total');
+  if (el) el.textContent = fmtFull(base + vids * MARC_VIDEO_RATE);
+}
+
+function renderPnlCommissionInputs() {
+  const monthEl = document.getElementById('pnl-comm-month');
+  if (!monthEl) return;
+  if (!monthEl.value) {
+    const now = new Date();
+    monthEl.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  }
+  const month = monthEl.value; // YYYY-MM
+  for (const p of COMMISSION_PEOPLE) {
+    const rec = (MANUAL_COMMISSIONS || []).find(
+      r => r.staff_name === p && String(r.month).slice(0, 7) === month
+    );
+    const baseEl = document.getElementById('pnl-comm-' + p.toLowerCase());
+    if (baseEl) baseEl.value = rec ? (Number(rec.base_usd) || '') : '';
+    if (p === 'Marc') {
+      const vEl = document.getElementById('pnl-comm-marc-videos');
+      if (vEl) vEl.value = rec ? (Number(rec.videos) || '') : '';
+    }
+  }
+  updateMarcTotal();
+}
+
+async function savePnlCommissions() {
+  const monthEl = document.getElementById('pnl-comm-month');
+  const month = monthEl && monthEl.value;
+  if (!month) { showToast('Pick a month first', 'error'); return; }
+  const monthDate = month + '-01';
+  const rows = COMMISSION_PEOPLE.map(p => {
+    const base = parseFloat((document.getElementById('pnl-comm-' + p.toLowerCase()) || {}).value) || 0;
+    const videos = p === 'Marc' ? (parseInt((document.getElementById('pnl-comm-marc-videos') || {}).value) || 0) : 0;
+    return {
+      staff_name: p,
+      month: monthDate,
+      base_usd: base,
+      videos: videos,
+      amount_usd: base + videos * MARC_VIDEO_RATE,
+      updated_at: new Date().toISOString(),
+    };
+  });
+  try {
+    await sbFetch('manual_commissions', {
+      method: 'POST',
+      prefer: 'resolution=merge-duplicates,return=representation',
+      body: JSON.stringify(rows),
+    });
+    MANUAL_COMMISSIONS = await sbFetch('manual_commissions?order=month.desc,staff_name.asc');
+    renderPnl();
+    showToast('✓ Commissions saved for ' + month);
+  } catch(e) {
+    showToast('Save failed: ' + e.message, 'error');
+  }
 }
 
 // ── Expense CRUD ──────────────────────────────────────
