@@ -239,6 +239,7 @@ body {
 .kpi-tier-6 { grid-template-columns: repeat(6, 1fr); }
 .kpi-tier-7 { grid-template-columns: repeat(7, 1fr); }
 .kpi-tier-4 { grid-template-columns: repeat(4, 1fr); }
+.kpi-tier-3 { grid-template-columns: repeat(3, 1fr); }
 
 .kpi-card {
   background: var(--bg2);
@@ -849,6 +850,7 @@ select.input-field option { background: var(--bg2); }
 @media (max-width: 820px) {
   .sidebar { display: none; }
   .kpi-tier-4 { grid-template-columns: repeat(2, 1fr); }
+  .kpi-tier-3 { grid-template-columns: 1fr; }
   .closer-grid { grid-template-columns: 1fr; }
   .flag-grid { grid-template-columns: repeat(2, 1fr); }
   .scale-checks { grid-template-columns: repeat(2, 1fr); }
@@ -1124,6 +1126,34 @@ select.input-field option { background: var(--bg2); }
       <div class="kpi-meta">
         <span class="kpi-badge warn" id="k-roas-flag">target 3x</span>
       </div>
+    </div>
+  </div>
+
+  <div class="section-label">Cash efficiency · new vs overall ROAS</div>
+  <div class="kpi-tier kpi-tier-3">
+    <div class="kpi-card accent">
+      <div class="kpi-label">New Cash ROAS</div>
+      <div class="kpi-value mono" id="k-roas-new">0.0x</div>
+      <div class="kpi-meta">
+        <span class="kpi-badge neutral" id="k-roas-new-flag">— new cash</span>
+      </div>
+      <div class="kpi-sublabel" style="margin-top:4px;font-size:10px;color:var(--t3)">new HT + LT + OTO ÷ ad spend</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Overall ROAS</div>
+      <div class="kpi-value mono" id="k-roas-overall">0.0x</div>
+      <div class="kpi-meta">
+        <span class="kpi-badge neutral" id="k-roas-overall-flag">— total in</span>
+      </div>
+      <div class="kpi-sublabel" style="margin-top:4px;font-size:10px;color:var(--t3)">+ retainer top-ups ÷ ad spend</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Retainer Cash (period)</div>
+      <div class="kpi-value mono" id="k-ret-cash">$0</div>
+      <div class="kpi-meta">
+        <span class="kpi-badge neutral" id="k-ret-cash-flag">existing-client cash</span>
+      </div>
+      <div class="kpi-sublabel" style="margin-top:4px;font-size:10px;color:var(--t3)">the gap between the two ROAS</div>
     </div>
   </div>
 
@@ -2847,7 +2877,7 @@ const JUNE_LT_BACKFILL = [
 // ═══════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════
-let currentPeriod = 'all';
+let currentPeriod = 'mtd';
 let chartTrend=null, chartSource=null, chartCloser=null, chartCallsTrend=null;
 let DB_DEALS = [];
 let DB_LOG   = [];
@@ -2980,9 +3010,9 @@ function initPeriodBtns() {
   ps.innerHTML=`
     <button class="period-btn" onclick="setPeriod('today',this)">Latest Entry</button>
     <button class="period-btn" onclick="setPeriod('7d',this)">7 Days</button>
-    <button class="period-btn" onclick="setPeriod('mtd',this)">MTD</button>
+    <button class="period-btn active" onclick="setPeriod('mtd',this)">MTD</button>
     <button class="period-btn" onclick="setPeriod('lm',this)">Last Mo.</button>
-    <button class="period-btn active" onclick="setPeriod('all',this)">All Time</button>
+    <button class="period-btn" onclick="setPeriod('all',this)">All Time</button>
   `;
 }
 
@@ -3060,6 +3090,9 @@ function computeMetrics(period) {
     allTimeMetrics.showBase     = showRateBookedAT;
     allTimeMetrics.pendingCalls = pendingCallsAT;
     allTimeMetrics.slaBreached  = slaBreachedAT;
+    allTimeMetrics.retainerCash = (RETAINER_INSTALLMENTS || [])
+      .filter(i => i.paid && i.paid_date)
+      .reduce((s, i) => s + (Number(i.amount_usd) || 0), 0);
     return allTimeMetrics;
   }
 
@@ -3133,6 +3166,13 @@ function computeMetrics(period) {
   periodMetrics.showBase     = showBaseForPeriod;
   periodMetrics.pendingCalls = pending;
   periodMetrics.slaBreached  = slaBreached;
+  // Ongoing retainer cash = paid installments whose paid_date falls in the period.
+  // Signings live in `deals` as new_ht (counted in new cash), so every dated paid
+  // installment here is an existing-client top-up. The undated "prior paid" lump
+  // is all-time only and never enters a period's ROAS.
+  periodMetrics.retainerCash = (typeof RETAINER_INSTALLMENTS !== 'undefined' && RETAINER_INSTALLMENTS ? RETAINER_INSTALLMENTS : [])
+    .filter(i => i.paid && i.paid_date && inPeriod(i.paid_date))
+    .reduce((s, i) => s + (Number(i.amount_usd) || 0), 0);
   return periodMetrics;
 }
 
@@ -3169,6 +3209,9 @@ function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,ht
   const log = DB_LOG;
   const adsBooked    = log.reduce((s,l)=>s+((l.source||'').toLowerCase().includes('ads')?(l.booked||0):0),0);
   const totalCash    = htCash + lt;
+  // New-client HT cash = deal_type 'new_ht' only (signings). Retainer/back-end
+  // deal rows are excluded here — ongoing client cash comes from the retainers tab.
+  const newHtCash    = dealsArr.filter(isNewHt).reduce((s,d)=>s+(d.usd||0),0);
   const today = new Date();
   const last7=[];
   for(let i=6;i>=0;i--){
@@ -3189,6 +3232,7 @@ function buildMetrics(spend,leads,booked,shows,noshows,closes,lt,htCash,htAds,ht
     // so the show-up rate stays 39/75=52% while the Booked Calls card shows live count.
     showBase: booked,
     cash:totalCash,htCash,htAds,htOrg,contractTotal,pipeline:pipeline||0,
+    newHtCash,
     frankieDeals:frankieDeals.length,mehdiDeals:mehdiDeals.length,
     frankieCash,mehdiCash,frankieShows,mehdiShows,
     adsBookedCalls:adsBooked,orgBookedCalls:booked-adsBooked,
@@ -3797,6 +3841,29 @@ function renderExec(d) {
   set('k-oto-count', otoCount);
   set('k-oto-rev', otoCount > 0 ? (fmtFull(otoRev) + (ltCount > 0 ? ' · ' + otoAttach + '% of LT' : '')) : '—');
   badge('k-oto-rev', otoCount > 0 ? 'up' : 'neutral');
+
+  // ── New Cash ROAS vs Overall ROAS ──
+  // New cash  = new_ht signings + LT + OTO (all fresh, non-recurring cash).
+  // Overall   = new cash + ongoing retainer top-ups from existing clients.
+  // Both over the same ad spend. The only gap between them is retainer cash.
+  const newCashIn   = (d.newHtCash || 0) + (d.lt || 0) + otoRev;
+  const retCashIn   = d.retainerCash || 0;
+  const overallIn   = newCashIn + retCashIn;
+  const newRoas     = d.spend ? newCashIn / d.spend : 0;
+  const overallRoas = d.spend ? overallIn / d.spend : 0;
+  const roasClass   = (x) => x >= S.tgt_roas ? 'up' : x >= 1 ? 'warn' : 'down';
+
+  set('k-roas-new', d.spend ? newRoas.toFixed(2) + 'x' : '—');
+  set('k-roas-new-flag', d.spend ? fmtFull(newCashIn) + ' new cash' : '—');
+  badge('k-roas-new-flag', d.spend ? roasClass(newRoas) : 'neutral');
+
+  set('k-roas-overall', d.spend ? overallRoas.toFixed(2) + 'x' : '—');
+  set('k-roas-overall-flag', d.spend ? fmtFull(overallIn) + ' total in' : '—');
+  badge('k-roas-overall-flag', d.spend ? roasClass(overallRoas) : 'neutral');
+
+  set('k-ret-cash', fmtFull(retCashIn));
+  set('k-ret-cash-flag', retCashIn > 0 ? 'existing-client cash' : 'no top-ups in period');
+  badge('k-ret-cash-flag', 'neutral');
 
   // Revenue Per Lead — total cash collected / leads
   const rpl = d.leads ? d.cash / d.leads : 0;
