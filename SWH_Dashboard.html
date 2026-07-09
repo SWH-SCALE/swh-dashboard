@@ -7002,6 +7002,25 @@ function _mapEffStatusToLegacy(eff) {
   return 'scheduled';                              // 'pending' → legacy 'scheduled'
 }
 
+// Manual outcome/stage override. The calls_with_status view derives effective_status
+// from the GHL pipeline only, so a manual edit in the Booked Calls modal (Stage or
+// Manual Outcome) writes to the DB but never moves effective_status — leaving the pill
+// and show rate stuck on "pending". We layer the manual edit on here so EVERY consumer
+// of effective_status (the pill, the Booked Calls show rate, and the Executive show-up
+// rate) honors it. Manual is the intended escape hatch for calls GHL never got tagged.
+function applyBcManualOutcome(c) {
+  const OUT = { SHOWED:'showed', NO_SHOW:'no_show', 'NO-SHOW':'no_show', NOSHOW:'no_show',
+                CANCELLED:'cancelled', CANCELED:'cancelled', RESCHEDULED:'rescheduled' };
+  const mo = String(c.manual_outcome || '').trim().toUpperCase();
+  const st = String(c.stage || '').trim().toUpperCase();
+  // Explicit "Manual Outcome" wins; then the "Stage" field. If neither is set (or Stage
+  // is left as BOOKED), keep the view's GHL-derived effective_status untouched.
+  if (OUT[mo])      c.effective_status = OUT[mo];
+  else if (OUT[st]) c.effective_status = OUT[st];
+  c.status = _mapEffStatusToLegacy(c.effective_status);
+  return c;
+}
+
 async function getBookedCalls() {
   try {
     // Pull everything (the view is small — a few hundred rows max)
@@ -7029,7 +7048,7 @@ async function getBookedCalls() {
       is_test: r.is_test,
       manual_outcome: r.manual_outcome,
       manual_outcome_note: r.manual_outcome_note,
-    }));
+    })).map(applyBcManualOutcome);
   } catch(e) {
     console.log('calls_with_status not ready:', e.message);
     return [];
