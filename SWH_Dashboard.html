@@ -3067,6 +3067,16 @@ function computeMetrics(period) {
     // Show-rate denominator excludes pending (per locked rule: pending = unknown, not a no-show).
     const showRateBookedAT    = showsClampedAT + noshowsClampedAT;
 
+    // ── Outcomes (show-up + close rate), all-time, from the Closers Daily Tracker. ──
+    const _allCO = (typeof CALL_OUTCOMES !== 'undefined' && CALL_OUTCOMES) ? CALL_OUTCOMES : [];
+    const _isAdsCO_at = c => String(c.source || '').toLowerCase() === 'ads';
+    const coShowsAT     = _allCO.filter(c => c.showed === 'showed').length;
+    const coNoshowsAT   = _allCO.filter(c => c.showed === 'noshow').length;
+    const coClosesAT    = _allCO.filter(c => c.outcome === 'closed').length;
+    const coAdsShowsAT  = _allCO.filter(c => _isAdsCO_at(c) && c.showed === 'showed').length;
+    const coAdsClosesAT = _allCO.filter(c => _isAdsCO_at(c) && c.outcome === 'closed').length;
+    const coShowBaseAT  = coShowsAT + coNoshowsAT;
+
     const dbCloses = DB_LOG.reduce((s,l)=>s+(l.closes||0),0);
     const dbLt     = DB_LOG.reduce((s,l)=>s+(l.lt||0),0);
     const sheetLtRevenue = LT_FROM_SHEET > 0 ? LT_FROM_SHEET * 27 : 0;
@@ -3079,17 +3089,19 @@ function computeMetrics(period) {
       spendAuthoritative,
       Math.max(dbLeads, sheetLeads, fuTotal, ALL_TIME.leads) + (typeof JUNE_LEAD_BACKFILL !== 'undefined' ? JUNE_LEAD_BACKFILL.length : 0),
       bookedAuthoritative,
-      showsClampedAT,
-      noshowsClampedAT,
-      Math.max(dbCloses, ALL_TIME.closes),
+      coShowsAT,
+      coNoshowsAT,
+      coClosesAT,
       Math.max(dbLt, sheetLtRevenue, ALL_TIME.lt) + (typeof JUNE_LT_BACKFILL !== 'undefined' ? JUNE_LT_BACKFILL.length * 27 : 0),
       htCash, htAds, htOrg,
       deals.filter(d=>d.usd>0), contractTotal, pipeline, deals
     );
     // Show-rate denominator = showed + no_show (pending excluded — outcome unknown).
-    allTimeMetrics.showBase     = showRateBookedAT;
+    allTimeMetrics.showBase     = coShowBaseAT;
     allTimeMetrics.pendingCalls = pendingCallsAT;
     allTimeMetrics.slaBreached  = slaBreachedAT;
+    allTimeMetrics.adsShowsCO   = coAdsShowsAT;
+    allTimeMetrics.adsClosesCO  = coAdsClosesAT;
     allTimeMetrics.retainerCash = (RETAINER_INSTALLMENTS || [])
       .filter(i => i.paid && i.paid_date)
       .reduce((s, i) => s + (Number(i.amount_usd) || 0), 0);
@@ -3134,21 +3146,26 @@ function computeMetrics(period) {
       })
     : [];
   const booked  = _periodCalls.length;
-  const shows   = _periodCalls.filter(b => b.effective_status === 'showed').length;
-  const noshows = _periodCalls.filter(b => b.effective_status === 'no_show').length;
   const pending = _periodCalls.filter(b => b.effective_status === 'pending').length;
   const slaBreached = _periodCalls.filter(b => b.sla_breached).length;
-  // Per-closer shows for THIS period (the unfiltered all-time count is wrong here).
-  // We pass these into buildMetrics so the Closers tab respects the period switcher.
-  const frankieShowsPeriod = _periodCalls.filter(b =>
-    b.closer === 'Frankie' && b.effective_status === 'showed'
-  ).length;
-  const mehdiShowsPeriod = _periodCalls.filter(b =>
-    b.closer === 'Mehdi' && b.effective_status === 'showed'
-  ).length;
-  // Show-rate denominator excludes pending — outcome unknown ≠ no-show.
+  // ── Show-up + close rate come from the Closers Daily Tracker (call_outcomes) —
+  // the log Frankie actually maintains — NOT the booked-calls view, whose GHL stages
+  // are frequently left pending. call_outcomes is the source of truth for outcomes.
+  // Booked count still comes from the booked-calls view above (real bookings). ──
+  const _periodCO = (typeof CALL_OUTCOMES !== 'undefined' && CALL_OUTCOMES)
+    ? CALL_OUTCOMES.filter(c => c.date && inPeriod(c.date))
+    : [];
+  const _isAdsCO = c => String(c.source || '').toLowerCase() === 'ads';
+  const shows   = _periodCO.filter(c => c.showed === 'showed').length;
+  const noshows = _periodCO.filter(c => c.showed === 'noshow').length;
+  const frankieShowsPeriod = _periodCO.filter(c => c.closer === 'Frankie' && c.showed === 'showed').length;
+  const mehdiShowsPeriod   = _periodCO.filter(c => c.closer === 'Mehdi'   && c.showed === 'showed').length;
+  // Show-rate denominator = showed + no_show (rescheduled/blank excluded).
   const showBaseForPeriod = shows + noshows;
-  const closes = pLog.reduce((s,l)=>s+(l.closes||0),0);
+  const closes = _periodCO.filter(c => c.outcome === 'closed').length;
+  // Ads-only splits drive the "Close Rate (Ads)" card.
+  const adsShowsCO  = _periodCO.filter(c => _isAdsCO(c) && c.showed === 'showed').length;
+  const adsClosesCO = _periodCO.filter(c => _isAdsCO(c) && c.outcome === 'closed').length;
   const ltFromLog = pLog.reduce((s,l)=>s+(l.lt||0),0);
   const ltFromSheetPeriod = getLTForPeriod(period);
   const lt = Math.max(ltFromLog, ltFromSheetPeriod);
@@ -3166,6 +3183,8 @@ function computeMetrics(period) {
   periodMetrics.showBase     = showBaseForPeriod;
   periodMetrics.pendingCalls = pending;
   periodMetrics.slaBreached  = slaBreached;
+  periodMetrics.adsShowsCO   = adsShowsCO;
+  periodMetrics.adsClosesCO  = adsClosesCO;
   // Ongoing retainer cash = paid installments whose paid_date falls in the period.
   // Signings live in `deals` as new_ht (counted in new cash), so every dated paid
   // installment here is an existing-client top-up. The undated "prior paid" lump
@@ -3882,15 +3901,14 @@ function renderExec(d) {
   set('k-cpbc-flag', cpbc>0?(cpbc<=S.tgt_cpbc?'✓ under $'+S.tgt_cpbc:'target $'+S.tgt_cpbc):'—');
   badge('k-cpbc-flag', cpbc<=S.tgt_cpbc&&cpbc>0?'up':cpbc>0?'warn':'neutral');
 
-  set('k-showup', d.booked?Math.round(showR*100)+'%':'—');
-  const showOk=showR>=(S.tgt_showup/100)&&d.booked>0;
-  set('k-showup-flag', d.booked?(showOk?'✓ healthy':'target '+S.tgt_showup+'%'):'—');
-  badge('k-showup-flag', showOk?'up':d.booked?'warn':'neutral');
-  // Pending-calls note: explains why the rate may dip — calls booked but not yet held
-  const pend = d.pendingCalls || 0;
-  set('k-showup-pending', pend > 0
-    ? '↳ ' + pend + ' call' + (pend===1?'':'s') + ' booked, awaiting outcome'
-    : '');
+  set('k-showup', d.showBase?Math.round(showR*100)+'%':'—');
+  const showOk=showR>=(S.tgt_showup/100)&&d.showBase>0;
+  set('k-showup-flag', d.showBase?(showOk?'✓ healthy':'target '+S.tgt_showup+'%'):'—');
+  badge('k-showup-flag', showOk?'up':d.showBase?'warn':'neutral');
+  // Outcomes come from the Closers Daily Tracker (call_outcomes), not the booked-calls view.
+  set('k-showup-pending', d.showBase
+    ? '↳ ' + d.shows + ' showed / ' + d.noshows + ' no-show logged'
+    : d.booked ? '↳ ' + d.booked + ' booked · no outcomes logged yet' : '');
 
   // Close Rate (Ads) — deals attributable to calls that SHOWED in this period.
   //
@@ -3933,8 +3951,9 @@ function renderExec(d) {
       .filter(e => e)
       .filter(e => currentPeriod === 'all' ? true : _showedCallEmailsInPeriod.has(e))
   );
-  let adsDeals = adsUniqueCustomers.size;
-  let closeRateAds = d.shows > 0 ? adsDeals / d.shows : 0;
+  // Close Rate (Ads) — from the Closers Daily Tracker: ads closes ÷ ads shows.
+  let adsDeals = d.adsClosesCO || 0;
+  let closeRateAds = (d.adsShowsCO || 0) > 0 ? adsDeals / d.adsShowsCO : 0;
 
   // ── Hardcoded overrides for historical periods (audited values) ──
   // Verified against SWH_Payout_Tracker 2026 + Whop CSV exports:
@@ -3957,9 +3976,9 @@ function renderExec(d) {
     closeRateAds = 4 / 8;
   }
 
-  set('k-close-rate', d.shows ? Math.round(closeRateAds*100)+'%' : '—');
-  set('k-close-rate-meta', d.shows ? (adsDeals + ' of ' + d.shows + ' shows closed') : '— ads deals');
-  badge('k-close-rate-meta', closeRateAds >= 0.25 && d.shows > 0 ? 'up' : d.shows > 0 ? 'warn' : 'neutral');
+  set('k-close-rate', d.adsShowsCO ? Math.round(closeRateAds*100)+'%' : '—');
+  set('k-close-rate-meta', d.adsShowsCO ? (adsDeals + ' of ' + d.adsShowsCO + ' ads shows closed') : '— ads deals');
+  badge('k-close-rate-meta', closeRateAds >= 0.25 && d.adsShowsCO > 0 ? 'up' : d.adsShowsCO > 0 ? 'warn' : 'neutral');
 
   // Cash Collected — Ads (sum of usd on ads-sourced deals this period)
   // Source of truth: deals table. Whop sync writes here automatically.
