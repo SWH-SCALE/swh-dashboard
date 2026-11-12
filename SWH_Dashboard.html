@@ -2812,20 +2812,34 @@ async function getHtSales() {
 // ── Retainer system: NEW flexible installments model (manual entry only) ──
 // retainer_summary VIEW has one row per client with aggregated totals.
 // retainer_installments table has one row per installment.
+// A failed load must never blank the Retainers tab: retry once, and if it
+// still fails keep the last data that loaded (and say so on the tab).
+let RET_LOAD_FAILED = false;
+async function retFetchWithRetry(path) {
+  try { return await sbFetch(path); }
+  catch (e) {
+    await new Promise(r => setTimeout(r, 1500));
+    return await sbFetch(path);
+  }
+}
 async function getRetainerSummary() {
   try {
-    return await sbFetch('retainer_summary?order=name.asc');
+    const rows = await retFetchWithRetry('retainer_summary?order=name.asc');
+    RET_LOAD_FAILED = false;
+    return rows;
   } catch (e) {
-    console.log('retainer_summary view not ready:', e.message);
-    return [];
+    console.warn('retainer_summary load failed, keeping last data:', e.message);
+    RET_LOAD_FAILED = true;
+    return (typeof RETAINER_SUMMARY !== 'undefined' && RETAINER_SUMMARY) ? RETAINER_SUMMARY : [];
   }
 }
 async function getRetainerInstallments() {
   try {
-    return await sbFetch('retainer_installments?order=client_id.asc,installment_number.asc');
+    return await retFetchWithRetry('retainer_installments?order=client_id.asc,installment_number.asc');
   } catch (e) {
-    console.log('retainer_installments table not ready:', e.message);
-    return [];
+    console.warn('retainer_installments load failed, keeping last data:', e.message);
+    RET_LOAD_FAILED = true;
+    return (typeof RETAINER_INSTALLMENTS !== 'undefined' && RETAINER_INSTALLMENTS) ? RETAINER_INSTALLMENTS : [];
   }
 }
 // Sum Meta spend (USD) for a given dashboard period: 'all' | 'today' | '7d' | 'mtd' | 'lm'
@@ -3929,8 +3943,9 @@ async function loadAndRender() {
       RETAINER_INSTALLMENTS = await getRetainerInstallments();
     } catch(e) {
       console.warn('retainer load failed:', e.message);
-      RETAINER_SUMMARY = []; RETAINER_INSTALLMENTS = [];
     }
+    // Redraw the Retainers tab now its data is in (it may already be open)
+    if (typeof renderRetainers === 'function') { try { renderRetainers(); } catch(e) { console.warn(e); } }
     // Fetch P&L expenses + commissions (separate try — a failure here must not break the dashboard)
     try { await loadPnlData(); } catch(e) { console.warn('pnl data load failed:', e.message); }
     // Background: pull any new leads from Sheets into followup_leads
@@ -5017,7 +5032,9 @@ function renderRetainers() {
   const monthTbody = document.getElementById('ret-month-tbody');
   if (monthTbody) {
     if (!monthKeys.length && undatedCount === 0) {
-      monthTbody.innerHTML = '<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--t3)">No installments scheduled.</td></tr>';
+      monthTbody.innerHTML = RET_LOAD_FAILED
+        ? '<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--amber)">Couldn\'t load instalments just now. It retries automatically every 2 minutes, or refresh the page.</td></tr>'
+        : '<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--t3)">No installments scheduled.</td></tr>';
     } else {
       let html = monthKeys.map(k => {
         const b = monthBuckets[k];
