@@ -1535,6 +1535,10 @@ select.input-field option { background: var(--bg2); }
     </div>
   </div>
 
+  <!-- ── Payment reminders (Gmail) ── -->
+  <div class="section-label" style="margin:16px 0 10px">Payment reminders · Gmail <span id="rem-mode-badge" style="letter-spacing:0"></span></div>
+  <div id="rem-panel" class="chart-card" style="padding:14px 16px"></div>
+
   <!-- ── Expected Revenue by Month table ── -->
   <div class="section-label" style="margin:16px 0 10px">Expected revenue by month</div>
   <div class="chart-card">
@@ -4803,10 +4807,20 @@ function renderRetainers() {
   const totalOverdue     = activeClients.reduce((s,c) => s + (parseFloat(c.overdue_amount)    || 0), 0);
   const overdueInstCount = activeClients.reduce((s,c) => s + (parseInt(c.overdue_count)       || 0), 0);
 
+  // Partial payments on still-unpaid instalments (amount_paid_usd, written by the reminder system)
+  const partialClientIds = new Set(activeClients.map(c => c.id));
+  let partialPaid = 0, partialOverdue = 0;
+  installments.forEach(inst => {
+    if (!partialClientIds.has(inst.client_id)) return;
+    const pp = retPartialOf(inst); if (!pp) return;
+    partialPaid += pp;
+    if (inst.due_date && retDaysFromNow(inst.due_date) < 0) partialOverdue += pp;
+  });
+
   set('ret-contracted',     retFmt$(totalContracted));
-  set('ret-paid',           retFmt$(totalPaid));
-  set('ret-outstanding',    retFmt$(totalOutstanding));
-  set('ret-overdue',        retFmt$(totalOverdue));
+  set('ret-paid',           retFmt$(totalPaid + partialPaid));
+  set('ret-outstanding',    retFmt$(totalOutstanding - partialPaid));
+  set('ret-overdue',        retFmt$(totalOverdue - partialOverdue));
   set('ret-overdue-sub',    `${overdueInstCount} installment${overdueInstCount===1?'':'s'} past due`);
   set('ret-active',         activeClients.length);
   set('ret-paused-sub',     `${pausedCount} paused`);
@@ -4829,9 +4843,11 @@ function renderRetainers() {
     if (inst.paid) {
       monthBuckets[key].paid += amt;
     } else {
-      monthBuckets[key].outstanding += amt;
+      const pp = retPartialOf(inst);
+      monthBuckets[key].paid += pp;
+      monthBuckets[key].outstanding += amt - pp;
       if (retDaysFromNow(inst.due_date) < 0) {
-        monthBuckets[key].overdue += amt;
+        monthBuckets[key].overdue += amt - pp;
       }
     }
   });
@@ -4843,7 +4859,7 @@ function renderRetainers() {
     if (inst.due_date) return;
     const amt = parseFloat(inst.amount_usd) || 0;
     undatedExpected += amt;
-    if (inst.paid) undatedPaid += amt;
+    if (inst.paid) undatedPaid += amt; else undatedPaid += retPartialOf(inst);
     undatedCount++;
   });
 
@@ -4910,6 +4926,15 @@ function renderRetainers() {
   const closedTotalPaid = closedClients.reduce((s,c) => s + (parseFloat(c.total_paid) || 0), 0);
   set('ret-closed-total', retFmt$(closedTotalPaid));
   set('ret-closed-count', closedClients.length);
+
+  if (typeof remRenderPanel === 'function') remRenderPanel();
+}
+
+// Amount already paid towards an instalment that isn't fully paid yet (partial payment)
+function retPartialOf(inst) {
+  if (inst.paid) return 0;
+  const v = parseFloat(inst.amount_paid_usd);
+  return v > 0 ? v : 0;
 }
 
 // Compact table renderer for closed retainers — no installment tracking,
@@ -4996,8 +5021,9 @@ function renderInstallmentRow(inst) {
       <td style="padding:6px 8px;color:var(--t2);font-family:var(--font-mono);font-size:11px">#${inst.installment_number}</td>
       <td style="padding:6px 8px;font-family:var(--font-mono);font-weight:700;color:var(--t1)">${retFmt$(amt)}</td>
       <td style="padding:6px 8px;color:var(--t2);font-family:var(--font-mono);font-size:11px">${retFmtDate(inst.due_date)}</td>
-      <td style="padding:6px 8px">${statusPill}${notesHtml}</td>
-      <td style="padding:6px 8px;text-align:right">
+      <td style="padding:6px 8px;white-space:normal">${statusPill}${notesHtml}${typeof remInstStatus === 'function' ? remInstStatus(inst) : ''}</td>
+      <td style="padding:6px 8px;text-align:right;white-space:nowrap">
+        ${typeof remInstButtons === 'function' ? remInstButtons(inst) : ''}
         <button onclick="openEditInstallmentModal('${inst.id}')" title="Edit installment"
           style="background:var(--bg3);color:var(--t2);border:1px solid var(--border2);border-radius:5px;padding:3px 7px;font-size:10px;font-family:var(--font-mono);cursor:pointer">Edit</button>
         <button onclick="deleteRetInstallment('${inst.id}', '${(inst.installment_number||'')}')" title="Delete installment"
@@ -5014,9 +5040,11 @@ function renderRetClientCard(c, allInstallments) {
 
   // Totals (from view; all pre-computed)
   const total           = parseFloat(c.total_contracted)  || 0;
-  const paid            = parseFloat(c.total_paid)        || 0;
-  const outstanding     = parseFloat(c.total_outstanding) || 0;
-  const overdueAmt      = parseFloat(c.overdue_amount)    || 0;
+  const clientPartial   = clientInsts.reduce((s,i) => s + retPartialOf(i), 0);
+  const clientPartialOD = clientInsts.reduce((s,i) => s + ((i.due_date && retDaysFromNow(i.due_date) < 0) ? retPartialOf(i) : 0), 0);
+  const paid            = (parseFloat(c.total_paid)        || 0) + clientPartial;
+  const outstanding     = (parseFloat(c.total_outstanding) || 0) - clientPartial;
+  const overdueAmt      = (parseFloat(c.overdue_amount)    || 0) - clientPartialOD;
   const overdueCnt      = parseInt(c.overdue_count)       || 0;
   const installmentCount  = parseInt(c.installment_count)   || 0;
   const installmentsPaid  = parseInt(c.installments_paid)   || 0;
@@ -5070,6 +5098,7 @@ function renderRetClientCard(c, allInstallments) {
         <div style="font-size:11px;color:var(--t3);font-family:var(--font-mono);margin-top:3px">
           ${subtext}
         </div>
+        ${typeof remClientStrip === 'function' ? remClientStrip(c) : ''}
       </div>
 
       <div style="display:flex;gap:14px;align-items:center">
@@ -7388,6 +7417,454 @@ setInterval(autoSync, AUTO_SYNC_INTERVAL_MS);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) autoSync();
 });
+</script>
+<script>
+// ═══════════════════════════════════════════
+// PAYMENT REMINDERS (Gmail) · Retainers tab
+// ═══════════════════════════════════════════
+// All reminder data lives behind /api/reminders and needs the admin passcode
+// (DASHBOARD_ADMIN_PASSCODE in Vercel). No API keys or Gmail tokens are ever
+// in this page. Live client emails only go out when REMINDERS_LIVE=true.
+
+const REM = { unlocked: false, state: null, preview: null, showPreview: false, showLog: false, busy: false, _pass: '' };
+const REM_STAGE = { pre3: '3 days before', due: 'Due date', over2: '2 days overdue', over5: '5 days overdue', over7: '7 days overdue' };
+
+function remPass() { try { return sessionStorage.getItem('swh_rem_pass') || REM._pass; } catch (e) { return REM._pass; } }
+function remSetPass(p) { REM._pass = p || ''; try { p ? sessionStorage.setItem('swh_rem_pass', p) : sessionStorage.removeItem('swh_rem_pass'); } catch (e) {} }
+function remId(id) { return String(id == null ? '' : id).replace(/[^A-Za-z0-9_-]/g, ''); }
+function remEsc(s) { return retEscapeHtml(s); }
+function remWhen(ts) {
+  if (!ts) return '';
+  const d = new Date(ts); if (isNaN(d)) return '';
+  return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+function remBtn(label, onclick, opts = {}) {
+  const bg = opts.primary ? 'var(--accent)' : 'var(--bg3)';
+  const fg = opts.primary ? '#04140d' : (opts.danger ? 'var(--red)' : 'var(--t2)');
+  const bd = opts.primary ? 'none' : '1px solid var(--border2)';
+  return `<button onclick="event.stopPropagation();${onclick}" ${opts.title ? `title="${remEsc(opts.title)}"` : ''}
+    style="background:${bg};color:${fg};border:${bd};border-radius:6px;padding:${opts.small ? '3px 7px' : '6px 11px'};font-size:${opts.small ? '10px' : '11px'};font-weight:${opts.primary ? 700 : 500};font-family:var(--font-mono);cursor:pointer;white-space:nowrap">${label}</button>`;
+}
+function remPill(text, color, bg, title) {
+  return `<span class="pill" ${title ? `title="${remEsc(title)}"` : ''} style="background:${bg};color:${color};font-size:10px;margin-left:4px">${text}</span>`;
+}
+
+async function remApi(action, payload = {}) {
+  const res = await fetch('/api/reminders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-passcode': remPass() },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (res.status === 401) {
+    REM.unlocked = false; REM.state = null; remSetPass('');
+    if (typeof renderRetainers === 'function') renderRetainers();
+    throw new Error(data.error || 'Locked');
+  }
+  if (!res.ok || !data.ok) throw new Error(data.error || ('Request failed (' + res.status + ')'));
+  return data;
+}
+
+async function remUnlock() {
+  const p = prompt('Admin passcode for payment reminders');
+  if (!p) return;
+  remSetPass(p);
+  try {
+    await remApi('check');
+    REM.unlocked = true;
+    showToast('✓ Reminder controls unlocked');
+    await remRefresh();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+function remLock() { remSetPass(''); REM.unlocked = false; REM.state = null; REM.preview = null; renderRetainers(); }
+
+async function remRefresh() {
+  if (!REM.unlocked) return;
+  try {
+    REM.state = await remApi('state');
+    if (REM.showPreview) REM.preview = await remApi('preview');
+  } catch (e) { console.warn('reminder state failed:', e.message); }
+  renderRetainers();
+}
+
+// ── Top panel ─────────────────────────────
+function remRenderPanel() {
+  const el = document.getElementById('rem-panel');
+  const badge = document.getElementById('rem-mode-badge');
+  if (!el) return;
+  if (!REM.unlocked) {
+    if (badge) badge.innerHTML = '';
+    el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--t2)">🔒 Reminder controls are locked. Unlock to connect Gmail, manage reminders and see the activity log.</div>
+      ${remBtn('Unlock', 'remUnlock()', { primary: true })}</div>`;
+    return;
+  }
+  const s = REM.state;
+  if (!s) { el.innerHTML = '<div style="font-size:12px;color:var(--t3)">Loading reminder status…</div>'; return; }
+
+  const live = s.mode === 'live';
+  if (badge) badge.innerHTML = live
+    ? '<span class="pill" style="background:var(--accentd);color:var(--accent);letter-spacing:0">LIVE · emailing clients</span>'
+    : '<span class="pill" style="background:var(--amberd);color:var(--amber);letter-spacing:0">TEST MODE · no client emails</span>';
+
+  const insts = Object.values(s.instalments || {});
+  const sendToday = insts.filter(i => i.state === 'send').length;
+  const held = insts.filter(i => i.state === 'held').length;
+  const warn = insts.filter(i => i.state === 'scheduled' && (i.warnings || []).length).length;
+  const on = Object.values(s.clients || {}).filter(c => c.auto_reminders && !c.paused).length;
+  const g = s.gmail || {};
+
+  const setup = (s.missing_config || []).length
+    ? `<div style="margin-bottom:12px;padding:9px 12px;border-radius:7px;background:var(--amberd);color:var(--amber);font-size:11px;font-family:var(--font-mono)">Setup needed in Vercel → Environment Variables: ${s.missing_config.map(remEsc).join(', ')}</div>` : '';
+
+  const gmailLine = g.status === 'connected'
+    ? `<span style="color:var(--accent)">●</span> Sending from <b style="color:var(--t1)">${remEsc(g.email)}</b> ${remBtn('Disconnect', 'remGmailDisconnect()', { small: true, danger: true })}`
+    : g.status === 'error'
+      ? `<span style="color:var(--red)">●</span> <span style="color:var(--red)">${remEsc(g.last_error || 'Gmail needs reconnecting')}</span> ${remBtn('Reconnect Gmail', 'remGmailConnect()', { primary: true })}`
+      : `<span style="color:var(--t3)">●</span> Gmail not connected ${remBtn('Connect Gmail', 'remGmailConnect()', { primary: true })}`;
+
+  const stat = (n, label, color) => `<div style="min-width:92px"><div style="font-size:18px;font-weight:700;font-family:var(--font-mono);color:${n ? color : 'var(--t3)'}">${n}</div><div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.5px">${label}</div></div>`;
+
+  let html = `${setup}
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--t2);display:flex;align-items:center;gap:6px;flex-wrap:wrap">${gmailLine}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${remBtn(REM.showPreview ? 'Hide preview' : 'Preview upcoming', 'remTogglePreview()')}
+        ${remBtn('Send test email', 'remTestEmail()')}
+        ${remBtn('Run check now', 'remRunNow()')}
+        ${remBtn(REM.showLog ? 'Hide activity log' : 'Activity log', 'remToggleLog()')}
+        ${remBtn('Lock', 'remLock()', { title: 'Lock reminder controls' })}
+      </div>
+    </div>
+    <div style="display:flex;gap:18px;margin-top:12px;flex-wrap:wrap">
+      ${stat(on, 'clients on', 'var(--accent)')}
+      ${stat(sendToday, live ? 'sending today' : 'would send today', 'var(--accent)')}
+      ${stat(held, 'held today', 'var(--red)')}
+      ${stat(warn, 'need a fix', 'var(--amber)')}
+      ${stat((s.reviews || []).length, 'payments to review', 'var(--amber)')}
+    </div>
+    <div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:8px">Daily check runs 05:00 UTC (9:00am Dubai) · business timezone ${remEsc(s.timezone)} · today is ${remEsc(retFmtDate(s.today))} · test emails go to ${remEsc(s.test_email || 'the connected Gmail')}</div>`;
+
+  if ((s.reviews || []).length) html += remRenderReviews(s.reviews);
+  if (REM.showPreview) html += remRenderPreview();
+  if (REM.showLog) html += remRenderLog(s.log || []);
+  el.innerHTML = html;
+}
+
+function remRenderPreview() {
+  const p = REM.preview;
+  if (!p) return '<div style="margin-top:14px;font-size:12px;color:var(--t3)">Loading preview…</div>';
+  const rows = (p.upcoming || []).map(u => `<tr>
+      <td style="color:var(--t1);font-family:var(--font-mono)">${remEsc(u.date === p.today ? 'Today' : retFmtDate(u.date))}</td>
+      <td style="color:var(--t1)">${remEsc(u.client_name)}</td>
+      <td style="font-family:var(--font-mono);font-size:11px">${remEsc(u.to_email || '-')}</td>
+      <td style="font-family:var(--font-mono)">#${remEsc(u.instalment_number)} · due ${remEsc(retFmtDate(u.due_date))}</td>
+      <td>${remEsc(REM_STAGE[u.stage] || u.stage)}</td>
+      <td style="font-family:var(--font-mono);font-weight:700;color:var(--t1)">${retFmt$(u.amount_due)}</td>
+      <td style="white-space:normal">${u.will_send
+        ? remPill(p.mode === 'live' ? 'will send' : 'would send', 'var(--accent)', 'var(--accentd)')
+        : remPill('held', 'var(--red)', 'var(--redd)') + `<div style="font-size:10px;color:var(--red);margin-top:3px">${remEsc(u.reason)}</div>`}</td>
+    </tr>`).join('');
+  const attention = (p.attention || []).map(a => `<div style="font-size:11px;padding:5px 0;border-top:1px solid var(--border);color:var(--t2)">
+      <b style="color:var(--t1)">${remEsc(a.client_name)}</b> · #${remEsc(a.instalment_number)} · <span style="color:var(--amber)">${remEsc(a.reason)}</span></div>`).join('');
+  return `<div style="margin-top:16px">
+    <div class="section-label" style="margin:0 0 8px">Next 14 days · which emails go to whom</div>
+    <div class="deals-table-wrap"><table class="deals-table"><thead><tr><th>Send date</th><th>Client</th><th>To</th><th>Instalment</th><th>Reminder</th><th>Amount</th><th>Status</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:14px">No reminders in the next 14 days. Switch on Auto reminders for a client and add Whop links.</td></tr>'}</tbody></table></div>
+    ${attention ? `<div style="margin-top:12px"><div class="section-label" style="margin:0 0 4px">Needs attention</div>${attention}</div>` : ''}
+  </div>`;
+}
+
+function remRenderLog(log) {
+  const color = l => l.level === 'error' ? 'var(--red)' : l.level === 'warn' ? 'var(--amber)' : (/payment_confirmed|reminder_sent|gmail_connected/.test(l.event) ? 'var(--accent)' : 'var(--t2)');
+  const rows = log.map(l => `<div style="display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--border);font-size:11px">
+      <div style="color:var(--t3);font-family:var(--font-mono);min-width:96px">${remEsc(remWhen(l.created_at))}</div>
+      <div style="color:${color(l)};white-space:normal">${remEsc(l.message || l.event)}</div></div>`).join('');
+  return `<div style="margin-top:16px"><div class="section-label" style="margin:0 0 4px">Automation activity log · sends, failures, payments</div>
+    ${rows || '<div style="font-size:11px;color:var(--t3);padding:8px 0">Nothing logged yet.</div>'}</div>`;
+}
+
+function remRenderReviews(reviews) {
+  const options = remUnpaidOptions();
+  return `<div style="margin-top:14px;padding:10px 12px;border:1px solid var(--amberd);border-radius:8px;background:rgba(255,183,66,0.04)">
+    <div style="font-size:11px;color:var(--amber);font-weight:700;margin-bottom:6px">Whop payments that need a decision (not matched automatically, nothing marked paid)</div>
+    ${reviews.map(r => `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--border);font-size:11px">
+      <div style="flex:1;min-width:220px;color:var(--t2)"><b style="color:var(--t1)">${retFmt$(r.amount_usd)}</b> from ${remEsc(r.payer_name || '')} ${remEsc(r.payer_email || 'unknown')} · ${remEsc(remWhen(r.paid_at))}<div style="color:var(--t3)">${remEsc(r.reason || '')}</div></div>
+      <select id="rem-rev-${remId(r.whop_payment_id)}" style="background:var(--bg3);color:var(--t1);border:1px solid var(--border2);border-radius:6px;padding:4px;font-size:11px;max-width:260px">${options}</select>
+      ${remBtn('Apply', `remApplyReview('${remId(r.whop_payment_id)}')`, { small: true, primary: true })}
+      ${remBtn('Not an instalment', `remDismissReview('${remId(r.whop_payment_id)}')`, { small: true })}
+    </div>`).join('')}</div>`;
+}
+
+function remUnpaidOptions(selectedId) {
+  const names = {}; (RETAINER_SUMMARY || []).forEach(c => { names[c.id] = c.name; });
+  return '<option value="">Choose instalment…</option>' + (RETAINER_INSTALLMENTS || [])
+    .filter(i => !i.paid)
+    .sort((a, b) => (names[a.client_id] || '').localeCompare(names[b.client_id] || '') || (a.installment_number - b.installment_number))
+    .map(i => `<option value="${remEsc(i.id)}" ${String(i.id) === String(selectedId) ? 'selected' : ''}>${remEsc(names[i.client_id] || '?')} · #${i.installment_number} · ${retFmt$(i.amount_usd)} · ${remEsc(retFmtDate(i.due_date))}</option>`).join('');
+}
+
+// ── Client card strip + instalment extras ─
+function remClientStrip(c) {
+  if (!REM.unlocked || !REM.state) return '';
+  const s = (REM.state.clients || {})[c.id] || {};
+  const email = s.reminder_email || c.email || '';
+  const statusPill = !s.auto_reminders ? remPill('reminders off', 'var(--t3)', 'var(--bg3)')
+    : s.paused ? remPill('reminders paused', 'var(--amber)', 'var(--amberd)')
+    : remPill('auto reminders on', 'var(--accent)', 'var(--accentd)');
+  const last = s.last_sent ? `Last email ${remEsc(remWhen(s.last_sent.at))} (${remEsc(REM_STAGE[s.last_sent.stage] || s.last_sent.stage)})` : 'No reminder emails sent yet';
+  return `<div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px;font-size:11px;color:var(--t2);cursor:default">
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--t1)">
+      <input type="checkbox" ${s.auto_reminders ? 'checked' : ''} onchange="remToggleAuto('${remId(c.id)}', this.checked)" style="width:13px;height:13px;cursor:pointer">Auto reminders</label>
+    ${statusPill}
+    <span style="font-family:var(--font-mono);color:${email ? 'var(--t2)' : 'var(--red)'}">✉ ${remEsc(email || 'no email')}</span>
+    ${remBtn('Edit email', `remEditEmail('${remId(c.id)}')`, { small: true })}
+    ${s.auto_reminders ? remBtn(s.paused ? 'Resume reminders' : 'Pause reminders', `remTogglePause('${remId(c.id)}', ${!s.paused})`, { small: true }) : ''}
+    ${remBtn('History', `remHistory('${remId(c.id)}')`, { small: true })}
+    <span style="color:var(--t3);font-family:var(--font-mono);font-size:10px">${last}</span>
+  </div>`;
+}
+
+function remInstStatus(inst) {
+  let html = '';
+  const pp = parseFloat(inst.amount_paid_usd) || 0;
+  if (!inst.paid && pp > 0) html += `<div style="font-size:10px;color:var(--accent);font-family:var(--font-mono);margin-top:2px">partially paid ${retFmt$(pp)} · ${retFmt$((parseFloat(inst.amount_usd) || 0) - pp)} left</div>`;
+  if (!REM.unlocked || !REM.state) return html;
+  const r = (REM.state.instalments || {})[inst.id];
+  if (!r || r.state === 'paid' || r.state === 'closed') return html;
+  const live = REM.state.mode === 'live';
+  let pill = '';
+  if (r.state === 'send') pill = remPill(`${live ? 'sends' : 'would send'} today · ${REM_STAGE[r.stage]}`, 'var(--accent)', 'var(--accentd)');
+  else if (r.state === 'scheduled') pill = remPill(`🔔 ${REM_STAGE[r.next_stage]} · ${retFmtDate(r.next_date)}`, 'var(--t2)', 'var(--bg3)')
+    + ((r.warnings || []).length ? remPill('⚠ fix before then', 'var(--amber)', 'var(--amberd)', r.warnings.join('; ')) : '');
+  else if (r.state === 'held') pill = remPill('held', 'var(--red)', 'var(--redd)', r.reason);
+  else if (r.state === 'complete') pill = remPill('all 5 reminders sent', 'var(--t2)', 'var(--bg3)', r.reason);
+  else if (r.state === 'missed') pill = remPill('past reminder schedule', 'var(--t3)', 'var(--bg3)', r.reason);
+  if (r.state === 'held' && r.reason) pill += `<div style="font-size:10px;color:var(--red);margin-top:2px;white-space:normal">${remEsc(r.reason)}</div>`;
+  if (r.last_sent) pill += `<div style="font-size:10px;color:var(--t3);font-family:var(--font-mono);margin-top:2px">last emailed ${remEsc(remWhen(r.last_sent.at))}</div>`;
+  return html + (pill ? `<div style="margin-top:3px">${pill}</div>` : '');
+}
+
+function remInstButtons(inst) {
+  if (!REM.unlocked || !REM.state) return '';
+  const r = (REM.state.instalments || {})[inst.id] || {};
+  const l = r.link;
+  let linkBtn;
+  if (!l) linkBtn = remBtn('+ Whop link', `remEditLink('${remId(inst.id)}')`, { small: true, title: 'Add Whop payment link' });
+  else {
+    const c = l.verify_status === 'verified' ? 'var(--accent)' : l.verify_status === 'mismatch' ? 'var(--red)' : 'var(--amber)';
+    linkBtn = `<button onclick="event.stopPropagation();remEditLink('${remId(inst.id)}')" title="${remEsc(l.url)}"
+      style="background:var(--bg3);color:${c};border:1px solid var(--border2);border-radius:5px;padding:3px 7px;font-size:10px;font-family:var(--font-mono);cursor:pointer">🔗 Whop</button>`;
+  }
+  const pay = inst.paid ? '' : remBtn('$ Record', `remRecordPayment('${remId(inst.id)}')`, { small: true, title: 'Record a payment made outside Whop (full or partial)' });
+  return `${linkBtn} ${pay} `;
+}
+
+// ── Actions ───────────────────────────────
+async function remDo(fn, okMsg) {
+  if (REM.busy) return;
+  REM.busy = true;
+  try { const r = await fn(); if (okMsg) showToast(typeof okMsg === 'function' ? okMsg(r) : okMsg); await remRefresh(); return r; }
+  catch (e) { showToast(e.message, 'error'); await remRefresh(); }
+  finally { REM.busy = false; }
+}
+
+function remToggleAuto(cid, on) {
+  return remDo(() => remApi('save-client', { client_id: cid, auto_reminders: on }), on ? '✓ Auto reminders on' : 'Auto reminders off');
+}
+function remTogglePause(cid, paused) {
+  return remDo(() => remApi('save-client', { client_id: cid, paused }), paused ? 'Reminders paused' : '✓ Reminders resumed');
+}
+async function remGmailConnect() {
+  try { const r = await remApi('gmail-connect-url'); window.location.href = r.url; }
+  catch (e) { showToast(e.message, 'error'); }
+}
+function remGmailDisconnect() {
+  if (!confirm('Disconnect Gmail? No reminder emails can be sent until it is reconnected.')) return;
+  return remDo(() => remApi('gmail-disconnect'), 'Gmail disconnected');
+}
+async function remTogglePreview() {
+  REM.showPreview = !REM.showPreview;
+  if (REM.showPreview) { REM.preview = null; remRenderPanel(); try { REM.preview = await remApi('preview'); } catch (e) { showToast(e.message, 'error'); } }
+  remRenderPanel();
+}
+function remToggleLog() { REM.showLog = !REM.showLog; remRenderPanel(); }
+function remRunNow() {
+  const live = REM.state && REM.state.mode === 'live';
+  const msg = live
+    ? 'LIVE MODE: this emails every client whose reminder is due today (each reminder is only ever sent once). Continue?'
+    : 'Run today\'s check in TEST MODE? No client emails are sent. The result appears in the activity log.';
+  if (!confirm(msg)) return;
+  REM.showLog = true;
+  return remDo(() => remApi('run'), r => {
+    const s = r.summary || {};
+    if (s.locked) return 'Another run is already in progress';
+    return s.mode === 'live' ? `✓ Run complete: ${s.sent} sent, ${s.failed} failed` : `✓ Test run: ${(s.would_send || []).length} reminder(s) would be sent today`;
+  });
+}
+
+// ── Modals ────────────────────────────────
+function remModal(title, body, actions) {
+  let m = document.getElementById('rem-modal');
+  if (!m) {
+    m = document.createElement('div'); m.id = 'rem-modal';
+    m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center';
+    m.addEventListener('click', e => { if (e.target === m) remCloseModal(); });
+    document.body.appendChild(m);
+  }
+  m.innerHTML = `<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:22px;width:520px;max-width:94vw;max-height:86vh;overflow:auto">
+    <div style="font-size:14px;font-weight:600;margin-bottom:14px;color:var(--t1)">${title}</div>${body}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">${actions || ''}<button class="period-btn" onclick="remCloseModal()" style="font-size:12px">Close</button></div></div>`;
+  m.style.display = 'flex';
+}
+function remCloseModal() { const m = document.getElementById('rem-modal'); if (m) m.style.display = 'none'; }
+const REM_INPUT = 'width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px';
+const remLabel = t => `<label style="font-size:11px;color:var(--t3);display:block;margin:10px 0 4px">${t}</label>`;
+function remInstLabel(inst) {
+  const c = (RETAINER_SUMMARY || []).find(x => x.id === inst.client_id);
+  return `${remEsc(c ? c.name : 'Client')} · instalment #${remEsc(inst.installment_number)} · ${retFmt$(inst.amount_usd)} · due ${remEsc(retFmtDate(inst.due_date))}`;
+}
+
+function remEditLink(instId) {
+  const inst = (RETAINER_INSTALLMENTS || []).find(i => remId(i.id) === instId); if (!inst) return;
+  const r = ((REM.state || {}).instalments || {})[inst.id] || {};
+  const l = r.link;
+  const status = !l ? '' : l.verify_status === 'verified'
+    ? `<div style="font-size:11px;color:var(--accent);margin-top:6px">✓ Verified with Whop: ${retFmt$(l.verified_amount)} ${remEsc(String(l.verified_currency || '').toUpperCase())}</div>`
+    : `<div style="font-size:11px;color:${l.verify_status === 'mismatch' ? 'var(--red)' : 'var(--amber)'};margin-top:6px">${remEsc(l.verify_note || 'Not verified: check the amount on the link yourself')}</div>`;
+  remModal('Whop payment link', `<div style="font-size:12px;color:var(--t2)">${remInstLabel(inst)}</div>
+    ${remLabel('Paste the Whop checkout link for this exact instalment amount')}
+    <input id="rem-link-url" type="url" value="${remEsc(l ? l.url : '')}" placeholder="https://whop.com/checkout/plan_..." style="${REM_INPUT}">
+    ${status}
+    <div style="font-size:10px;color:var(--t3);margin-top:8px;line-height:1.5">The link's price is checked against Whop when you save. If it doesn't match the amount due, reminders for this instalment are held until it's fixed. Clicking the link never marks anything paid: only a confirmed Whop payment does.</div>`,
+    (l ? remBtn('Remove link', `remRemoveLink('${instId}')`, { danger: true }) : '') + remBtn('Save', `remSaveLink('${instId}')`, { primary: true }));
+}
+function remSaveLink(instId) {
+  const url = document.getElementById('rem-link-url').value.trim();
+  remCloseModal();
+  return remDo(() => remApi('save-link', { instalment_id: instId, url }), r => r.note || '✓ Link saved');
+}
+function remRemoveLink(instId) {
+  if (!confirm('Remove this Whop link? Reminders for this instalment will be held until a link is added.')) return;
+  remCloseModal();
+  return remDo(() => remApi('remove-link', { instalment_id: instId }), 'Link removed');
+}
+
+function remRecordPayment(instId) {
+  const inst = (RETAINER_INSTALLMENTS || []).find(i => remId(i.id) === instId); if (!inst) return;
+  const left = (parseFloat(inst.amount_usd) || 0) - (parseFloat(inst.amount_paid_usd) || 0);
+  remModal('Record a payment', `<div style="font-size:12px;color:var(--t2)">${remInstLabel(inst)}</div>
+    ${remLabel('Amount received (USD) · enter less than the balance for a partial payment')}
+    <input id="rem-pay-amount" type="number" step="0.01" value="${left > 0 ? left.toFixed(2) : ''}" style="${REM_INPUT}">
+    ${remLabel('Date received')}
+    <input id="rem-pay-date" type="date" value="${new Date().toISOString().slice(0, 10)}" style="${REM_INPUT}">
+    ${remLabel('Notes (e.g. bank transfer to Mercury)')}
+    <input id="rem-pay-notes" type="text" style="${REM_INPUT}">
+    <div style="font-size:10px;color:var(--t3);margin-top:8px;line-height:1.5">Saved permanently to the payment history (records can't be edited or deleted). When the instalment is fully covered it's marked paid and its reminders stop.</div>`,
+    remBtn('Record payment', `remSavePayment('${instId}')`, { primary: true }));
+}
+function remSavePayment(instId) {
+  const amount = parseFloat(document.getElementById('rem-pay-amount').value);
+  const paid_date = document.getElementById('rem-pay-date').value;
+  const notes = document.getElementById('rem-pay-notes').value;
+  if (!(amount > 0)) { showToast('Enter an amount', 'error'); return; }
+  remCloseModal();
+  return remDo(async () => { const r = await remApi('record-payment', { instalment_id: instId, amount, paid_date, notes }); await reloadRetainerData(); return r; },
+    r => r.covered ? '✓ Payment recorded, instalment marked paid' : `✓ Partial payment recorded`);
+}
+
+function remEditEmail(cid) {
+  const c = (RETAINER_SUMMARY || []).find(x => remId(x.id) === cid); if (!c) return;
+  const s = ((REM.state || {}).clients || {})[c.id] || {};
+  remModal('Reminder email', `<div style="font-size:12px;color:var(--t2)">${remEsc(c.name)}</div>
+    ${remLabel('Send payment reminders to')}
+    <input id="rem-email" type="email" value="${remEsc(s.reminder_email || c.email || '')}" placeholder="client@example.com" style="${REM_INPUT}">
+    <div style="font-size:10px;color:var(--t3);margin-top:8px">Stored securely for reminders only. Leave blank to use the client's email from the card (${remEsc(c.email || 'none set')}).</div>`,
+    remBtn('Save', `remSaveEmail('${cid}')`, { primary: true }));
+}
+function remSaveEmail(cid) {
+  const e = document.getElementById('rem-email').value.trim();
+  remCloseModal();
+  return remDo(() => remApi('save-client', { client_id: cid, reminder_email: e }), '✓ Reminder email saved');
+}
+
+async function remHistory(cid) {
+  const c = (RETAINER_SUMMARY || []).find(x => remId(x.id) === cid);
+  remModal(`Reminder history · ${remEsc(c ? c.name : '')}`, '<div style="font-size:12px;color:var(--t3)">Loading…</div>');
+  try {
+    const h = await remApi('history', { client_id: cid });
+    const instNum = {}; (RETAINER_INSTALLMENTS || []).forEach(i => { instNum[i.id] = i.installment_number; });
+    const statusColor = s => s === 'sent' ? 'var(--accent)' : (s === 'failed' || s === 'uncertain') ? 'var(--red)' : 'var(--t3)';
+    const sends = (h.sends || []).map(s => `<tr><td style="font-family:var(--font-mono)">${remEsc(remWhen(s.sent_at || s.created_at))}</td>
+      <td>#${remEsc(instNum[s.instalment_id] || '-')}</td><td>${remEsc(REM_STAGE[s.stage] || s.stage)}${s.mode === 'test' ? ' <span style="color:var(--amber)">(test)</span>' : ''}</td>
+      <td style="font-family:var(--font-mono);font-size:11px">${remEsc(s.to_email)}</td>
+      <td style="color:${statusColor(s.status)}" title="${remEsc(s.last_error || '')}">${remEsc(s.status)}</td></tr>`).join('');
+    const pays = (h.payments || []).map(p => `<tr><td style="font-family:var(--font-mono)">${remEsc(retFmtDate(p.paid_at))}</td>
+      <td>#${remEsc(instNum[p.instalment_id] || '-')}</td><td style="color:var(--accent);font-weight:700;font-family:var(--font-mono)">${retFmt$(p.amount_usd)}</td>
+      <td>${remEsc(p.source === 'whop' ? 'Whop' : 'Manual')}</td><td style="font-size:11px">${remEsc(p.notes || p.match_method || '')}</td></tr>`).join('');
+    remModal(`Reminder history · ${remEsc(c ? c.name : '')}`, `
+      <div class="section-label" style="margin:0 0 6px">Emails</div>
+      <div class="deals-table-wrap"><table class="deals-table"><thead><tr><th>When</th><th>Inst.</th><th>Reminder</th><th>To</th><th>Status</th></tr></thead>
+      <tbody>${sends || '<tr><td colspan="5" style="color:var(--t3)">No reminder emails yet.</td></tr>'}</tbody></table></div>
+      <div class="section-label" style="margin:16px 0 6px">Payments recorded</div>
+      <div class="deals-table-wrap"><table class="deals-table"><thead><tr><th>Date</th><th>Inst.</th><th>Amount</th><th>Source</th><th>Notes</th></tr></thead>
+      <tbody>${pays || '<tr><td colspan="5" style="color:var(--t3)">No payments recorded through the reminder system.</td></tr>'}</tbody></table></div>
+      ${remRenderLog(h.log || [])}`);
+  } catch (e) { remCloseModal(); showToast(e.message, 'error'); }
+}
+
+function remTestEmail() {
+  const s = REM.state || {};
+  if (!s.gmail || s.gmail.status !== 'connected') { showToast('Connect Gmail first', 'error'); return; }
+  const stages = Object.entries(REM_STAGE).map(([k, v]) => `<option value="${k}" ${k === 'due' ? 'selected' : ''}>${v}</option>`).join('');
+  remModal('Send test email', `
+    <div style="font-size:12px;color:var(--t2);line-height:1.5">Sends a sample reminder to <b style="color:var(--t1)">${remEsc(s.test_email || '')}</b> only. No client is emailed, in test or live mode.</div>
+    ${remLabel('Use this instalment\'s details (optional)')}
+    <select id="rem-test-inst" style="${REM_INPUT}">${remUnpaidOptions().replace('Choose instalment…', 'Sample client ($3,000)')}</select>
+    ${remLabel('Reminder')}
+    <select id="rem-test-stage" style="${REM_INPUT}">${stages}</select>`,
+    remBtn('Send test', 'remSendTest()', { primary: true }));
+}
+function remSendTest() {
+  const instalment_id = document.getElementById('rem-test-inst').value || null;
+  const stage = document.getElementById('rem-test-stage').value;
+  remCloseModal();
+  return remDo(() => remApi('test-send', { instalment_id, stage }), r => `✓ Test email sent to ${r.sent_to}`);
+}
+
+function remApplyReview(pid) {
+  const sel = document.getElementById('rem-rev-' + pid);
+  if (!sel || !sel.value) { showToast('Choose the instalment this payment is for', 'error'); return; }
+  return remDo(async () => { const r = await remApi('resolve-review', { whop_payment_id: pid, instalment_id: sel.value }); await reloadRetainerData(); return r; }, '✓ Payment applied');
+}
+function remDismissReview(pid) {
+  if (!confirm('Mark this Whop payment as not an instalment? It stays in Whop and the Deal Log as normal.')) return;
+  return remDo(() => remApi('dismiss-review', { whop_payment_id: pid }), 'Dismissed');
+}
+
+// ── Startup ───────────────────────────────
+(async function remInit() {
+  const params = new URLSearchParams(location.search);
+  const back = params.get('reminders');
+  if (back) {
+    history.replaceState(null, '', location.pathname);
+    if (back === 'gmail-connected') setTimeout(() => showToast('✓ Gmail connected'), 600);
+    const nav = document.querySelector('.nav-item[onclick*="\'retainers\'"]');
+    if (nav) setTimeout(() => switchTab('retainers', nav), 300);
+  }
+  if (remPass()) {
+    try { await remApi('check'); REM.unlocked = true; await remRefresh(); } catch (e) { /* stays locked */ }
+  } else {
+    remRenderPanel();
+  }
+  // refresh reminder status every 2 minutes while the Retainers tab is open
+  setInterval(() => {
+    const tab = document.getElementById('tab-retainers');
+    if (REM.unlocked && !document.hidden && tab && tab.classList.contains('active')) remRefresh();
+  }, 2 * 60 * 1000);
+})();
 </script>
 </body>
 </html>

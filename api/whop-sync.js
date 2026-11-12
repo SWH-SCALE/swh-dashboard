@@ -224,6 +224,11 @@ export default async function handler(req, res) {
       } catch (e) { /* don't block deals if retainer table errors */ }
     }
 
+    // --- 3b. instalment payments (recorded by /api/whop-webhook) ---
+    // These are retainer instalments: tag them deal_type='retainer' and keep
+    // them out of the old retainer matcher below. Fails safe (empty set).
+    const instalmentPaymentIds = await lookupInstalmentPayments(paid);
+
     // --- 4. process each payment ---
     const seen = new Set();
     const newDealRows = [];
@@ -259,7 +264,9 @@ export default async function handler(req, res) {
         // ── HIGH-TICKET payment ──
         // Run through retainer matcher to determine deal_type.
         dealType = 'new_ht'; // safe default
-        if (!existingRetainerPayments.has(p.id) && dateOnly && gross > 0) {
+        if (instalmentPaymentIds.has(p.id)) {
+          dealType = 'retainer';
+        } else if (!existingRetainerPayments.has(p.id) && dateOnly && gross > 0) {
           try {
             const allocation = await syncToRetainerSystem({
               whop_payment_id: p.id,
@@ -363,6 +370,33 @@ export default async function handler(req, res) {
 // =========================================================
 // Returns { bucket, status, expected, notes } so the caller can use bucket
 // to determine deal_type for the deals row.
+
+// Payments that belong to a scheduled instalment: already in the
+// instalment_payments ledger, or made on a Whop plan saved against an
+// instalment. Needs SUPABASE_SERVICE_ROLE_KEY (those tables are server-only).
+async function lookupInstalmentPayments(payments) {
+  const out = new Set();
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key || !payments.length) return out;
+  const h = { apikey: key, Authorization: `Bearer ${key}` };
+  try {
+    const ids = payments.map(p => p.id).filter(Boolean);
+    for (let i = 0; i < ids.length; i += 50) {
+      const inList = ids.slice(i, i + 50).map(id => `"${id}"`).join(',');
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/instalment_payments?select=whop_payment_id&whop_payment_id=in.(${inList})`, { headers: h });
+      if (r.ok) (await r.json()).forEach(row => out.add(row.whop_payment_id));
+    }
+    const lr = await fetch(`${SUPABASE_URL}/rest/v1/instalment_whop_links?select=plan_id&plan_id=not.is.null`, { headers: h });
+    if (lr.ok) {
+      const plans = new Set((await lr.json()).map(row => row.plan_id));
+      for (const p of payments) {
+        const planId = (p.plan && p.plan.id) || p.plan_id;
+        if (planId && plans.has(planId)) out.add(p.id);
+      }
+    }
+  } catch (e) { /* fail safe: behave exactly as before */ }
+  return out;
+}
 
 async function syncToRetainerSystem(payment, stats) {
   let client = await findClientByEmail(payment.customer_email);
