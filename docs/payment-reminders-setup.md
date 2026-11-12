@@ -13,7 +13,7 @@ Supabase → SQL Editor → New query → paste `sql/payment_reminders.sql` → 
 5. Data Access → Add scope `https://www.googleapis.com/auth/gmail.send`.
 6. Clients → Create client → **Web application** → Authorized redirect URIs:
    - `https://YOUR-DASHBOARD-DOMAIN/api/gmail-auth`
-   - `https://YOUR-PREVIEW-DOMAIN/api/gmail-auth` (for testing on the preview)
+   - `https://swh-dashboard-git-payment-reminders-mentormehdi-6349s-projects.vercel.app/api/gmail-auth` (the test preview of this branch)
 7. Copy the **Client ID** and **Client secret**.
 
 ## 3. Vercel → Project → Settings → Environment Variables
