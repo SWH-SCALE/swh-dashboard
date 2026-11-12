@@ -5,7 +5,8 @@
 //  3. payment status is re-checked right before each email
 
 import crypto from 'node:crypto';
-import { settings, MAX_SEND_ATTEMPTS, MAX_SENDS_PER_RUN, AMOUNT_TOLERANCE, STAGES } from './config.js';
+import { settings, whopLinkConfig, MAX_SEND_ATTEMPTS, MAX_SENDS_PER_RUN, AMOUNT_TOLERANCE, STAGES } from './config.js';
+import { ensureLink as realEnsureLink, retireLink as realRetireLink } from './links.js';
 import { todayIn } from './dates.js';
 import { buildPlan } from './engine.js';
 import { buildReminderEmail } from './email.js';
@@ -15,7 +16,7 @@ const stageLabel = k => (STAGES.find(s => s.key === k) || {}).label || k;
 /**
  * deps: { store, send(gmailRow, msg) => {id}, now?: Date, live?: boolean, trigger?: string }
  */
-export async function runReminders({ store, send, now = new Date(), live, trigger = 'cron' }) {
+export async function runReminders({ store, send, now = new Date(), live, trigger = 'cron', ensureLink = realEnsureLink, retireLink = realRetireLink }) {
   const cfg = settings();
   const isLive = live ?? cfg.live;
   const today = todayIn(cfg.timezone, now);
@@ -38,12 +39,22 @@ export async function runReminders({ store, send, now = new Date(), live, trigge
     }
 
     const data = await store.loadAll();
-    const plan = buildPlan(data, today);
+    const autoLinks = whopLinkConfig().enabled;
+    const plan = buildPlan(data, today, { autoLinks });
+
+    // Switch off generated Whop links for instalments that are now paid
+    // (e.g. ticked paid by hand), so they can't be paid twice.
+    for (const it of plan.items) {
+      const l = data.links[it.instalment_id];
+      if (it.state === 'paid' && l && l.source === 'generated' && !l.retired_at) {
+        await retireLink(store, it.instalment_id).catch(() => {});
+      }
+    }
     summary.held = plan.items.filter(i => i.state === 'held' && i.stage).length;
     const toSend = plan.toSend;
 
     if (!isLive) {
-      summary.would_send = toSend.map(i => ({ to: i.to_email, client: i.client_name, instalment: i.instalment_number, stage: i.stage, amount: i.amount_due }));
+      summary.would_send = toSend.map(i => ({ to: i.to_email, client: i.client_name, instalment: i.instalment_number, stage: i.stage, amount: i.amount_due, link: i.link_action ? 'created automatically' : 'saved link' }));
       await store.log({
         event: 'dry_run',
         message: `Test mode: ${toSend.length} reminder(s) would be sent today${toSend.length ? ': ' + toSend.map(i => `${i.client_name} (${stageLabel(i.stage)})`).join(', ') : ''}. No client emails sent.`,
@@ -88,6 +99,25 @@ export async function runReminders({ store, send, now = new Date(), live, trigge
         await store.updateSend(claim.id, { status: 'cancelled', last_error: 'Paid before the email was sent' });
         await store.log({ event: 'reminder_cancelled', client_id: item.client_id, instalment_id: item.instalment_id, message: `${item.client_name}: paid moments before the reminder, so nothing was sent.` });
         continue;
+      }
+      item.amount_due = Math.round((Number(fresh.amount_usd) - paidSoFar) * 100) / 100;
+      item.amount_paid = paidSoFar;
+
+      // Create (or refresh) the Whop link for the exact amount due, if needed
+      if (item.link_action) {
+        try {
+          const inst = fresh;
+          const client = data.clients.find(c => String(c.id) === String(item.client_id));
+          const r = await ensureLink(store, { inst, client, amountDue: item.amount_due });
+          item.whop_url = r.link.url;
+          await store.updateSend(claim.id, { whop_url: item.whop_url });
+        } catch (e) {
+          await store.updateSend(claim.id, { status: 'failed', last_error: `Whop link: ${e.message}` });
+          await store.log({ level: 'error', event: 'reminder_failed', client_id: item.client_id, instalment_id: item.instalment_id,
+            message: `${item.client_name}: could not create the Whop link, so no email was sent (${e.message}). Will retry next run.` });
+          summary.failed++;
+          continue;
+        }
       }
 
       const email = buildReminderEmail({

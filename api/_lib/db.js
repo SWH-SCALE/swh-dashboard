@@ -135,6 +135,10 @@ export function createStore() {
       });
       return rows[0];
     },
+    async getLink(instalmentId) {
+      const rows = await rest(`instalment_whop_links?select=*&instalment_id=eq.${enc(instalmentId)}`);
+      return rows[0] || null;
+    },
     async deleteLink(instalmentId) {
       await rest(`instalment_whop_links?instalment_id=eq.${enc(instalmentId)}`, { method: 'DELETE' });
     },

@@ -154,3 +154,23 @@ test('ledger is append-only (records cannot be edited)', async () => {
   const body = event(payment()); await call(store, body, sign(body));
   assert.throws(() => { store.db.payments[0].amount_usd = 1; });
 });
+
+test('payment through a generated link: matched by metadata (even at $97), marked paid, link switched off in Whop', async () => {
+  process.env.WHOP_API_KEY = 'test_key';
+  const s = seed();
+  s.instalments[0].amount_usd = 97;
+  s.links.i1 = { instalment_id: 'i1', client_id: 'c1', url: 'https://whop.com/checkout/ch_7/', source: 'generated', checkout_config_id: 'ch_7', plan_id: 'plan_G', verified_amount: 97, verified_currency: 'usd' };
+  const store = createMemoryStore(s);
+  const deleted = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => { if (init?.method === 'DELETE') deleted.push(url); return { ok: true, status: 200, json: async () => ({}) }; };
+  try {
+    const body = event(payment({ id: 'pay_meta', total: 97, usd_total: 97, plan: { id: 'plan_G' }, user: { email: 'someone.else@x.com' }, metadata: { instalment_id: 'i1', client_id: 'c1' } }));
+    const out = await call(store, body, sign(body));
+    assert.equal(out.body.outcome, 'applied');
+    assert.equal(store.db.payments[0].match_method, 'metadata');
+    assert.equal(store.db.instalments.find(i => i.id === 'i1').paid, true);
+    assert.equal(deleted.length, 1); assert.match(deleted[0], /checkout_configurations\/ch_7$/);
+    assert.ok(store.db.links.i1.retired_at);
+  } finally { globalThis.fetch = realFetch; }
+});

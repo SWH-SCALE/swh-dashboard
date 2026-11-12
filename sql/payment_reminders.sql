@@ -30,8 +30,11 @@ create table if not exists public.reminder_client_settings (
   auto_reminders  boolean not null default false,   -- OFF until switched on per client
   paused          boolean not null default false,
   reminder_email  text,
+  confirmed_email text,                              -- email at the time reminders were switched on
   updated_at      timestamptz not null default now()
 );
+alter table public.reminder_client_settings add column if not exists confirmed_email text;
+alter table public.reminder_client_settings add column if not exists enabled_on date;  -- reminders dated before this are never back-filled
 
 -- ---------------------------------------------------------------------
 -- 3. Whop payment link per instalment
@@ -47,8 +50,16 @@ create table if not exists public.instalment_whop_links (
   verified_currency  text,
   verify_note        text,
   verified_at        timestamptz,
+  source             text not null default 'manual' check (source in ('manual','generated')),
+  checkout_config_id text,                           -- Whop checkout configuration (generated links)
+  generation         int not null default 0,
+  retired_at         timestamptz,                    -- generated link switched off in Whop after payment
   updated_at         timestamptz not null default now()
 );
+alter table public.instalment_whop_links add column if not exists source text not null default 'manual';
+alter table public.instalment_whop_links add column if not exists checkout_config_id text;
+alter table public.instalment_whop_links add column if not exists generation int not null default 0;
+alter table public.instalment_whop_links add column if not exists retired_at timestamptz;
 
 -- ---------------------------------------------------------------------
 -- 4. Payment ledger (append-only: rows can never be edited or deleted)

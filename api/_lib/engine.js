@@ -38,12 +38,35 @@ export function firstName(fullName) {
   return first.charAt(0).toUpperCase() + first.slice(1);
 }
 
+export function sameEmail(a, b) {
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+}
+
+/**
+ * What needs doing with the payment link before an email can go out.
+ * Returns { problems: [...], linkAction: null | 'generate' | 'regenerate' }.
+ * autoLinks: automatic Whop link generation is switched on.
+ */
+export function linkStatus({ link, amountDue, autoLinks }) {
+  if (!link || !link.url || link.retired_at) {
+    return autoLinks ? { problems: [], linkAction: 'generate' }
+                     : { problems: ['No Whop payment link for this instalment'], linkAction: null };
+  }
+  if (link.source === 'generated') {
+    const off = link.verified_amount == null || Math.abs(Number(link.verified_amount) - amountDue) > 0.009;
+    if (!off) return { problems: [], linkAction: null };
+    return autoLinks ? { problems: [], linkAction: 'regenerate' }
+                     : { problems: [`Whop link is for $${round2(link.verified_amount)} but $${round2(amountDue)} is due`], linkAction: null };
+  }
+  return { problems: sendProblems({ toEmail: 'ok@ok.ok', link, amountDue }), linkAction: null };
+}
+
 // Problems that would stop an email going out for this instalment.
 export function sendProblems({ toEmail, link, amountDue }) {
   const problems = [];
-  if (!isValidEmail(toEmail)) problems.push('No valid email address for this client');
+  if (!isValidEmail(toEmail)) problems.push('Missing email address');
   if (!link || !link.url) {
-    problems.push('No Whop payment link saved for this instalment');
+    problems.push('No Whop payment link for this instalment');
   } else if (!isWhopUrl(link.url)) {
     problems.push('Payment link is not a secure whop.com link');
   } else if (link.verify_status === 'mismatch') {
@@ -70,7 +93,7 @@ export function evaluateInstalment(inst, ctx, today, opts = {}) {
   const total = round2(inst.amount_usd);
   const ledgerPaid = round2(ctx.paidAmount || 0);
   const amountDue = round2(Math.max(0, total - ledgerPaid));
-  const toEmail = (s.reminder_email || client.email || '').trim();
+  const toEmail = String(client.email || '').trim();   // the email on the client's Edit panel, never guessed
   const dueDate = isIsoDate(inst.due_date) ? inst.due_date.slice(0, 10) : null;
 
   const base = {
@@ -118,7 +141,14 @@ export function evaluateInstalment(inst, ctx, today, opts = {}) {
   let ci = -1;
   STAGES.forEach((st, i) => { if (st.offset <= diff) ci = i; });
 
-  const problems = sendProblems({ toEmail, link: ctx.link, amountDue });
+  const ls = linkStatus({ link: ctx.link, amountDue, autoLinks: !!opts.autoLinks });
+  const problems = [];
+  if (!isValidEmail(toEmail)) problems.push('Missing email address');
+  else if (s.confirmed_email && !sameEmail(s.confirmed_email, toEmail)) {
+    problems.push('Client email was changed. Confirm it before reminders resume');
+  }
+  problems.push(...ls.problems);
+  base.link_action = ls.linkAction;
   const scheduled = (idx, extra = {}) => {
     const next = STAGES[idx];
     return {
@@ -136,8 +166,10 @@ export function evaluateInstalment(inst, ctx, today, opts = {}) {
   }
 
   const current = STAGES[ci];
-  if (diff - current.offset > catchUp) {
-    if (ci + 1 < STAGES.length) return scheduled(ci + 1, { reason: `Missed "${current.label}" reminder` });
+  // Switching reminders on never back-fills reminders dated before that day
+  const beforeEnabled = s.enabled_on && addDays(dueDate, current.offset) < String(s.enabled_on).slice(0, 10);
+  if (diff - current.offset > catchUp || beforeEnabled) {
+    if (ci + 1 < STAGES.length) return scheduled(ci + 1, { reason: beforeEnabled ? `"${current.label}" was before reminders were switched on` : `Missed "${current.label}" reminder` });
     return { ...base, state: 'missed', reason: 'Overdue beyond the reminder schedule. Not emailed automatically.' };
   }
 

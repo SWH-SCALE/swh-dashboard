@@ -41,6 +41,16 @@ export function settings() {
   };
 }
 
+// Automatic Whop checkout links. Needs an existing Whop product to sit
+// under (no products are ever created). Set WHOP_AUTO_LINKS=false to turn off.
+export function whopLinkConfig() {
+  const productId = env('WHOP_INSTALMENT_PRODUCT_ID');
+  if (env('WHOP_AUTO_LINKS') === 'false') return { enabled: false, reason: 'Turned off (WHOP_AUTO_LINKS=false)' };
+  if (!env('WHOP_API_KEY')) return { enabled: false, reason: 'WHOP_API_KEY is not set' };
+  if (!productId) return { enabled: false, reason: 'Set WHOP_INSTALMENT_PRODUCT_ID to the Whop product links should use' };
+  return { enabled: true, productId, reason: null };
+}
+
 // Which required variables are missing (shown on the dashboard, values never shown)
 export function missingConfig() {
   const required = [

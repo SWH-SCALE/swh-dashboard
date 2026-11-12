@@ -5,10 +5,11 @@
 // Live client emails are only sent when REMINDERS_LIVE=true in Vercel.
 // Otherwise everything runs in test mode: previews and test emails only.
 
-import { settings, missingConfig, STAGES, AMOUNT_TOLERANCE } from './_lib/config.js';
+import { settings, missingConfig, whopLinkConfig, STAGES, AMOUNT_TOLERANCE } from './_lib/config.js';
+import { ensureLink, retireLink } from './_lib/links.js';
 import { todayIn, isIsoDate } from './_lib/dates.js';
 import { createStore } from './_lib/db.js';
-import { buildPlan, simulateUpcoming, isValidEmail, isWhopUrl, round2 } from './_lib/engine.js';
+import { buildPlan, simulateUpcoming, isValidEmail, isWhopUrl, sameEmail, round2 } from './_lib/engine.js';
 import { buildReminderEmail } from './_lib/email.js';
 import { sendEmail, authUrl, revoke } from './_lib/gmail.js';
 import { runReminders } from './_lib/runner.js';
@@ -43,6 +44,17 @@ export default async function handler(req, res) {
   }
 }
 
+function contactAudit(clients) {
+  const active = clients.filter(c => !c.is_paused && !c.is_closed);
+  const missing = active.filter(c => !isValidEmail(c.email || ''));
+  return {
+    active: active.length,
+    with_email: active.length - missing.length,
+    missing: missing.length,
+    missing_clients: missing.map(c => ({ id: String(c.id), name: c.name })),
+  };
+}
+
 function fail(message, status = 400) { const e = new Error(message); e.status = status; return e; }
 
 const ACTIONS = {
@@ -52,7 +64,8 @@ const ACTIONS = {
     const cfg = settings();
     const today = todayIn(cfg.timezone);
     const data = await store.loadAll();
-    const plan = buildPlan(data, today);
+    const links = whopLinkConfig();
+    const plan = buildPlan(data, today, { autoLinks: links.enabled });
     const [reviews, log] = await Promise.all([store.openReviews(), store.recentLog(80)]);
 
     const lastByClient = {};
@@ -68,7 +81,8 @@ const ACTIONS = {
       const k = String(c.id); const s = data.settings[k] || {};
       clients[k] = {
         auto_reminders: !!s.auto_reminders, paused: !!s.paused,
-        reminder_email: s.reminder_email || null, client_email: c.email || null,
+        email_ok: isValidEmail(c.email || ''),
+        email_needs_confirm: !!(s.auto_reminders && s.confirmed_email && isValidEmail(c.email || '') && !sameEmail(s.confirmed_email, c.email)),
         last_sent: lastByClient[k] || null,
       };
     }
@@ -78,8 +92,8 @@ const ACTIONS = {
       instalments[it.instalment_id] = {
         state: it.state, stage: it.stage, next_stage: it.next_stage, next_date: it.next_date,
         reason: it.reason, warnings: it.warnings, amount_paid: it.amount_paid, amount_due: it.amount_due,
-        last_sent: it.last_sent,
-        link: l ? { url: l.url, verify_status: l.verify_status, verified_amount: l.verified_amount, verified_currency: l.verified_currency, verify_note: l.verify_note } : null,
+        last_sent: it.last_sent, link_action: it.link_action || null,
+        link: l && !l.retired_at ? { url: l.url, source: l.source || 'manual', verify_status: l.verify_status, verified_amount: l.verified_amount, verified_currency: l.verified_currency, verify_note: l.verify_note } : null,
       };
     }
     const g = data.gmail || {};
@@ -89,6 +103,8 @@ const ACTIONS = {
       gmail: { status: g.status || 'disconnected', email: g.email || null, connected_at: g.connected_at || null, last_used_at: g.last_used_at || null, last_error: g.last_error || null },
       test_email: cfg.testEmail || g.email || null,
       from_name: cfg.fromName,
+      auto_links: { enabled: links.enabled, reason: links.reason },
+      contact_audit: contactAudit(data.clients),
       clients, instalments, reviews, log,
       stages: STAGES,
     };
@@ -98,8 +114,9 @@ const ACTIONS = {
     const cfg = settings();
     const today = todayIn(cfg.timezone);
     const data = await store.loadAll();
-    const plan = buildPlan(data, today);
-    const upcoming = simulateUpcoming(data, today, 14);
+    const autoLinks = whopLinkConfig().enabled;
+    const plan = buildPlan(data, today, { autoLinks });
+    const upcoming = simulateUpcoming(data, today, 14, { autoLinks });
     const attention = plan.items
       .filter(i => (i.state === 'held') || (i.state === 'scheduled' && i.warnings?.length) || i.state === 'missed')
       .map(i => ({ client_name: i.client_name, instalment_number: i.instalment_number, instalment_id: i.instalment_id, client_id: i.client_id, due_date: i.due_date, state: i.state, reason: i.reason || (i.warnings || []).join('; ') }));
@@ -153,15 +170,11 @@ const ACTIONS = {
     const changes = [];
     if (typeof body.auto_reminders === 'boolean') { row.auto_reminders = body.auto_reminders; changes.push(`auto reminders ${body.auto_reminders ? 'ON' : 'OFF'}`); }
     if (typeof body.paused === 'boolean') { row.paused = body.paused; changes.push(body.paused ? 'reminders paused' : 'reminders resumed'); }
-    if (body.reminder_email !== undefined) {
-      const e = String(body.reminder_email || '').trim().toLowerCase();
-      if (e && !isValidEmail(e)) throw fail('That email address is not valid');
-      row.reminder_email = e || null; changes.push(`reminder email set to ${e || '(client email)'}`);
-    }
     if (row.auto_reminders === true) {
-      const existing = await store.getSettings(cid);
-      const effective = (row.reminder_email !== undefined ? row.reminder_email : existing?.reminder_email) || client.email || '';
-      if (!isValidEmail(effective)) throw fail('Add an email for this client before switching reminders on');
+      if (!isValidEmail(client.email || '')) throw fail('Add an email to this client (Edit) before switching reminders on');
+      row.confirmed_email = client.email.trim().toLowerCase();
+      const prev = await store.getSettings(cid);
+      if (!prev || !prev.auto_reminders) row.enabled_on = todayIn(settings().timezone);
     }
     const saved = await store.upsertSettings(row);
     await store.log({ event: 'settings_changed', client_id: cid, message: `${client.name}: ${changes.join(', ')}.` });
@@ -175,10 +188,12 @@ const ACTIONS = {
     if (!url) throw fail('Paste a Whop link');
     if (!isWhopUrl(url)) throw fail('Paste the full https://whop.com/... payment link');
     const v = await verifyLink(url);
+    await retireLink(store, String(inst.id), { reason: 'replaced' }).catch(() => {}); // a generated link being replaced
     const saved = await store.upsertLink({
       instalment_id: String(inst.id), client_id: String(inst.client_id), url,
       plan_id: v.plan_id || null, verify_status: v.verify_status, verified_amount: v.verified_amount ?? null,
       verified_currency: v.verified_currency ?? null, verify_note: v.verify_note ?? null, verified_at: v.verified_at ?? null,
+      source: 'manual', checkout_config_id: null, retired_at: null,
     });
     const owed = round2(Number(inst.amount_usd) - Number(inst.amount_paid_usd || 0));
     let note = v.verify_status === 'verified'
@@ -190,9 +205,37 @@ const ACTIONS = {
     return { link: saved, note };
   },
 
+  // The client's email was edited: confirm it so reminders can go to it
+  async 'confirm-email'({ store, body }) {
+    const cid = String(body.client_id || '');
+    const client = cid && await store.getClient(cid);
+    if (!client) throw fail('Client not found');
+    if (!isValidEmail(client.email || '')) throw fail('This client has no valid email yet');
+    const existing = await store.getSettings(cid);
+    if (!existing) return { confirmed: false };
+    if (sameEmail(existing.confirmed_email, client.email)) return { confirmed: true };
+    await store.upsertSettings({ client_id: cid, confirmed_email: client.email.trim().toLowerCase() });
+    await store.log({ event: 'settings_changed', client_id: cid, message: `${client.name}: reminder email confirmed as ${client.email.trim()}.` });
+    return { confirmed: true };
+  },
+
+  async 'generate-link'({ store, body }) {
+    const inst = await store.getInstalment(String(body.instalment_id || ''));
+    if (!inst) throw fail('Instalment not found');
+    if (inst.paid) throw fail('This instalment is already paid');
+    const due = round2(Number(inst.amount_usd) - await store.ledgerSum(String(inst.id)));
+    if (!(due > AMOUNT_TOLERANCE)) throw fail('Nothing is due on this instalment');
+    const client = await store.getClient(String(inst.client_id));
+    try {
+      const r = await ensureLink(store, { inst, client, amountDue: due, replaceManual: true });
+      return { link: { url: r.link.url, source: r.link.source }, note: r.created ? `✓ Whop link created for $${due}` : 'This instalment already has a link for the right amount' };
+    } catch (e) { throw fail(e.message); }
+  },
+
   async 'remove-link'({ store, body }) {
     const inst = await store.getInstalment(String(body.instalment_id || ''));
     if (!inst) throw fail('Instalment not found');
+    await retireLink(store, String(inst.id), { reason: 'removed' }).catch(() => {});
     await store.deleteLink(String(inst.id));
     await store.log({ event: 'link_removed', client_id: String(inst.client_id), instalment_id: String(inst.id), message: `Whop link removed from instalment #${inst.installment_number}.` });
     return {};
@@ -210,6 +253,7 @@ const ACTIONS = {
       notes: String(body.notes || '').slice(0, 500) || null,
     });
     const r = await store.applyLedger(String(inst.id), date);
+    if (r.covered) await retireLink(store, String(inst.id)).catch(() => {});
     const client = await store.getClient(String(inst.client_id));
     await store.log({ event: r.covered ? 'payment_confirmed' : 'payment_partial', client_id: String(inst.client_id), instalment_id: String(inst.id),
       message: `Manual payment recorded: ${client?.name || 'client'} paid $${amount} on ${date} for instalment #${inst.installment_number}. ${r.covered ? 'Marked paid, reminders stopped.' : `$${round2(r.total - r.sum)} still due.`}` });

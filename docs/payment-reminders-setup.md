@@ -29,11 +29,18 @@ Supabase → SQL Editor → New query → paste `sql/payment_reminders.sql` → 
 | `GMAIL_ALLOWED_SENDER` | optional: the only Gmail address allowed to connect |
 | `REMINDER_TEST_EMAIL` | optional: where test emails go (default: the connected Gmail) |
 | `BUSINESS_TIMEZONE` | optional, default `Asia/Dubai` |
+| `WHOP_INSTALMENT_PRODUCT_ID` | turns on automatic Whop links: the ID (`prod_...`) of the existing Whop product the instalment links sit under |
 
 Do **not** add `REMINDERS_LIVE` until live sending is approved. Without it, no client is ever emailed.
 
 ## 4. Whop webhook
 Whop dashboard → Developer → Webhooks → Create → URL `https://YOUR-DASHBOARD-DOMAIN/api/whop-webhook`, event `payment.succeeded` → copy the secret (`ws_...`) into `WHOP_WEBHOOK_SECRET`.
+
+## 4b. Automatic Whop links (optional)
+1. Whop dashboard → Developer → API keys → edit the key used as `WHOP_API_KEY` and allow: checkout configurations (create, read, delete), plans (create, read), and the access pass create/update permissions Whop requires for checkout links. The dashboard always passes your existing product, so no products are created.
+2. Add `WHOP_INSTALMENT_PRODUCT_ID` in Vercel and redeploy.
+3. Test: Retainers → open a client → instalment → Link → Generate link now.
+Links are one-time, hidden, single-use, USD, for the exact amount still due. They're reused while the amount is unchanged, replaced after a partial payment, and switched off in Whop once the instalment is paid. Set `WHOP_AUTO_LINKS=false` to turn this off.
 
 ## 5. Connect Gmail
 Redeploy → Retainers tab → Unlock (passcode) → **Connect Gmail** → sign in with the business account → Allow.

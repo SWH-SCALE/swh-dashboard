@@ -20,7 +20,7 @@ export function createMemoryStore(seed = {}) {
     webhooks: {},
     log: [],
     gmail: seed.gmail || { id: 1, status: 'connected', email: 'billing@swh.test', refresh_token_enc: 'x' },
-    lock: null,
+    locks: {},
   };
   const now = () => new Date().toISOString();
 
@@ -41,11 +41,12 @@ export function createMemoryStore(seed = {}) {
 
     async claimLock(name, holder, seconds) {
       await tick();
-      if (db.lock && db.lock.until > Date.now()) return false;
-      db.lock = { holder, until: Date.now() + seconds * 1000 };
+      const l = db.locks[name];
+      if (l && l.until > Date.now()) return false;
+      db.locks[name] = { holder, until: Date.now() + seconds * 1000 };
       return true;
     },
-    async releaseLock(name, holder) { if (db.lock?.holder === holder) db.lock = null; },
+    async releaseLock(name, holder) { if (db.locks[name]?.holder === holder) delete db.locks[name]; },
 
     async claimSend(row) {
       await tick();
@@ -74,6 +75,7 @@ export function createMemoryStore(seed = {}) {
     async getSettings(cid) { return db.settings[cid] || null; },
     async upsertSettings(row) { db.settings[row.client_id] = { auto_reminders: false, paused: false, ...(db.settings[row.client_id] || {}), ...row }; return db.settings[row.client_id]; },
     async upsertLink(row) { db.links[row.instalment_id] = { ...(db.links[row.instalment_id] || {}), ...row }; return db.links[row.instalment_id]; },
+    async getLink(id) { await tick(); return db.links[id] ? structuredClone(db.links[id]) : null; },
     async deleteLink(id) { delete db.links[id]; },
 
     async insertPayment(row) {

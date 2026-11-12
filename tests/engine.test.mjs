@@ -83,14 +83,16 @@ test('auto reminders off, paused, client paused, closed: nothing sent', () => {
 test('held: missing link, bad link, missing email, wrong currency, no due date', () => {
   assert.match(ev('2026-11-20', {}, { link: null }).reason, /No Whop payment link/);
   assert.match(ev('2026-11-20', {}, { link: { url: 'https://evil.com/pay' } }).reason, /not a secure whop.com link/);
-  assert.match(ev('2026-11-20', {}, { client: { ...client, email: '' } }).reason, /No valid email/);
+  assert.match(ev('2026-11-20', {}, { client: { ...client, email: '' } }).reason, /Missing email address/);
   assert.match(ev('2026-11-20', {}, { link: { ...link, verified_currency: 'gbp' } }).reason, /GBP/);
   assert.equal(ev('2026-11-20', { due_date: null }).state, 'held');
 });
 
-test('reminder email override wins over client email', () => {
-  const r = ev('2026-11-20', {}, { settings: { ...on, reminder_email: 'accounts@client.com' } });
-  assert.equal(r.to_email, 'accounts@client.com');
+test('email comes only from the client record, and a changed email holds reminders until confirmed', () => {
+  assert.equal(ev('2026-11-20', {}, { settings: { ...on, reminder_email: 'other@x.com' } }).to_email, 'john@client.com');
+  const changed = ev('2026-11-20', {}, { settings: { ...on, confirmed_email: 'old@client.com' } });
+  assert.equal(changed.state, 'held'); assert.match(changed.reason, /Confirm it/);
+  assert.equal(ev('2026-11-20', {}, { settings: { ...on, confirmed_email: 'JOHN@client.com' } }).state, 'send');
 });
 
 test('failed send is retried while the stage is current, then given up after 3 attempts', () => {
@@ -126,4 +128,15 @@ test('helpers', () => {
   assert.equal(firstName('john smith (GBP)'), 'John');
   assert.equal(firstName(''), 'there');
   assert.equal(extractPlanId('https://whop.com/checkout/plan_X1y2Z3/?d=1'), 'plan_X1y2Z3');
+});
+
+test('switching reminders on never back-fills reminders dated before that day', () => {
+  // 9 days overdue, switched on today: no surprise "final reminder"
+  const r = ev('2026-11-29', {}, { settings: { ...on, enabled_on: '2026-11-29' } });
+  assert.equal(r.state, 'missed');
+  // switched on 3 days before due: the schedule runs normally from there
+  assert.equal(ev('2026-11-17', {}, { settings: { ...on, enabled_on: '2026-11-17' } }).stage, 'pre3');
+  // switched on the day after due: skips "due", next is +2
+  const late = ev('2026-11-21', {}, { settings: { ...on, enabled_on: '2026-11-21' } });
+  assert.equal(late.state, 'scheduled'); assert.equal(late.next_stage, 'over2');
 });

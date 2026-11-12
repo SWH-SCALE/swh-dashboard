@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { env, WHOP_COMPANY_ID, LT_PRODUCT_IDS, LT_AMOUNTS, AMOUNT_TOLERANCE, settings } from './config.js';
 import { round2, extractPlanId, isWhopUrl } from './engine.js';
 import { todayIn } from './dates.js';
+import { retireLink } from './links.js';
 
 // ── Signature (Standard Webhooks: HMAC-SHA256 over "id.timestamp.body") ──
 export function verifyWebhook(rawBody, headers, secret, nowSec = Math.floor(Date.now() / 1000)) {
@@ -117,7 +118,8 @@ export async function recordWhopPayment(store, raw, { dataOverride } = {}) {
   const pay = normalisePayment(raw);
   if (!pay.id) return { outcome: 'ignored', reason: 'No payment id' };
   if (!isSucceeded(pay)) return { outcome: 'ignored', reason: `Status ${pay.status}/${pay.substatus}` };
-  if (isNeverInstalment(pay)) return { outcome: 'ignored', reason: 'Low-ticket product, not an instalment' };
+  // A payment made on one of our instalment links always counts, whatever the amount
+  if (!pay.metadata?.instalment_id && isNeverInstalment(pay)) return { outcome: 'ignored', reason: 'Low-ticket product, not an instalment' };
 
   const data = dataOverride || await store.loadAll();
   const already = await store.paymentsByWhopIds([pay.id]);
@@ -154,6 +156,7 @@ export async function applyPayment(store, data, pay, inst, method) {
     return { outcome: 'duplicate', instalment_id: String(inst.id) };
   }
   const res = await store.applyLedger(inst.id, paidDate);
+  if (res.covered) await retireLink(store, inst.id).catch(() => {}); // stop the link being paid twice
   const client = data.clients.find(c => String(c.id) === String(inst.client_id)) || {};
   const over = res.sum - res.total;
   await store.log({
