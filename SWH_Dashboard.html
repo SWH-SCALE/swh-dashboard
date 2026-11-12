@@ -1581,6 +1581,7 @@ select.input-field option { background: var(--bg2); }
     <div class="section-label" style="margin:0">Active retainers · current clients with installment schedules</div>
     <button onclick="openNewClientModal('active')" class="period-btn active" style="font-size:11px">+ Add Active Client</button>
   </div>
+  <div id="ret-missing-emails"></div>
   <div id="ret-clients-list"></div>
 
   <!-- ── Closed retainers section ── -->
@@ -1613,9 +1614,10 @@ select.input-field option { background: var(--bg2); }
         style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
     </div>
     <div style="margin-bottom:10px">
-      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Email (optional)</label>
-      <input id="ret-client-email" type="email" placeholder="client@example.com"
+      <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Client email</label>
+      <input id="ret-client-email" type="email" placeholder="client@example.com" oninput="retEmailHint()"
         style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);color:var(--t1);border-radius:6px;font-size:13px">
+      <div id="ret-client-email-hint" style="font-size:10px;margin-top:3px;line-height:1.4;color:var(--t3)"></div>
     </div>
     <div style="margin-bottom:10px">
       <label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">Total deal value (USD) · default 10000</label>
@@ -4934,6 +4936,18 @@ function renderRetainers() {
       : `${monthKeys.length} month${monthKeys.length === 1 ? '' : 's'} scheduled`;
   }
 
+  // ── Missing emails: active clients only, never guessed ──
+  const missingEl = document.getElementById('ret-missing-emails');
+  if (missingEl) {
+    const missing = activeClients.filter(c => !retValidEmail(c.email || '')).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    missingEl.innerHTML = !missing.length ? '' : `
+      <div style="margin:0 0 10px;padding:12px 14px;border:1px solid rgba(255,183,66,0.25);background:rgba(255,183,66,0.05);border-radius:10px">
+        <div style="font-size:12px;color:var(--amber);font-weight:600;margin-bottom:8px">✉ ${missing.length} of ${activeClients.length} active clients are missing an email. Click a name to add it.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${missing.map(c => `<button onclick="openEditClientModal('${c.id}')" title="Add email for ${retEscapeHtml(c.name)}"
+          style="background:var(--amberd);color:var(--amber);border:1px solid rgba(255,183,66,0.25);border-radius:14px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:var(--font-display)">${retEscapeHtml(c.name)}</button>`).join('')}</div>
+      </div>`;
+  }
+
   // ── Active client cards (cards with installments) ──
   const list = document.getElementById('ret-clients-list');
   if (list) {
@@ -5082,6 +5096,9 @@ function renderRetClientCard(c, allInstallments) {
 
   // Badges
   const pausedBadge  = isPaused ? '<span class="pill" style="background:var(--bg3);color:var(--t3);margin-left:6px;font-size:10px">paused</span>' : '';
+  const emailBadge   = (!c.is_closed && !retValidEmail(c.email || ''))
+    ? `<span class="pill" onclick="event.stopPropagation();openEditClientModal('${c.id}')" title="Add email" style="background:var(--amberd);color:var(--amber);margin-left:6px;font-size:10px;cursor:pointer">✉ missing email</span>`
+    : '';
   const overdueBadge = overdueCnt > 0
     ? `<span class="pill" style="background:var(--redd);color:var(--red);margin-left:6px;font-size:10px">${overdueCnt} overdue · ${retFmt$(overdueAmt)}</span>`
     : '';
@@ -5120,7 +5137,7 @@ function renderRetClientCard(c, allInstallments) {
 
       <div style="flex:1;min-width:200px">
         <div style="font-weight:700;color:var(--t1);font-size:14px">
-          ${escName}${pausedBadge}${overdueBadge}${notesBadge}${paidUpBadge}
+          ${escName}${emailBadge}${pausedBadge}${overdueBadge}${notesBadge}${paidUpBadge}
         </div>
         <div style="font-size:11px;color:var(--t3);font-family:var(--font-mono);margin-top:3px">
           ${subtext}
@@ -5194,6 +5211,7 @@ function openNewClientModal(defaultSection) {
   document.getElementById('ret-client-contract-url').value = '';
   document.getElementById('ret-client-section').value      = section;
   document.getElementById('ret-client-paused').checked     = false;
+  retEmailHint();
   document.getElementById('ret-client-modal').style.display = 'flex';
 }
 
@@ -5210,7 +5228,19 @@ function openEditClientModal(clientId) {
   document.getElementById('ret-client-contract-url').value = c.contract_url || '';
   document.getElementById('ret-client-section').value      = c.is_closed ? 'closed' : 'active';
   document.getElementById('ret-client-paused').checked     = !!c.is_paused;
+  retEmailHint();
   document.getElementById('ret-client-modal').style.display = 'flex';
+}
+
+function retValidEmail(e) {
+  return typeof e === 'string' && /^[^\s@<>()",;]+@[^\s@<>()",;]+\.[^\s@<>()",;]{2,}$/.test(e.trim());
+}
+function retEmailHint() {
+  const v = (document.getElementById('ret-client-email').value || '').trim();
+  const h = document.getElementById('ret-client-email-hint'); if (!h) return;
+  if (!v) { h.style.color = 'var(--amber)'; h.textContent = 'Missing email. Only enter the client\'s real address.'; }
+  else if (!retValidEmail(v)) { h.style.color = 'var(--red)'; h.textContent = "That doesn't look like a valid email address."; }
+  else { h.style.color = 'var(--t3)'; h.textContent = ''; }
 }
 
 function closeRetClientModal() {
@@ -5229,6 +5259,7 @@ async function saveRetClient() {
   const isPaused    = document.getElementById('ret-client-paused').checked;
 
   if (!name) { showToast('Client name required', 'error'); return; }
+  if (email && !retValidEmail(email)) { showToast("That email doesn't look valid", 'error'); return; }
   const total = totalRaw === '' ? 0 : parseFloat(totalRaw);
   if (isNaN(total) || total < 0) {
     showToast('Invalid total value', 'error'); return;
