@@ -855,6 +855,21 @@ select.input-field option { background: var(--bg2); }
   .flag-grid { grid-template-columns: repeat(2, 1fr); }
   .scale-checks { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ─── Retainers: collapsible sections ─── */
+.rt-acc { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; margin: 16px 0 10px; overflow: hidden; }
+.rt-acc-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: none; border: none; color: var(--t1); cursor: pointer; text-align: left; font-family: var(--font-display); flex-wrap: wrap; }
+.rt-acc-head:hover { background: rgba(255,255,255,0.015); }
+.rt-acc-title { font-size: 13px; font-weight: 600; }
+.rt-acc-summary { margin-left: auto; font-size: 11.5px; color: var(--t3); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rt-sum-v { color: var(--t1); font-family: var(--font-mono); font-weight: 600; }
+.rt-chev { display: inline-block; color: var(--t3); font-size: 15px; line-height: 1; width: 10px; transition: transform .25s ease; }
+.rt-acc.open > .rt-acc-head .rt-chev { transform: rotate(90deg); color: var(--accent); }
+.rt-acc-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s ease; }
+.rt-acc.open > .rt-acc-body { grid-template-rows: 1fr; }
+.rt-acc-inner { overflow: hidden; min-height: 0; }
+.rt-acc-pad { padding: 0 16px 16px; }
+@media (max-width: 820px) { .rt-acc-summary { margin-left: 20px; width: 100%; } }
 </style>
 </head>
 <body>
@@ -1535,10 +1550,15 @@ select.input-field option { background: var(--bg2); }
     </div>
   </div>
 
-  <!-- ── Expected Revenue by Month table ── -->
-  <div class="section-label" style="margin:16px 0 10px">Expected revenue by month</div>
-  <div class="chart-card">
-    <div class="deals-table-wrap">
+  <!-- ── Expected Revenue by Month (dropdown, collapsed by default) ── -->
+  <div class="rt-acc" id="rt-acc-months">
+    <button class="rt-acc-head" aria-expanded="false" onclick="retToggleSection('rt-acc-months')">
+      <span class="rt-chev">›</span>
+      <span class="rt-acc-title">Expected revenue by month</span>
+      <span class="rt-acc-summary" id="ret-month-summary"></span>
+    </button>
+    <div class="rt-acc-body"><div class="rt-acc-inner">
+    <div class="deals-table-wrap rt-acc-pad">
       <table class="deals-table" id="ret-month-table">
         <thead>
           <tr>
@@ -1553,6 +1573,7 @@ select.input-field option { background: var(--bg2); }
         <tbody id="ret-month-tbody"></tbody>
       </table>
     </div>
+    </div></div>
   </div>
 
   <!-- ── Active retainers section ── -->
@@ -2655,20 +2676,34 @@ async function getHtSales() {
 // ── Retainer system: NEW flexible installments model (manual entry only) ──
 // retainer_summary VIEW has one row per client with aggregated totals.
 // retainer_installments table has one row per installment.
+// A failed load must never blank the Retainers tab: retry once, and if it
+// still fails keep the last data that loaded (and say so on the tab).
+let RET_LOAD_FAILED = false;
+async function retFetchWithRetry(path) {
+  try { return await sbFetch(path); }
+  catch (e) {
+    await new Promise(r => setTimeout(r, 1500));
+    return await sbFetch(path);
+  }
+}
 async function getRetainerSummary() {
   try {
-    return await sbFetch('retainer_summary?order=name.asc');
+    const rows = await retFetchWithRetry('retainer_summary?order=name.asc');
+    RET_LOAD_FAILED = false;
+    return rows;
   } catch (e) {
-    console.log('retainer_summary view not ready:', e.message);
-    return [];
+    console.warn('retainer_summary load failed, keeping last data:', e.message);
+    RET_LOAD_FAILED = true;
+    return (typeof RETAINER_SUMMARY !== 'undefined' && RETAINER_SUMMARY) ? RETAINER_SUMMARY : [];
   }
 }
 async function getRetainerInstallments() {
   try {
-    return await sbFetch('retainer_installments?order=client_id.asc,installment_number.asc');
+    return await retFetchWithRetry('retainer_installments?order=client_id.asc,installment_number.asc');
   } catch (e) {
-    console.log('retainer_installments table not ready:', e.message);
-    return [];
+    console.warn('retainer_installments load failed, keeping last data:', e.message);
+    RET_LOAD_FAILED = true;
+    return (typeof RETAINER_INSTALLMENTS !== 'undefined' && RETAINER_INSTALLMENTS) ? RETAINER_INSTALLMENTS : [];
   }
 }
 // Sum Meta spend (USD) for a given dashboard period: 'all' | 'today' | '7d' | 'mtd' | 'lm'
@@ -3772,8 +3807,8 @@ async function loadAndRender() {
       RETAINER_INSTALLMENTS = await getRetainerInstallments();
     } catch(e) {
       console.warn('retainer load failed:', e.message);
-      RETAINER_SUMMARY = []; RETAINER_INSTALLMENTS = [];
     }
+    if (typeof renderRetainers === 'function') { try { renderRetainers(); } catch(e) { console.warn(e); } }
     // Fetch P&L expenses + commissions (separate try — a failure here must not break the dashboard)
     try { await loadPnlData(); } catch(e) { console.warn('pnl data load failed:', e.message); }
     // Background: pull any new leads from Sheets into followup_leads
@@ -4783,6 +4818,15 @@ function retEscapeHtml(s) {
   }[c]));
 }
 
+// Open / close a collapsible section on the Retainers tab
+function retToggleSection(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('open');
+  const btn = el.querySelector('.rt-acc-head');
+  if (btn) btn.setAttribute('aria-expanded', el.classList.contains('open') ? 'true' : 'false');
+}
+
 // ── Main render ──
 function renderRetainers() {
   const clients = RETAINER_SUMMARY || [];
@@ -4851,7 +4895,9 @@ function renderRetainers() {
   const monthTbody = document.getElementById('ret-month-tbody');
   if (monthTbody) {
     if (!monthKeys.length && undatedCount === 0) {
-      monthTbody.innerHTML = '<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--t3)">No installments scheduled.</td></tr>';
+      monthTbody.innerHTML = RET_LOAD_FAILED
+        ? '<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--amber)">Couldn\'t load instalments just now. It retries automatically every 2 minutes, or refresh the page.</td></tr>'
+        : '<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--t3)">No installments scheduled.</td></tr>';
     } else {
       let html = monthKeys.map(k => {
         const b = monthBuckets[k];
@@ -4877,6 +4923,15 @@ function renderRetainers() {
       }
       monthTbody.innerHTML = html;
     }
+  }
+  const nowM = new Date();
+  const thisKey = `${nowM.getFullYear()}-${String(nowM.getMonth() + 1).padStart(2, '0')}`;
+  const tb = monthBuckets[thisKey];
+  const monthSummary = document.getElementById('ret-month-summary');
+  if (monthSummary) {
+    monthSummary.innerHTML = tb
+      ? `<span>${retFmtMonth(thisKey + '-01')}</span><span class="rt-sum-v">${retFmt$(tb.expected)}</span> expected · <span class="rt-sum-v" style="color:${tb.outstanding > 0 ? 'var(--amber)' : 'var(--t2)'}">${retFmt$(tb.outstanding)}</span> outstanding${tb.overdue > 0 ? ` · <span class="rt-sum-v" style="color:var(--red)">${retFmt$(tb.overdue)}</span> overdue` : ''}`
+      : `${monthKeys.length} month${monthKeys.length === 1 ? '' : 's'} scheduled`;
   }
 
   // ── Active client cards (cards with installments) ──
